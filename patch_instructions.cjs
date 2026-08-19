@@ -14,7 +14,7 @@ const stateReplacement = `
   useEffect(() => {
     const fetchInstructions = async () => {
       try {
-        const token = localStorage.getItem('traineer_uid');
+        const token = localStorage.getItem('ravengard_uid');
         const res = await fetch(\`/api/interview/instructions/confirm\`, {
           method: 'POST',
           headers: {
@@ -39,7 +39,7 @@ const stateReplacement = `
     if (!inputText.trim()) return;
     setAiLoading(true);
     try {
-      const token = localStorage.getItem('traineer_uid');
+      const token = localStorage.getItem('ravengard_uid');
       const res = await fetch(\`/api/interview/instructions/confirm\`, {
         method: 'POST',
         headers: {

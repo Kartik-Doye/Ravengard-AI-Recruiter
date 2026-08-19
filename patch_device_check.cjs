@@ -19,7 +19,7 @@ const stateReplacement = `
       const validateWithAi = async () => {
         setAiLoading(true);
         try {
-          const token = localStorage.getItem('traineer_uid');
+          const token = localStorage.getItem('ravengard_uid');
           const payload = {
             camera: checks.camera.status === 'success',
             microphone: checks.mic.status === 'success',
@@ -69,7 +69,7 @@ const stateReplacement = `
     if (!inputText.trim()) return;
     setAiLoading(true);
     try {
-      const token = localStorage.getItem('traineer_uid');
+      const token = localStorage.getItem('ravengard_uid');
       const res = await fetch(\`/api/interview/readiness/confirm\`, {
         method: 'POST',
         headers: {

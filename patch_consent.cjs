@@ -16,7 +16,7 @@ const stateReplacement = `
     if (!inputText.trim()) return;
     setAiLoading(true);
     try {
-      const token = localStorage.getItem('traineer_uid');
+      const token = localStorage.getItem('ravengard_uid');
       const res = await fetch(\`/api/session/\${session.id}/policy-confirm\`, {
         method: 'POST',
         headers: {

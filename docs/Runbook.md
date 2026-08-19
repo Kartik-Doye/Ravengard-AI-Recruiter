@@ -1,4 +1,4 @@
-# Traineer - Operational Runbook
+# Ravengard AI Recruiter - Operational Runbook
 
 ## 1. Deployment Guide
 - **Frontend:** Run `npm run build` to compile the React application.

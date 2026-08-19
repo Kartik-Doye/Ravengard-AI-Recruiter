@@ -1,26 +1,26 @@
-# Traineer - System Architecture Document (SAD)
+# Ravengard AI Recruiter - System Architecture Document (SAD)
 
 ## 1. System Overview
-Traineer uses a decoupled, event-driven architecture designed to balance fast UI rendering with intensive background AI inference. It leverages a modern TypeScript stack (React/Vite for frontend, Express for backend) integrated tightly with Google's Gemini AI services.
+Ravengard AI Recruiter uses a decoupled, event-driven architecture designed to balance fast UI rendering with intensive background AI inference. It leverages a modern TypeScript stack (React/Vite for frontend, Express for backend) integrated tightly with Google's Gemini AI services.
 
 ## 2. Context Diagram
 
 ```mermaid
 C4Context
-    title System Context Diagram for Traineer
+    title System Context Diagram for Ravengard AI Recruiter
     
     Person(candidate, "Candidate", "Job seeker practicing interviews")
     
-    System(traineer, "Traineer Platform", "AI Interview & Assessment System")
+    System(ravengard, "Ravengard AI Recruiter Platform", "AI Interview & Assessment System")
     
     System_Ext(gemini, "Google Gemini API", "LLM for parsing, reasoning, and live voice")
     System_Ext(n8n, "n8n Automation", "Handles email delivery & webhooks")
     System_Ext(s3, "Object Storage", "Stores resumes and generated PDFs")
     
-    Rel(candidate, traineer, "Interacts with", "HTTPS/WSS")
-    Rel(traineer, gemini, "Sends prompts & audio stream", "WSS/REST")
-    Rel(traineer, n8n, "Triggers webhooks", "REST")
-    Rel(traineer, s3, "Uploads/Downloads assets", "HTTPS")
+    Rel(candidate, ravengard, "Interacts with", "HTTPS/WSS")
+    Rel(ravengard, gemini, "Sends prompts & audio stream", "WSS/REST")
+    Rel(ravengard, n8n, "Triggers webhooks", "REST")
+    Rel(ravengard, s3, "Uploads/Downloads assets", "HTTPS")
 ```
 
 ## 3. Container/Service Breakdown

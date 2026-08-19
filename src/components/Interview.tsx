@@ -71,7 +71,7 @@ export default function Interview({ session, onNext }: { session: any, onNext: (
 
     // Setup websocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const token = localStorage.getItem('traineer_uid');
+    const token = localStorage.getItem('ravengard_uid');
     const wsUrl = `${protocol}//${window.location.host}/api/live?sessionId=${session?.id}&token=${token}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -154,7 +154,7 @@ export default function Interview({ session, onNext }: { session: any, onNext: (
   const handleThinkAgain = async () => {
     if (thinkAgainLeft <= 0) return;
     try {
-      const token = localStorage.getItem('traineer_uid');
+      const token = localStorage.getItem('ravengard_uid');
       const res = await fetch(`/api/session/${session?.id}/think-again`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -173,7 +173,7 @@ export default function Interview({ session, onNext }: { session: any, onNext: (
   const handleComplete = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('traineer_uid');
+      const token = localStorage.getItem('ravengard_uid');
       const res = await fetch(`/api/session/${session?.id || 'new'}/stage`, {
         method: 'POST',
         headers: {

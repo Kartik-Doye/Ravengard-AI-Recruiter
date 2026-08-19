@@ -8,7 +8,7 @@ export const registrationSchema = z.object({
   degree: z.string().min(1, "Degree is required."),
   gradYear: z.coerce.number().int().max(new Date().getFullYear(), "Graduation year cannot be in the future."),
   preferredLanguage: z.enum(['English', 'Spanish', 'French', 'Hindi'], {
-    errorMap: () => ({ message: "Invalid preferred language." })
+    message: "Invalid preferred language."
   }),
 });
 

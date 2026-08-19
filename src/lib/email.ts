@@ -27,11 +27,11 @@ export const sendWelcomeEmail = async (toEmail: string, candidateName: string) =
     }
 
     const info = await transporter.sendMail({
-      from: '"Traineer" <noreply@traineer.ai>',
+      from: '"Ravengard AI Recruiter" <noreply@ravengard.ai>',
       to: toEmail,
-      subject: 'Welcome to Traineer!',
-      text: `Hi ${candidateName},\n\nWelcome to Traineer! Your registration was successful. You can now begin your assessment.\n\nBest,\nThe Traineer Team`,
-      html: `<h3>Hi ${candidateName},</h3><p>Welcome to <strong>Traineer!</strong></p><p>Your registration was successful. You can now begin your assessment.</p><br/><p>Best,<br/>The Traineer Team</p>`,
+      subject: 'Welcome to Ravengard AI Recruiter!',
+      text: `Hi ${candidateName},\n\nWelcome to Ravengard AI Recruiter! Your registration was successful. You can now begin your assessment.\n\nBest,\nThe Ravengard AI Recruiter Team`,
+      html: `<h3>Hi ${candidateName},</h3><p>Welcome to <strong>Ravengard AI Recruiter!</strong></p><p>Your registration was successful. You can now begin your assessment.</p><br/><p>Best,<br/>The Ravengard AI Recruiter Team</p>`,
     });
 
     if (isTest) {

@@ -3,7 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { db } from "./src/db/index.ts";
-import { candidates, sessions, resumeAnalyses, retakeRequests, integrityEvents, auditLogs } from "./src/db/schema.ts";
+import { users, sessions, resumeParses, sessionViolations, roundOutputs, assessments, assessmentRecommendations } from "./src/db/schema.ts";
 import { eq, and, or, desc, lt } from "drizzle-orm";
 import multer from "multer";
 import { extractText, getDocumentProxy } from "unpdf";
@@ -14,6 +14,7 @@ import { WebSocketServer } from "ws";
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { parse } from "url";
 import crypto from "crypto";
+import fs from "fs/promises";
 import { registrationSchema } from "./src/lib/validation.ts";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -27,26 +28,26 @@ async function startServer() {
   // API Routes
   app.get("/api/me", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const uid = req.user!.uid;
-      const [candidate] = await db.select().from(candidates).where(eq(candidates.uid, uid));
-      if (!candidate) {
+      const email = req.user!.email;
+      const [user] = await db.select().from(users).where(eq(users.email, email));
+      if (!user) {
         return res.status(404).json({ error: "Candidate not found" });
       }
       
       const [activeSession] = await db.select().from(sessions)
-        .where(eq(sessions.candidateId, candidate.id))
-        .orderBy(desc(sessions.startedAt))
+        .where(eq(sessions.userId, user.id))
+        .orderBy(desc(sessions.createdAt))
         .limit(1);
 
       let resumeText = null;
-      if (activeSession && activeSession.currentStage === 'dashboard') {
-        const [analysis] = await db.select().from(resumeAnalyses).where(eq(resumeAnalyses.sessionId, activeSession.id));
+      if (activeSession && activeSession.currentPhase === 'dashboard') {
+        const [analysis] = await db.select().from(resumeParses).where(eq(resumeParses.sessionId, activeSession.id));
         if (analysis) {
           resumeText = analysis.rawText;
         }
       }
 
-      res.json({ candidate, activeSession, resumeText });
+      res.json({ user, activeSession, resumeText });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Server error", details: String(error) });
@@ -55,13 +56,13 @@ async function startServer() {
 
   app.post("/api/register", requireAuth, async (req: AuthRequest, res) => {
     const correlationId = crypto.randomUUID();
-    const uid = req.user!.uid;
+    const email = req.user!.email;
 
     try {
       await db.insert(auditLogs).values({
         eventType: 'registration_submitted',
         correlationId,
-        details: { uid, body: req.body }
+        details: { email, body: req.body }
       });
 
       const email = req.user!.email || req.body.email || '';
@@ -69,22 +70,22 @@ async function startServer() {
       
       const parsedData = registrationSchema.safeParse(bodyWithEmail);
       if (!parsedData.success) {
-        const errors = parsedData.error.errors.map(e => e.message);
+        const errors = parsedData.error.issues.map(e => e.message);
         await db.insert(auditLogs).values({
           eventType: 'registration_rejected',
           correlationId,
-          details: { uid, reason: 'schema_validation_failed', errors }
+          details: { email, reason: 'schema_validation_failed', errors }
         });
         return res.status(400).json({ success: false, errors });
       }
 
       const { name, mobile, college, degree, gradYear, preferredLanguage } = parsedData.data;
 
-      const existingCandidate = await db.select().from(candidates).where(
+      const existingCandidate = await db.select().from(users).where(
         or(
-          eq(candidates.uid, uid),
-          eq(candidates.email, email),
-          eq(candidates.mobile, mobile)
+          eq(users.email, email),
+          eq(users.email, email),
+          eq(users.mobile, mobile)
         )
       ).limit(1);
 
@@ -92,7 +93,7 @@ async function startServer() {
         await db.insert(auditLogs).values({
           eventType: 'registration_rejected',
           correlationId,
-          details: { uid, reason: 'duplicate_candidate' }
+          details: { email, reason: 'duplicate_user' }
         });
         return res.status(400).json({ success: false, errors: ['Candidate is already registered with this account, email, or mobile number.'] });
       }
@@ -103,13 +104,13 @@ async function startServer() {
         await db.insert(auditLogs).values({
           eventType: 'ai_validation_failed',
           correlationId,
-          details: { uid, errors: aiValidation.errors }
+          details: { email, errors: aiValidation.errors }
         });
         return res.status(400).json({ success: false, errors: aiValidation.errors });
       }
 
-      const [candidate] = await db.insert(candidates).values({
-        uid,
+      const [user] = await db.insert(users).values({
+        email,
         name,
         mobile,
         email,
@@ -122,7 +123,7 @@ async function startServer() {
       await db.insert(auditLogs).values({
         eventType: 'registration_validated',
         correlationId,
-        details: { uid, candidateId: candidate.id }
+        details: { email, userId: user.id }
       });
 
       // Send welcome email asynchronously
@@ -130,7 +131,7 @@ async function startServer() {
         sendWelcomeEmail(email, name).catch(console.error);
       }
 
-      res.json({ candidateId: candidate.id, registrationStatus: 'validated', welcomeMessage: aiValidation.welcomeMessage });
+      res.json({ userId: user.id, registrationStatus: 'validated', welcomeMessage: aiValidation.welcomeMessage });
     } catch (error) {
       console.error(error);
       res.status(500).json({ success: false, errors: ["Registration failed due to a server error."] });
@@ -140,25 +141,25 @@ async function startServer() {
   
   app.get("/api/welcome-message", requireAuth, async (req: AuthRequest, res) => {
     const correlationId = crypto.randomUUID();
-    const uid = req.user!.uid;
+    const email = req.user!.email;
 
     try {
-      const [candidate] = await db.select().from(candidates).where(eq(candidates.uid, uid));
-      if (!candidate) {
+      const [user] = await db.select().from(users).where(eq(users.email, email));
+      if (!user) {
         return res.status(404).json({ success: false, error: "Candidate not found" });
       }
       
-      const aiResponse = await generateWelcomeChecklist(candidate);
+      const aiResponse = await generateWelcomeChecklist(user);
       
       if (!aiResponse) {
         await db.insert(auditLogs).values({
           eventType: 'welcome_failed',
           correlationId,
-          details: { uid, candidateId: candidate.id }
+          details: { email, userId: user.id }
         });
         return res.json({ 
           success: true,
-          message: "Welcome to Traineer! We'll guide you through this sequential interview process. It should take about 60-90 minutes. Up next: Policy Consent.",
+          message: "Welcome to Ravengard AI Recruiter! We'll gemaile you through this sequential interview process. It should take about 60-90 minutes. Up next: Policy Consent.",
           checklist: ["Camera and Microphone required", "Find a quiet space"]
         });
       }
@@ -166,7 +167,7 @@ async function startServer() {
       await db.insert(auditLogs).values({
         eventType: 'welcome_generated',
         correlationId,
-        details: { uid, candidateId: candidate.id }
+        details: { email, userId: user.id }
       });
 
       res.json({ success: true, ...aiResponse });
@@ -175,11 +176,11 @@ async function startServer() {
       await db.insert(auditLogs).values({
         eventType: 'welcome_failed',
         correlationId,
-        details: { uid, error: String(e) }
+        details: { email, error: String(e) }
       });
       res.json({ 
         success: true,
-        message: "Welcome to Traineer! We'll guide you through this sequential interview process. It should take about 60-90 minutes. Up next: Policy Consent.",
+        message: "Welcome to Ravengard AI Recruiter! We'll gemaile you through this sequential interview process. It should take about 60-90 minutes. Up next: Policy Consent.",
         checklist: ["Camera and Microphone required", "Find a quiet space"]
       });
     }
@@ -187,28 +188,28 @@ async function startServer() {
 
   app.post("/api/session/start", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const { candidateId } = req.body;
+      const { userId } = req.body;
 
       // Ensure idempotency by returning an existing active session if one exists
       const [existingSession] = await db.select().from(sessions)
         .where(
           and(
-            eq(sessions.candidateId, candidateId),
+            eq(sessions.userId, userId),
             eq(sessions.locked, true)
           )
         )
-        .orderBy(desc(sessions.startedAt))
+        .orderBy(desc(sessions.createdAt))
         .limit(1);
 
-      if (existingSession && (existingSession.status === 'created' || existingSession.status === 'in_progress')) {
+      if (existingSession && (existingSession.status === 'created' || existingSession.status === 'active')) {
         return res.json(existingSession);
       }
 
       const [newSession] = await db.insert(sessions).values({
-        candidateId, companyId: 1, configSnapshot: {},
+        userId, companyId: 1, configSnapshot: {},
         locked: true,
         consentAcceptedAt: null,
-        currentStage: 'consent',
+        currentPhase: 'consent',
         status: 'created'
       }).returning();
 
@@ -221,13 +222,74 @@ async function startServer() {
 
   
   app.post("/api/session/:id/policy-confirm", requireAuth, async (req: AuthRequest, res) => {
+    const correlationId = crypto.randomUUID();
+    const email = req.user!.email;
+
     try {
-      const { text } = req.body;
-      const response = await validatePolicyConsent(text);
-      res.json({ response });
+      const sessionId = req.params.id;
+      const { text, policyVersion } = req.body;
+
+      if (isNaN(sessionId)) {
+        return res.status(400).json({ success: false, error: "Invalid session ID" });
+      }
+
+      const [user] = await db.select().from(users).where(eq(users.email, email));
+      if (!user) {
+        return res.status(404).json({ success: false, error: "Candidate not found" });
+      }
+
+      const [session] = await db.select().from(sessions).where(and(eq(sessions.id, sessionId), eq(sessions.userId, user.id)));
+      
+      if (!session) {
+        return res.status(404).json({ success: false, error: "Session not found" });
+      }
+
+      if (session.locked) {
+        await db.insert(auditLogs).values({
+          eventType: 'consent_failed',
+          correlationId,
+          details: { email, sessionId, reason: "session_already_locked" }
+        });
+        return res.status(400).json({ success: false, error: "Session is already locked" });
+      }
+
+      if (text !== "I Agree") {
+        await db.insert(auditLogs).values({
+          eventType: 'consent_failed',
+          correlationId,
+          details: { email, sessionId, reason: "invalid_agreement_text", submittedText: text }
+        });
+        return res.status(400).json({ success: false, error: "Exact text 'I Agree' is required." });
+      }
+
+      const activePolicyVersion = policyVersion || "v1.0";
+
+      // Lock the session and record consent
+      const [updatedSession] = await db.update(sessions)
+        .set({ 
+          locked: true,
+          consentAcceptedAt: new Date(),
+          policyVersion: activePolicyVersion,
+          currentPhase: 'resume'
+        })
+        .where(eq(sessions.id, sessionId))
+        .returning();
+
+      await db.insert(auditLogs).values({
+        eventType: 'consent_success',
+        correlationId,
+        details: { email, sessionId, policyVersion: activePolicyVersion, timestamp: new Date().toISOString() }
+      });
+
+      res.json({ success: true, session: updatedSession });
     } catch (e) {
       console.error(e);
-      res.status(500).json({ error: "Failed to confirm policy" });
+      await db.insert(auditLogs).values({
+        eventType: 'consent_failed',
+        correlationId,
+        details: { email, error: String(e) }
+      });
+      res.status(500).json({ success: false, error: "Failed to confirm policy" });
     }
   });
 
@@ -235,10 +297,10 @@ async function startServer() {
   app.post("/api/interview/instructions/confirm", requireAuth, async (req: AuthRequest, res) => {
     try {
       const { text } = req.body;
-      const [candidate] = await db.select().from(candidates).where(eq(candidates.uid, req.user!.uid));
-      if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+      const [user] = await db.select().from(users).where(eq(users.email, req.user!.email));
+      if (!user) return res.status(404).json({ error: "Candidate not found" });
 
-      const response = await generateInstructionsResponse(candidate, text);
+      const response = await generateInstructionsResponse(user, text);
       res.json({ response });
     } catch (e) {
       console.error(e);
@@ -260,10 +322,50 @@ async function startServer() {
   app.post("/api/interview/readiness/confirm", requireAuth, async (req: AuthRequest, res) => {
     try {
       const { text, sessionId } = req.body;
-      const [candidate] = await db.select().from(candidates).where(eq(candidates.uid, req.user!.uid));
-      if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+      const [user] = await db.select().from(users).where(eq(users.email, req.user!.email));
+      if (!user) return res.status(404).json({ error: "Candidate not found" });
 
-      const response = await confirmReadiness(candidate.name, sessionId.toString(), text);
+      const response = await confirmReadiness(user.name, sessionId.toString(), text);
+      res.json({ response });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to confirm readiness" });
+    }
+  });
+
+  
+  app.post("/api/interview/instructions/confirm", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { text } = req.body;
+      const [user] = await db.select().from(users).where(eq(users.email, req.user!.email));
+      if (!user) return res.status(404).json({ error: "Candidate not found" });
+
+      const response = await generateInstructionsResponse(user, text);
+      res.json({ response });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to confirm instructions" });
+    }
+  });
+
+  app.post("/api/device-check/validate", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const results = req.body;
+      const response = await validateDeviceCheck(results);
+      res.json(response);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to validate device check" });
+    }
+  });
+
+  app.post("/api/interview/readiness/confirm", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { text, sessionId } = req.body;
+      const [user] = await db.select().from(users).where(eq(users.email, req.user!.email));
+      if (!user) return res.status(404).json({ error: "Candidate not found" });
+
+      const response = await confirmReadiness(user.name, sessionId.toString(), text);
       res.json({ response });
     } catch (e) {
       console.error(e);
@@ -273,7 +375,7 @@ async function startServer() {
 
   app.post("/api/session/:id/stage", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const sessionId = parseInt(req.params.id);
+      const sessionId = req.params.id;
       const { stage, version } = req.body;
       
       const [currentSession] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
@@ -285,10 +387,23 @@ async function startServer() {
          return res.status(409).json({ error: "Conflict: Session state changed", session: currentSession });
       }
 
-      const updateData: any = { currentStage: stage, version: currentSession.version + 1 };
-      if (stage === 'resume') {
-        updateData.consentAcceptedAt = new Date();
+      if (currentSession.locked) {
+        const validTransitions: Record<string, string[]> = {
+          'resume': ['resume_analysis', 'consent'],
+          'resume_analysis': ['instructions', 'resume'],
+          'instructions': ['device_check', 'resume_analysis'],
+          'device_check': ['waiting_room', 'instructions'],
+          'waiting_room': ['interview', 'device_check'],
+          'interview': ['completed']
+        };
+
+        const allowedNext = validTransitions[currentSession.currentPhase] || [];
+        if (!allowedNext.includes(stage)) {
+          return res.status(400).json({ error: `Invalid phase transition from ${currentSession.currentPhase} to ${stage}. Manual phase selection is locked.` });
+        }
       }
+
+      const updateData: any = { currentPhase: stage, version: currentSession.version + 1 };
 
       const [updatedSession] = await db.update(sessions)
         .set(updateData)
@@ -313,14 +428,14 @@ async function startServer() {
 
   app.post("/api/session/:id/request-retake", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const sessionId = parseInt(req.params.id);
+      const sessionId = req.params.id;
       const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
 
-      await db.insert(retakeRequests).values({
-        candidateId: session.candidateId,
+      await db.insert(/* removed */).values({
+        userId: session.userId,
         status: 'pending',
       });
 
@@ -334,8 +449,8 @@ async function startServer() {
   
   app.get("/api/session/:id/resume-analysis", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const sessionId = parseInt(req.params.id);
-      const [analysis] = await db.select().from(resumeAnalyses).where(eq(resumeAnalyses.sessionId, sessionId));
+      const sessionId = req.params.id;
+      const [analysis] = await db.select().from(resumeParses).where(eq(resumeParses.sessionId, sessionId));
       if (!analysis) return res.status(404).json({ error: "Analysis not found" });
       res.json(analysis);
     } catch (e) {
@@ -345,53 +460,75 @@ async function startServer() {
   });
 
   app.post("/api/session/:id/upload-resume", requireAuth, upload.single('resume'), async (req: AuthRequest, res) => {
+    const correlationId = crypto.randomUUID();
+    const email = req.user!.email;
+    const sessionId = req.params.id;
+
     try {
-      const sessionId = parseInt(req.params.id);
       const file = req.file;
       
       if (!file) {
         return res.status(400).json({ error: "No resume file provided" });
       }
 
-      let rawText = '';
-      if (file.mimetype === 'application/pdf') {
-        const pdfDocument = await getDocumentProxy(new Uint8Array(file.buffer));
-        const { text } = await extractText(pdfDocument, { mergePages: true });
-        rawText = text;
-      } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        const result = await mammoth.extractRawText({ buffer: file.buffer });
-        rawText = result.value;
-      } else {
-        return res.status(400).json({ error: "Unsupported file type. Please upload PDF or DOCX." });
+      // Phase 1.1: Server-side validation
+      const header = file.buffer.subarray(0, 4);
+      let isValidType = false;
+      let detectedType = '';
+
+      // Check magic bytes
+      if (header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46) {
+        isValidType = true;
+        detectedType = 'pdf';
+      } else if (header[0] === 0x50 && header[1] === 0x4B && header[2] === 0x03 && header[3] === 0x04) {
+        isValidType = true;
+        detectedType = 'docx';
       }
 
-      // Phase 1: AI Analysis
-      const analysis = await analyzeResume(rawText, "Software Engineer");
+      const originalExt = path.extname(file.originalname).toLowerCase();
+      if (!['.pdf', '.docx'].includes(originalExt)) {
+         isValidType = false;
+      }
 
-      await db.insert(resumeAnalyses).values({
-        sessionId,
-        rawText,
-        skills: analysis.skills,
-        projects: analysis.projects,
-        experience: analysis.experience,
-        education: analysis.education,
-        certifications: analysis.certifications,
-        atsScore: analysis.atsScore,
-        strengths: analysis.strengths,
-        weaknesses: analysis.weaknesses,
-        missingKeywords: analysis.missingKeywords,
-        recruiterReviewText: analysis.recruiterReviewText
-      });
+      if (!isValidType) {
+        await db.insert(auditLogs).values({
+          eventType: 'upload_rejected',
+          correlationId,
+          details: { email, sessionId, reason: "invalid_file_type", fileType: detectedType || 'unknown', originalName: file.originalname }
+        });
+        return res.status(400).json({ error: "Unsupported or corrupted file. Please upload a valid PDF or DOCX." });
+      }
+
+      const fileId = crypto.randomUUID();
+      const storageFilename = `${fileId}.${detectedType}`;
+      const storagePath = path.join(process.cwd(), 'uploads', storageFilename);
+
+      await fs.writeFile(storagePath, file.buffer);
 
       const [updatedSession] = await db.update(sessions)
-        .set({ currentStage: 'resume_analysis', status: 'in_progress', resumeUrl: file.originalname })
-        .where(eq(sessions.id, sessionId))
+        .set({ resumeUrl: storagePath }) 
+        .where(and(eq(sessions.id, sessionId), eq(sessions.locked, true)))
         .returning();
 
-      res.json({ session: updatedSession, resumeText: rawText, analysis });
+      if (!updatedSession) {
+         throw new Error("Failed to update session or session not locked.");
+      }
+
+      await db.insert(auditLogs).values({
+        eventType: 'upload_success',
+        correlationId,
+        details: { email, sessionId, fileId, fileType: detectedType, storagePath }
+      });
+
+      res.json({ success: true, session: updatedSession, resumeReference: storagePath });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ error: "Failed to process resume", details: String(error) });
+      await db.insert(auditLogs).values({
+        eventType: 'upload_failed',
+        correlationId,
+        details: { email, sessionId, error: String(error) }
+      });
+      res.status(500).json({ error: "Failed to store resume", details: String(error) });
     }
   });
 
@@ -405,12 +542,12 @@ async function startServer() {
       const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
       if (!session) return res.status(404).json({ error: "Session not found" });
 
-      const [candidate] = await db.select().from(candidates).where(eq(candidates.uid, req.user!.uid));
-      if (!candidate || session.candidateId !== candidate.id) {
+      const [user] = await db.select().from(users).where(eq(users.email, req.user!.email));
+      if (!user || session.userId !== user.id) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      await db.insert(integrityEvents).values({
+      await db.insert(sessionViolations).values({
         sessionId,
         type: 'tab_switch_violation',
         severity: 'high',
@@ -425,19 +562,19 @@ async function startServer() {
 
   app.post("/api/session/:id/think-again", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const sessionId = parseInt(req.params.id);
+      const sessionId = req.params.id;
       const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
       if (!session) return res.status(404).json({ error: "Session not found" });
 
-      if (session.thinkAgainUsed >= 2) {
+      if (session.thinkAgainUsesLeft >= 2) {
         return res.status(400).json({ error: "No think-agains left" });
       }
 
       await db.update(sessions)
-        .set({ thinkAgainUsed: session.thinkAgainUsed + 1 })
+        .set({ thinkAgainUsesLeft: session.thinkAgainUsesLeft + 1 })
         .where(eq(sessions.id, sessionId));
 
-      res.json({ success: true, thinkAgainUsed: session.thinkAgainUsed + 1 });
+      res.json({ success: true, thinkAgainUsesLeft: session.thinkAgainUsesLeft + 1 });
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Failed to process think again" });
@@ -446,7 +583,7 @@ async function startServer() {
 
   app.post("/api/session/:id/violation", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const sessionId = parseInt(req.params.id);
+      const sessionId = req.params.id;
       const { type, severity, evidenceRef } = req.body;
       
       const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
@@ -454,7 +591,7 @@ async function startServer() {
         return res.status(404).json({ error: "Session not found" });
       }
 
-      await db.insert(integrityEvents).values({
+      await db.insert(sessionViolations).values({
         sessionId,
         type: type || 'tab_switch',
         severity: severity || 'low',
@@ -470,7 +607,7 @@ async function startServer() {
 
   app.post("/api/session/:id/schedule", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const sessionId = parseInt(req.params.id);
+      const sessionId = req.params.id;
 
       const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
       if (!session) {
@@ -487,12 +624,12 @@ async function startServer() {
   // Admin endpoint for monitoring stuck sessions
   app.get("/api/admin/stuck-sessions", async (req, res) => {
     try {
-      // Sessions with status 'in_progress' inactive for > 2 hours
+      // Sessions with status 'active' inactive for > 2 hours
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
       const stuckSessions = await db.select().from(sessions)
         .where(
           and(
-            eq(sessions.status, 'in_progress'),
+            eq(sessions.status, 'active'),
             lt(sessions.lastActiveAt, twoHoursAgo)
           )
         );
@@ -528,7 +665,7 @@ async function startServer() {
         .set({ status: 'abandoned' })
         .where(
           and(
-            eq(sessions.status, 'in_progress'),
+            eq(sessions.status, 'active'),
             lt(sessions.lastActiveAt, oneDayAgo)
           )
         );
@@ -547,45 +684,6 @@ async function startServer() {
      // Implementation would integrate with the chosen LLM provider's billing API
      // and send an alert email via sendWelcomeEmail or similar utility if thresholds exceed limits.
   }, 24 * 60 * 60 * 1000); // 24 hours
-
-  app.get("/api/admin/retake-requests", requireAuth, async (req: AuthRequest, res) => {
-    try {
-      if (!req.user!.admin) return res.status(403).json({ error: "Forbidden" });
-      const requests = await db.select().from(retakeRequests).where(eq(retakeRequests.status, 'pending'));
-      res.json(requests);
-    } catch (e) { res.status(500).json({ error: "Failed to fetch retake requests" }); }
-  });
-
-  app.post("/api/admin/retake-requests/:id/approve", requireAuth, async (req: AuthRequest, res) => {
-    try {
-      if (!req.user!.admin) return res.status(403).json({ error: "Forbidden" });
-      const requestId = parseInt(req.params.id);
-      
-      const [request] = await db.select().from(retakeRequests).where(eq(retakeRequests.id, requestId));
-      if (!request) return res.status(404).json({ error: "Not found" });
-
-      // Approve retake request - create a new session
-      const [newSession] = await db.insert(sessions).values({
-        candidateId: request.candidateId, companyId: 1, configSnapshot: {},
-        locked: true,
-        consentAcceptedAt: null,
-        currentStage: 'consent',
-        status: 'created',
-        version: 1
-      }).returning();
-
-      await db.update(retakeRequests).set({
-        status: 'approved',
-        reviewedBy: req.user!.uid,
-        reviewedAt: new Date()
-      }).where(eq(retakeRequests.id, requestId));
-
-      res.json({ success: true, newSession });
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to approve retake request" });
-    }
-  });
 
   const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
@@ -608,26 +706,26 @@ async function startServer() {
         }
         
         // Simple token verification
-        const [candidate] = await db.select().from(candidates).where(eq(candidates.uid, token));
-        if (!candidate) {
+        const [user] = await db.select().from(users).where(eq(users.email, token));
+        if (!user) {
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
         }
 
-        const sessionId = parseInt(sessionIdStr);
+        const sessionId = sessionIdStr;
         const [sessionRow] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
         
-        if (!sessionRow || sessionRow.candidateId !== candidate.id) {
+        if (!sessionRow || sessionRow.userId !== user.id) {
           socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
           socket.destroy();
           return;
         }
         
         // Fetch resume analysis for context
-        const [resumeAnalysis] = await db.select().from(resumeAnalyses).where(eq(resumeAnalyses.sessionId, sessionId));
+        const [resumeAnalysis] = await db.select().from(resumeParses).where(eq(resumeParses.sessionId, sessionId));
 
-        (request as any).context = { candidate, session: sessionRow, resumeAnalysis };
+        (request as any).context = { user, session: sessionRow, resumeAnalysis };
 
         wss.handleUpgrade(request, socket as any, head, (ws) => {
           wss.emit('connection', ws, request);
@@ -641,11 +739,11 @@ async function startServer() {
 
   wss.on("connection", async (clientWs, request) => {
     try {
-      const { candidate, session, resumeAnalysis } = (request as any).context;
+      const { user, session, resumeAnalysis } = (request as any).context;
       
-      const candidateContext = resumeAnalysis 
-        ? `Candidate Name: ${candidate.name}. Skills: ${resumeAnalysis.skills?.join(', ')}. Strengths: ${resumeAnalysis.strengths?.join(', ')}. Job Role specific gaps to watch for: ${resumeAnalysis.missingKeywords?.join(', ')}.` 
-        : `Candidate Name: ${candidate.name}`;
+      const userContext = resumeAnalysis 
+        ? `Candidate Name: ${user.name}. Skills: ${resumeAnalysis.skills?.join(', ')}. Strengths: ${resumeAnalysis.strengths?.join(', ')}. Job Role specific gaps to watch for: ${resumeAnalysis.missingKeywords?.join(', ')}.` 
+        : `Candidate Name: ${user.name}`;
 
       const ai = new GoogleGenAI({ 
         apiKey: process.env.GEMINI_API_KEY,
@@ -662,18 +760,18 @@ async function startServer() {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
           },
-          systemInstruction: `You are the 'Friendly HR' AI interviewer for Traineer. 
-          Your goal is to greet the candidate, break the ice, introduce yourself, and test their communication style. 
+          systemInstruction: `You are the 'Friendly HR' AI interviewer for Ravengard AI Recruiter. 
+          Your goal is to greet the user, break the ice, introduce yourself, and test their communication style. 
           
-          Candidate Context: ${candidateContext}
+          Candidate Context: ${userContext}
           
           Rules:
           - Ask one question at a time. 
           - Be warm, low-pressure, and conversational. 
           - Do NOT reveal live scores, pass/fail status. 
           - Limit this round to 4-6 turns. 
-          - If the candidate stops speaking, gently prompt them to continue or move to the next question.
-          - Never fabricate claims about the candidate.`,
+          - If the user stops speaking, gently prompt them to continue or move to the next question.
+          - Never fabricate claims about the user.`,
         },
         callbacks: {
           onmessage: (message: LiveServerMessage) => {

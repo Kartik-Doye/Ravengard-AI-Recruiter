@@ -9,7 +9,7 @@ const fetchCode = `
   useEffect(() => {
     const fetchAiMessage = async () => {
       try {
-        const token = localStorage.getItem('traineer_uid');
+        const token = localStorage.getItem('ravengard_uid');
         const res = await fetch('/api/welcome-message', {
           headers: { 'Authorization': \`Bearer \${token}\` }
         });

@@ -1,9 +1,29 @@
 @import "tailwindcss";
 
+@theme {
+  --color-bg-0: #0B0D12;
+  --color-bg-1: #11131A;
+  --color-bg-2: #1A1D27;
+  --color-bg-3: #222633;
+  
+  --color-glass: rgba(26, 29, 39, 0.4);
+  --color-glass-highlight: rgba(255, 255, 255, 0.05);
+  
+  --color-primary: #8B5CF6; /* electric violet */
+  --color-secondary: #06B6D4; /* muted cyan */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 @custom-variant high-contrast (&:where(.high-contrast, .high-contrast *));
 
 @layer base {
+  body {
+    @apply bg-[var(--color-bg-0)] text-white;
+  }
+
   .high-contrast {
     @apply bg-black text-yellow-300;
   }
@@ -12,5 +32,15 @@
   }
   .high-contrast button, .high-contrast a {
     @apply bg-yellow-300 text-black outline-2 outline-offset-2 outline-yellow-300 hover:bg-yellow-400;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-[var(--color-glass)] backdrop-blur-md border border-[var(--color-glass-highlight)] shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative overflow-hidden;
+  }
+  .glass-panel::before {
+    content: '';
+    @apply absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent;
   }
 }

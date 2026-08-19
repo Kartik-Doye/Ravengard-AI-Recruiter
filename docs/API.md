@@ -1,9 +1,9 @@
-# Traineer - API Specification
+# Ravengard AI Recruiter - API Specification
 
 ```yaml
 openapi: 3.0.3
 info:
-  title: Traineer API
+  title: Ravengard AI Recruiter API
   version: 1.0.0
 servers:
   - url: /api

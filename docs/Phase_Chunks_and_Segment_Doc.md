@@ -1,7 +1,7 @@
-🧩 Traineer — Full Phase Breakdown (Segments + Chunks)
+🧩 Ravengard AI Recruiter — Full Phase Breakdown (Segments + Chunks)
 Each Phase is divided into Segments (logical units), and each Segment is split into Chunks (implementable tasks with clear inputs/outputs).
 
-🔹 PHASE 0 — BEFORE TRAINEER (Registration + Policy)
+🔹 PHASE 0 — BEFORE RAVENGARD (Registration + Policy)
 Segment 0.1 — Registration & Validation
 Chunk	Description	Input	Output	Owner
 0.1.1	Frontend Registration Form	User fills form	JSON payload	Frontend

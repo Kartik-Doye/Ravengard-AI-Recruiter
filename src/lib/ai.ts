@@ -4,7 +4,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function validateRegistration(data: any) {
   const prompt = `
-You are Traineer’s Registration Validation Engine.
+You are Ravengard AI Recruiter’s Registration Validation Engine.
 Validate the candidate profile for completeness and correctness.
 
 You must:
@@ -58,9 +58,9 @@ ${JSON.stringify(data, null, 2)}
 
 export async function generateWelcomeChecklist(candidate: any) {
   const prompt = `
-You are Traineer’s Readiness Coach. Your job is to:
+You are Ravengard AI Recruiter’s Readiness Coach. Your job is to:
 1. Assess the candidate’s profile to personalize the welcome text.
-2. Generate a short explanation of what Traineer does (guided, sequential interview).
+2. Generate a short explanation of what Ravengard AI Recruiter does (guided, sequential interview).
 3. State the estimated time required for the full session (e.g. 60-90 minutes).
 4. Explain that they will move to policy consent next.
 5. Provide a readiness checklist.
@@ -101,7 +101,7 @@ ${JSON.stringify(candidate, null, 2)}
 
 export async function validatePolicyConsent(question: string) {
   const prompt = `
-You are Traineer’s Compliance Assistant. Your job is to:
+You are Ravengard AI Recruiter’s Compliance Assistant. Your job is to:
 1. Summarize the Policy & Consent terms in 3–4 simple bullet points (no legalese).
 2. Emphasize the “one-time acceptance, no restart” rule clearly.
 3. Ask for explicit confirmation (e.g., “Type ‘I Agree’ to proceed”).
@@ -126,7 +126,7 @@ Candidate Input: "${question}"
 
 export async function analyzeResume(resumeText: string, targetRole: string = "Software Engineer") {
   const prompt = `
-You are Traineer’s Resume Intelligence Engine. Perform the following tasks in one pass:
+You are Ravengard AI Recruiter’s Resume Intelligence Engine. Perform the following tasks in one pass:
 
 Task 1: Resume Parser
 1. Extract candidate’s name, email, phone from the resume.
@@ -228,7 +228,7 @@ ${resumeText.substring(0, 30000)}
 
 export async function generateInstructionsResponse(candidateProfile: any, text: string = "") {
   const prompt = `
-You are Traineer’s Interview Guide. Your job is to:
+You are Ravengard AI Recruiter’s Interview Guide. Your job is to:
 1. Summarize the interview process in 4–6 bullet points (max 60 words total).
 2. Highlight key rules: no restarts, auto-save, Think Again (2 uses), timer, anti-cheat.
 3. Mention the 8 rounds briefly (HR → Aptitude → Technical → Senior SWE → Tech Lead → Behavior → Startup → Strict).
@@ -254,7 +254,7 @@ Candidate says: "${text}"
 
 export async function validateDeviceCheck(results: any) {
   const prompt = `
-You are Traineer’s Device Support Assistant. Your job is to:
+You are Ravengard AI Recruiter’s Device Support Assistant. Your job is to:
 1. Review the device check results (camera, mic, speaker, browser, internet).
 2. If all pass: Generate a short success message (max 20 words).
 3. If any fail: Provide specific, actionable troubleshooting steps (max 3 bullets).
@@ -290,7 +290,7 @@ Device check results: ${JSON.stringify(results)}
 
 export async function confirmReadiness(candidateName: string, sessionId: string, text: string) {
   const prompt = `
-You are Traineer’s Readiness Confirmer. Your job is to:
+You are Ravengard AI Recruiter’s Readiness Confirmer. Your job is to:
 1. Confirm all device checks passed.
 2. Remind candidate of the “no restart” rule one final time.
 3. Ask for explicit confirmation: “Type ‘I’m Ready’ to enter the Waiting Room.”

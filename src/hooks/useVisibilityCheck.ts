@@ -8,7 +8,7 @@ export function useVisibilityCheck(sessionId: number, onViolation: () => void) {
       if (document.hidden) {
         onViolation();
         try {
-          const token = localStorage.getItem('traineer_uid');
+          const token = localStorage.getItem('ravengard_uid');
           await fetch('/api/session/violation', {
             method: 'POST',
             headers: {

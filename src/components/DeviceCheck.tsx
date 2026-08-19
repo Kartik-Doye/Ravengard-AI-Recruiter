@@ -100,7 +100,7 @@ export default function DeviceCheck({ session, onNext }: { session: any, onNext:
       const validateWithAi = async () => {
         setAiLoading(true);
         try {
-          const token = localStorage.getItem('traineer_uid');
+          const token = localStorage.getItem('ravengard_uid');
           const payload = {
             camera: checks.camera.status === 'success',
             microphone: checks.mic.status === 'success',
@@ -150,7 +150,7 @@ export default function DeviceCheck({ session, onNext }: { session: any, onNext:
     if (!inputText.trim()) return;
     setAiLoading(true);
     try {
-      const token = localStorage.getItem('traineer_uid');
+      const token = localStorage.getItem('ravengard_uid');
       const res = await fetch(`/api/interview/readiness/confirm`, {
         method: 'POST',
         headers: {
@@ -180,7 +180,7 @@ export default function DeviceCheck({ session, onNext }: { session: any, onNext:
       stream.getTracks().forEach(track => track.stop());
     }
     try {
-      const token = localStorage.getItem('traineer_uid');
+      const token = localStorage.getItem('ravengard_uid');
       const res = await fetch(`/api/session/${session.id}/stage`, {
         method: 'POST',
         headers: {
@@ -208,66 +208,66 @@ export default function DeviceCheck({ session, onNext }: { session: any, onNext:
 
   return (
     <div className="max-w-[800px] mx-auto">
-      <h1 className="text-3xl font-semibold mb-2 text-slate-900">Device Check</h1>
-      <p className="text-slate-500 mb-8">Let's make sure your equipment is ready for the interview.</p>
+      <h1 className="text-3xl font-semibold mb-2 text-white">Device Check</h1>
+      <p className="text-white/50 mb-8 font-mono text-xs tracking-wider">LET'S MAKE SURE YOUR EQUIPMENT IS READY FOR THE INTERVIEW.</p>
         
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <div className="space-y-4">
-          <div className={`p-4 border rounded-xl flex items-center gap-4 ${checks.browser.status === 'error' ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`}>
-            <Globe className="w-6 h-6 text-slate-400" />
+          <div className={`p-4 border rounded-xl flex items-center gap-4 ${checks.browser.status === 'error' ? 'bg-[var(--color-error)]/10 border-[var(--color-error)]/30' : 'glass-panel border-white/5'}`}>
+            <Globe className="w-6 h-6 text-white/30" />
             <div className="flex-1">
-              <h4 className="font-medium text-slate-900 text-sm">Browser</h4>
-              <p className="text-xs text-slate-500">{checks.browser.message}</p>
+              <h4 className="font-medium text-white text-sm">Browser</h4>
+              <p className="text-xs text-white/50">{checks.browser.message}</p>
             </div>
             {renderStatusIcon(checks.browser.status)}
           </div>
 
-          <div className={`p-4 border rounded-xl flex items-center gap-4 ${checks.camera.status === 'error' ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`}>
-            <Camera className="w-6 h-6 text-slate-400" />
+          <div className={`p-4 border rounded-xl flex items-center gap-4 ${checks.camera.status === 'error' ? 'bg-[var(--color-error)]/10 border-[var(--color-error)]/30' : 'glass-panel border-white/5'}`}>
+            <Camera className="w-6 h-6 text-white/30" />
             <div className="flex-1">
-              <h4 className="font-medium text-slate-900 text-sm">Camera</h4>
-              <p className="text-xs text-slate-500">{checks.camera.message}</p>
+              <h4 className="font-medium text-white text-sm">Camera</h4>
+              <p className="text-xs text-white/50">{checks.camera.message}</p>
             </div>
             {renderStatusIcon(checks.camera.status)}
           </div>
 
-          <div className={`p-4 border rounded-xl flex items-center gap-4 ${checks.mic.status === 'error' ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`}>
-            <Mic className="w-6 h-6 text-slate-400" />
+          <div className={`p-4 border rounded-xl flex items-center gap-4 ${checks.mic.status === 'error' ? 'bg-[var(--color-error)]/10 border-[var(--color-error)]/30' : 'glass-panel border-white/5'}`}>
+            <Mic className="w-6 h-6 text-white/30" />
             <div className="flex-1">
-              <h4 className="font-medium text-slate-900 text-sm">Microphone</h4>
-              <p className="text-xs text-slate-500">{checks.mic.message}</p>
+              <h4 className="font-medium text-white text-sm">Microphone</h4>
+              <p className="text-xs text-white/50">{checks.mic.message}</p>
             </div>
             {renderStatusIcon(checks.mic.status)}
           </div>
 
-          <div className={`p-4 border rounded-xl flex items-center gap-4 ${checks.network.status === 'error' ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`}>
-            <Globe className="w-6 h-6 text-slate-400" />
+          <div className={`p-4 border rounded-xl flex items-center gap-4 ${checks.network.status === 'error' ? 'bg-[var(--color-error)]/10 border-[var(--color-error)]/30' : 'glass-panel border-white/5'}`}>
+            <Globe className="w-6 h-6 text-white/30" />
             <div className="flex-1">
-              <h4 className="font-medium text-slate-900 text-sm">Network</h4>
-              <p className="text-xs text-slate-500">{checks.network.message}</p>
+              <h4 className="font-medium text-white text-sm">Network</h4>
+              <p className="text-xs text-white/50">{checks.network.message}</p>
             </div>
             {renderStatusIcon(checks.network.status)}
           </div>
 
-          <div className={`p-4 border rounded-xl flex flex-col gap-3 ${checks.speaker.status === 'error' ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`}>
+          <div className={`p-4 border rounded-xl flex flex-col gap-3 ${checks.speaker.status === 'error' ? 'bg-[var(--color-error)]/10 border-[var(--color-error)]/30' : 'glass-panel border-white/5'}`}>
             <div className="flex items-center gap-4">
-              <Volume2 className="w-6 h-6 text-slate-400" />
+              <Volume2 className="w-6 h-6 text-white/30" />
               <div className="flex-1">
-                <h4 className="font-medium text-slate-900 text-sm">Speaker</h4>
-                <p className="text-xs text-slate-500">{checks.speaker.message}</p>
+                <h4 className="font-medium text-white text-sm">Speaker</h4>
+                <p className="text-xs text-white/50">{checks.speaker.message}</p>
               </div>
               {renderStatusIcon(checks.speaker.status)}
             </div>
             {checks.speaker.status === 'pending' && (
-              <div className="flex items-center gap-3 mt-2 pt-3 border-t border-slate-100">
-                <button onClick={playTestSound} className="text-sm bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-md font-medium transition-colors">
+              <div className="flex items-center gap-3 mt-2 pt-3 border-t border-white/5">
+                <button onClick={playTestSound} className="text-sm bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-md font-medium transition-colors border border-white/5">
                   Play Test Sound
                 </button>
-                <span className="text-xs text-slate-500">Did you hear it?</span>
-                <button onClick={() => handleSpeakerConfirm(true)} className="text-xs bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-md font-medium transition-colors">
+                <span className="text-xs text-white/40 font-mono">Did you hear it?</span>
+                <button onClick={() => handleSpeakerConfirm(true)} className="text-xs bg-[var(--color-success)]/20 text-[var(--color-success)] hover:bg-[var(--color-success)]/30 px-3 py-1.5 rounded-md font-medium transition-colors border border-[var(--color-success)]/30">
                   Yes
                 </button>
-                <button onClick={() => handleSpeakerConfirm(false)} className="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-md font-medium transition-colors">
+                <button onClick={() => handleSpeakerConfirm(false)} className="text-xs bg-[var(--color-error)]/20 text-[var(--color-error)] hover:bg-[var(--color-error)]/30 px-3 py-1.5 rounded-md font-medium transition-colors border border-[var(--color-error)]/30">
                   No
                 </button>
               </div>
@@ -276,28 +276,34 @@ export default function DeviceCheck({ session, onNext }: { session: any, onNext:
         </div>
 
         <div>
-          <div className="bg-slate-900 rounded-xl overflow-hidden aspect-video relative flex items-center justify-center border border-slate-800 shadow-inner">
+          <div className="bg-black/80 rounded-xl overflow-hidden aspect-video relative flex items-center justify-center border border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
             <video 
               ref={videoRef} 
               autoPlay 
               playsInline 
               muted 
-              className={`w-full h-full object-cover ${checks.camera.status === 'success' ? 'opacity-100' : 'opacity-0'}`} 
+              className={`w-full h-full object-cover scale-x-[-1] transition-opacity duration-1000 ${checks.camera.status === 'success' ? 'opacity-100' : 'opacity-0'}`} 
             />
             {checks.camera.status !== 'success' && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 gap-3">
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-white/30 gap-3">
                 <Camera className="w-8 h-8 opacity-50" />
-                <span className="text-sm font-medium">Camera Preview</span>
+                <span className="text-sm font-medium tracking-widest font-mono uppercase">Camera Preview</span>
               </div>
+            )}
+            {checks.camera.status === 'success' && (
+               <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1 bg-black/60 backdrop-blur-sm rounded-full border border-white/10">
+                 <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)] shadow-[0_0_5px_var(--color-success)] animate-pulse"></div>
+                 <span className="text-[10px] text-white/80 tracking-widest uppercase font-mono">Live</span>
+               </div>
             )}
           </div>
           {anyFailed && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-              <div className="text-sm text-red-800">
-                <strong className="font-semibold block mb-1">Checks Failed</strong>
+            <div className="mt-4 p-4 bg-[var(--color-error)]/10 border border-[var(--color-error)]/30 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-[var(--color-error)] shrink-0 mt-0.5" />
+              <div className="text-sm text-[var(--color-error)]/90">
+                <strong className="font-semibold block mb-1 text-[var(--color-error)] tracking-wide">Checks Failed</strong>
                 Please fix the errors above and ensure permissions are granted. You cannot proceed until all checks pass.
-                <button onClick={runChecks} className="mt-2 block text-red-700 underline font-medium hover:text-red-900">
+                <button onClick={runChecks} className="mt-2 block text-white/70 underline font-medium hover:text-white text-xs tracking-wider uppercase">
                   Run Checks Again
                 </button>
               </div>
@@ -308,28 +314,28 @@ export default function DeviceCheck({ session, onNext }: { session: any, onNext:
       </div>
 
       {checkCompleted && (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-8 mt-4">
+        <div className="glass-panel border border-white/5 rounded-xl p-6 mb-8 mt-4">
           <div className="flex flex-col space-y-4">
-            <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg text-slate-800 whitespace-pre-line text-sm">
-              {aiLoading ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> AI Analyzing setup...</span> : aiMessage}
+            <div className="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 p-4 rounded-lg text-white/90 whitespace-pre-line text-sm leading-relaxed">
+              {aiLoading ? <span className="flex items-center gap-2 font-mono text-[var(--color-primary)]"><Loader2 className="w-4 h-4 animate-spin" /> ANALYZING_SYSTEM_STATE...</span> : aiMessage}
             </div>
             
             {allPassed && (
-              <form onSubmit={handleChat} className="flex gap-2">
+              <form onSubmit={handleChat} className="flex gap-3">
                 <input 
                   type="text" 
                   value={inputText}
                   onChange={e => setInputText(e.target.value)}
                   disabled={readinessConfirmed || aiLoading}
-                  placeholder={readinessConfirmed ? "Ready to begin!" : "Type 'I'm Ready'..."}
-                  className="flex-1 px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none text-sm disabled:bg-slate-100"
+                  placeholder={readinessConfirmed ? "READINESS CONFIRMED" : "Type 'I'm Ready'..."}
+                  className="flex-1 px-4 py-3 border border-white/10 bg-black/40 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white disabled:opacity-50 font-mono tracking-wider transition-all shadow-inner"
                 />
                 <button 
                   type="submit" 
                   disabled={readinessConfirmed || aiLoading || !inputText.trim()}
-                  className="bg-slate-800 text-white px-4 py-2 rounded-md hover:bg-slate-700 disabled:opacity-50"
+                  className="bg-[var(--color-primary)] text-white px-6 py-3 rounded-md hover:bg-violet-500 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-[0_0_15px_rgba(139,92,246,0.2)]"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-5 h-5" />
                 </button>
               </form>
             )}
@@ -341,9 +347,9 @@ export default function DeviceCheck({ session, onNext }: { session: any, onNext:
 
         onClick={handleProceed}
         disabled={!allPassed || !readinessConfirmed || loading}
-        className="bg-blue-600 text-white font-semibold py-3 px-8 rounded-md hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        className="bg-[var(--color-primary)] text-white font-semibold py-3 px-8 rounded-md hover:bg-violet-500 transition-colors text-sm disabled:opacity-30 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(139,92,246,0.3)] tracking-widest"
       >
-        {loading ? 'Processing...' : 'ENTER WAITING ROOM'}
+        {loading ? 'PROCESSING...' : 'ENTER WAITING ROOM'}
       </button>
     </div>
   );

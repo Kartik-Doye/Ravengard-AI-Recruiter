@@ -26,7 +26,7 @@ export default function Registration({ user, onComplete }: { user: string, onCom
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
-        setErrors(prev => ({ ...prev, [field]: error.errors[0].message }));
+        setErrors(prev => ({ ...prev, [field]: error.issues[0].message }));
       }
     }
   };
@@ -45,7 +45,7 @@ export default function Registration({ user, onComplete }: { user: string, onCom
     } catch (error) {
       if (error instanceof z.ZodError) {
         const newErrors: Record<string, string> = {};
-        error.errors.forEach(err => {
+        error.issues.forEach(err => {
           if (err.path[0]) {
             newErrors[err.path[0] as string] = err.message;
           }
@@ -81,12 +81,12 @@ export default function Registration({ user, onComplete }: { user: string, onCom
 
   return (
     <div className="max-w-[600px] mx-auto">
-      <h1 className="text-3xl font-semibold mb-2 text-slate-900">Complete your profile</h1>
-      <p className="text-slate-500 mb-8">Please provide your details to personalize your assessment experience.</p>
+      <h1 className="text-3xl font-semibold mb-2 text-white">Complete your profile</h1>
+      <p className="text-white/50 mb-8">Please provide your details to personalize your assessment experience.</p>
       
       {serverErrors.length > 0 && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-          <ul className="list-disc pl-5 text-sm text-red-600 space-y-1">
+        <div className="mb-6 p-4 bg-[var(--color-error)]/10 border border-[var(--color-error)]/30 rounded-md">
+          <ul className="list-disc pl-5 text-sm text-[var(--color-error)] space-y-1">
             {serverErrors.map((err, i) => (
               <li key={i}>{err}</li>
             ))}
@@ -94,48 +94,48 @@ export default function Registration({ user, onComplete }: { user: string, onCom
         </div>
       )}
 
-      <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm">
+      <div className="glass-panel p-8 rounded-xl border border-white/5 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-              <input type="text" value={formData.name} onBlur={() => handleBlur('name')} onChange={e => { setFormData({...formData, name: e.target.value}); validateField('name', e.target.value); }} className={`w-full px-4 py-2 border ${errors.name ? 'border-red-500' : 'border-slate-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm`} />
-              {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
+              <label className="block text-sm font-medium text-white/80 mb-1">Full Name</label>
+              <input type="text" value={formData.name} onBlur={() => handleBlur('name')} onChange={e => { setFormData({...formData, name: e.target.value}); validateField('name', e.target.value); }} className={`w-full px-4 py-2 border ${errors.name ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.name && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.name}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email Address</label>
-              <input type="email" value={formData.email} onBlur={() => handleBlur('email')} onChange={e => { setFormData({...formData, email: e.target.value}); validateField('email', e.target.value); }} className={`w-full px-4 py-2 border ${errors.email ? 'border-red-500' : 'border-slate-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm`} />
-              {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email}</p>}
+              <label className="block text-sm font-medium text-white/80 mb-1">Email Address</label>
+              <input type="email" value={formData.email} onBlur={() => handleBlur('email')} onChange={e => { setFormData({...formData, email: e.target.value}); validateField('email', e.target.value); }} className={`w-full px-4 py-2 border ${errors.email ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.email && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.email}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Mobile Number</label>
-              <input type="tel" value={formData.mobile} onBlur={() => handleBlur('mobile')} onChange={e => { setFormData({...formData, mobile: e.target.value}); validateField('mobile', e.target.value); }} className={`w-full px-4 py-2 border ${errors.mobile ? 'border-red-500' : 'border-slate-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm`} />
-              {errors.mobile && <p className="mt-1 text-xs text-red-500">{errors.mobile}</p>}
+              <label className="block text-sm font-medium text-white/80 mb-1">Mobile Number</label>
+              <input type="tel" value={formData.mobile} onBlur={() => handleBlur('mobile')} onChange={e => { setFormData({...formData, mobile: e.target.value}); validateField('mobile', e.target.value); }} className={`w-full px-4 py-2 border ${errors.mobile ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.mobile && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.mobile}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">College Name</label>
-              <input type="text" value={formData.college} onBlur={() => handleBlur('college')} onChange={e => { setFormData({...formData, college: e.target.value}); validateField('college', e.target.value); }} className={`w-full px-4 py-2 border ${errors.college ? 'border-red-500' : 'border-slate-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm`} />
-              {errors.college && <p className="mt-1 text-xs text-red-500">{errors.college}</p>}
+              <label className="block text-sm font-medium text-white/80 mb-1">College Name</label>
+              <input type="text" value={formData.college} onBlur={() => handleBlur('college')} onChange={e => { setFormData({...formData, college: e.target.value}); validateField('college', e.target.value); }} className={`w-full px-4 py-2 border ${errors.college ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.college && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.college}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Degree</label>
-              <input type="text" value={formData.degree} onBlur={() => handleBlur('degree')} onChange={e => { setFormData({...formData, degree: e.target.value}); validateField('degree', e.target.value); }} className={`w-full px-4 py-2 border ${errors.degree ? 'border-red-500' : 'border-slate-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm`} />
-              {errors.degree && <p className="mt-1 text-xs text-red-500">{errors.degree}</p>}
+              <label className="block text-sm font-medium text-white/80 mb-1">Degree</label>
+              <input type="text" value={formData.degree} onBlur={() => handleBlur('degree')} onChange={e => { setFormData({...formData, degree: e.target.value}); validateField('degree', e.target.value); }} className={`w-full px-4 py-2 border ${errors.degree ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.degree && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.degree}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Graduation Year</label>
-              <input type="number" value={formData.gradYear} onBlur={() => handleBlur('gradYear')} onChange={e => { setFormData({...formData, gradYear: e.target.value}); validateField('gradYear', e.target.value); }} className={`w-full px-4 py-2 border ${errors.gradYear ? 'border-red-500' : 'border-slate-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm`} />
-              {errors.gradYear && <p className="mt-1 text-xs text-red-500">{errors.gradYear}</p>}
+              <label className="block text-sm font-medium text-white/80 mb-1">Graduation Year</label>
+              <input type="number" value={formData.gradYear} onBlur={() => handleBlur('gradYear')} onChange={e => { setFormData({...formData, gradYear: e.target.value}); validateField('gradYear', e.target.value); }} className={`w-full px-4 py-2 border ${errors.gradYear ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.gradYear && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.gradYear}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Preferred Language</label>
-              <select value={formData.preferredLanguage} onBlur={() => handleBlur('preferredLanguage')} onChange={e => { setFormData({...formData, preferredLanguage: e.target.value}); validateField('preferredLanguage', e.target.value); }} className={`w-full px-4 py-2 border ${errors.preferredLanguage ? 'border-red-500' : 'border-slate-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white`}>
-                <option value="English">English</option>
-                <option value="Spanish">Spanish</option>
-                <option value="French">French</option>
-                <option value="Hindi">Hindi</option>
+              <label className="block text-sm font-medium text-white/80 mb-1">Preferred Language</label>
+              <select value={formData.preferredLanguage} onBlur={() => handleBlur('preferredLanguage')} onChange={e => { setFormData({...formData, preferredLanguage: e.target.value}); validateField('preferredLanguage', e.target.value); }} className={`w-full px-4 py-2 border ${errors.preferredLanguage ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`}>
+                <option className="text-black" value="English">English</option>
+                <option className="text-black" value="Spanish">Spanish</option>
+                <option className="text-black" value="French">French</option>
+                <option className="text-black" value="Hindi">Hindi</option>
               </select>
-              {errors.preferredLanguage && <p className="mt-1 text-xs text-red-500">{errors.preferredLanguage}</p>}
+              {errors.preferredLanguage && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.preferredLanguage}</p>}
             </div>
           </div>
           
@@ -146,16 +146,16 @@ export default function Registration({ user, onComplete }: { user: string, onCom
                 required
                 checked={isAdult}
                 onChange={(e) => setIsAdult(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                className="w-4 h-4 text-[var(--color-primary)] bg-white/5 border-white/20 rounded focus:ring-[var(--color-primary)] focus:ring-offset-[var(--color-bg-2)] cursor-pointer"
               />
             </div>
-            <span className="text-slate-700 text-sm group-hover:text-slate-900 select-none">
+            <span className="text-white/70 text-sm group-hover:text-white transition-colors select-none">
               I confirm that I am at least 18 years of age.
             </span>
           </label>
 
-          <div className="pt-4 border-t border-slate-200 mt-6">
-            <button disabled={loading || !isAdult} type="submit" className="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+          <div className="pt-4 border-t border-white/10 mt-6">
+            <button disabled={loading || !isAdult} type="submit" className="w-full bg-[var(--color-primary)] text-white font-semibold py-3 px-4 rounded-md hover:bg-violet-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-[0_0_15px_rgba(139,92,246,0.3)]">
               {loading ? 'Validating...' : 'Complete Profile'}
             </button>
           </div>

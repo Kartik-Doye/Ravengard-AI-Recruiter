@@ -72,7 +72,7 @@ const wsCode = `
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
           },
-          systemInstruction: \`You are the 'Friendly HR' AI interviewer for Traineer. 
+          systemInstruction: \`You are the 'Friendly HR' AI interviewer for Ravengard AI Recruiter. 
           Your goal is to greet the candidate, break the ice, introduce yourself, and test their communication style. 
           
           Candidate Context: \${candidateContext}

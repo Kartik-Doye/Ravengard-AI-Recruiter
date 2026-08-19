@@ -1,224 +1,124 @@
-import { relations } from 'drizzle-orm';
-import { integer, pgTable, serial, text, timestamp, boolean, varchar, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, integer, boolean, uuid, jsonb, pgEnum } from 'drizzle-orm/pg-core';
 
-export const companies = pgTable('companies', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  plan: varchar('plan', { length: 50 }).notNull().default('starter'),
-  seats: integer('seats').notNull().default(1),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
 
-export const recruiterUsers = pgTable('recruiter_users', {
-  id: serial('id').primaryKey(),
-  companyId: integer('company_id').references(() => companies.id).notNull(),
-  uid: text('uid').notNull().unique(), // Firebase Auth UID
-  name: text('name').notNull(),
-  email: text('email').notNull(),
-  role: varchar('role', { length: 50 }).notNull().default('recruiter'), // admin, recruiter, viewer
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const phaseEnum = pgEnum('phase', [
+  'registration', 
+  'intelligence', 
+  'pre_flight',
+  'interview_round_1', 
+  'interview_round_2', 
+  'interview_round_3', 
+  'interview_round_4',
+  'interview_round_5', 
+  'interview_round_6', 
+  'interview_round_7', 
+  'interview_round_8',
+  'assessment', 
+  'completed', 
+  'failed'
+]);
 
-export const jobRoles = pgTable('job_roles', {
-  id: serial('id').primaryKey(),
-  companyId: integer('company_id').references(() => companies.id).notNull(),
-  title: text('title').notNull(),
-  requiredSkills: jsonb('required_skills').default([]), // array of strings
-  personaToggle: jsonb('persona_toggle').default({}), 
-  questionCounts: jsonb('question_counts').default({ aptitude: 20, technical: 60 }),
-  thinkAgainLimit: integer('think_again_limit').default(2),
-  rubricWeights: jsonb('rubric_weights').default({}),
-  passThresholds: jsonb('pass_thresholds').default({}),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const sessionStatusEnum = pgEnum('session_status', [
+  'active', 
+  'paused', 
+  'completed', 
+  'failed'
+]);
 
-export const candidateInvites = pgTable('candidate_invites', {
-  id: serial('id').primaryKey(),
-  jobRoleId: integer('job_role_id').references(() => jobRoles.id).notNull(),
-  email: text('email').notNull(),
-  mobile: text('mobile'),
-  token: text('token').notNull().unique(),
-  status: varchar('status', { length: 50 }).notNull().default('pending'), // pending, used, expired
-  expiresAt: timestamp('expires_at').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const violationTypeEnum = pgEnum('violation_type', [
+  'visibility_change', 
+  'devtools_resize', 
+  'audio_loss',
+  'other'
+]);
 
-export const candidates = pgTable('candidates', {
-  id: serial('id').primaryKey(),
-  uid: text('uid').notNull().unique(), // Firebase Auth UID
-  name: text('name').notNull(),
-  mobile: text('mobile').notNull(),
-  email: text('email').notNull(),
-  emailVerified: boolean('email_verified').default(false),
-  college: text('college').notNull(),
-  degree: text('degree').notNull(),
-  gradYear: integer('grad_year').notNull(),
-  preferredLanguage: text('preferred_language').notNull(),
-  isAdmin: boolean('is_admin').default(false),
+export const violationSeverityEnum = pgEnum('violation_severity', [
+  'warning',
+  'escalation',
+  'hard_fail'
+]);
+
+// -----------------------------------------------------------------------------
+// TABLES
+// -----------------------------------------------------------------------------
+
+export const users = pgTable('users', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  email: text('email').notNull().unique(),
+  phone: text('phone'),
+  gradYear: integer('grad_year'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const auditLogs = pgTable('audit_logs', {
-  id: serial('id').primaryKey(),
-  eventType: varchar('event_type', { length: 100 }).notNull(),
-  correlationId: text('correlation_id'),
-  details: jsonb('details').default({}),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
 export const sessions = pgTable('sessions', {
-  id: serial('id').primaryKey(),
-  candidateId: integer('candidate_id')
-    .references(() => candidates.id)
-    .notNull(),
-  companyId: integer('company_id').references(() => companies.id),
-  jobRoleId: integer('job_role_id').references(() => jobRoles.id),
-  status: varchar('status', { length: 50 }).notNull().default('created'), // created, in_progress, completed, abandoned
-  currentStage: varchar('current_stage', { length: 50 }).notNull().default('welcome'), // welcome, consent, resume, etc.
-  locked: boolean('locked').notNull().default(false),
-  version: integer('version').notNull().default(1),
-  configSnapshot: jsonb('config_snapshot').default({}),
-  consentAcceptedAt: timestamp('consent_accepted_at'),
-  resumeUrl: text('resume_url'),
-  startedAt: timestamp('started_at').defaultNow().notNull(),
-  lastActiveAt: timestamp('last_active_at').defaultNow().notNull(),
-  thinkAgainUsed: integer('think_again_used').notNull().default(0),
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  
+  // State Machine Authority
+  currentPhase: phaseEnum('current_phase').default('registration').notNull(),
+  status: sessionStatusEnum('status').default('active').notNull(),
+  locked: boolean('locked').default(false).notNull(),
+  currentRoundIndex: integer('current_round_index').default(1).notNull(),
+  thinkAgainUsesLeft: integer('think_again_uses_left').default(2).notNull(),
+  
+  // O(1) Anti-Cheat Counters
+  visibilityStrikes: integer('visibility_strikes').default(0).notNull(),
+  devtoolsStrikes: integer('devtools_strikes').default(0).notNull(),
+  lastViolationAt: timestamp('last_violation_at'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const resumeAnalyses = pgTable('resume_analyses', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id')
-    .references(() => sessions.id)
-    .notNull(),
-  rawText: text('raw_text'),
+export const resumeParses = pgTable('resume_parses', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  sessionId: uuid('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
   atsScore: integer('ats_score'),
-  skills: jsonb('skills').default([]),
-  projects: jsonb('projects').default([]),
-  experience: jsonb('experience').default([]),
-  education: jsonb('education').default([]),
-  certifications: jsonb('certifications').default([]),
-  strengths: jsonb('strengths').default([]),
-  weaknesses: jsonb('weaknesses').default([]),
-  missingKeywords: jsonb('missing_keywords').default([]),
-  recruiterReviewText: text('recruiter_review_text'),
-});
-
-export const interviewTurns = pgTable('interview_turns', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id').references(() => sessions.id).notNull(),
-  persona: varchar('persona', { length: 50 }).notNull(),
-  questionText: text('question_text').notNull(),
-  answerTranscript: text('answer_transcript'),
-  audioRef: text('audio_ref'),
-  videoRef: text('video_ref'),
-  isFollowup: boolean('is_followup').default(false),
-  thinkAgainUsed: boolean('think_again_used').default(false),
+  skills: jsonb('skills'), // Structured array of extracted skills
+  experience: jsonb('experience'), // Structured array of experiences
+  education: jsonb('education'), // Structured array of education
+  rawText: text('raw_text'), // Backup of extracted text from PDF
+  status: text('status').default('pending').notNull(), // pending, success, failed
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const interviewerNotes = pgTable('interviewer_notes', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id').references(() => sessions.id).notNull(),
-  persona: varchar('persona', { length: 50 }).notNull(),
-  noteText: text('note_text').notNull(),
+export const sessionViolations = pgTable('session_violations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  sessionId: uuid('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  violationType: violationTypeEnum('violation_type').notNull(),
+  severity: violationSeverityEnum('severity').notNull(),
+  context: jsonb('context'), // e.g., timestamp delta, browser agent
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const roundScores = pgTable('round_scores', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id').references(() => sessions.id).notNull(),
-  persona: varchar('persona', { length: 50 }).notNull(),
-  score: integer('score').notNull(),
-  rationaleText: text('rationale_text').notNull(),
+export const roundOutputs = pgTable('round_outputs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  sessionId: uuid('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  roundIndex: integer('round_index').notNull(),
+  aiPrompt: text('ai_prompt').notNull(),
+  candidateResponseSummary: text('candidate_response_summary').notNull(),
+  score: integer('score'), // Evaluated score for this specific round
+  validationStatus: text('validation_status').default('validated').notNull(), // schema validation status
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const integrityEvents = pgTable('integrity_events', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id').references(() => sessions.id).notNull(),
-  type: varchar('type', { length: 100 }).notNull(),
-  severity: varchar('severity', { length: 50 }).notNull(), // low, medium, high
-  evidenceRef: text('evidence_ref'),
+export const assessments = pgTable('assessments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  sessionId: uuid('session_id').notNull().references(() => sessions.id, { onDelete: 'cascade' }),
+  holisticScore: integer('holistic_score').notNull(),
+  reportSnapshot: jsonb('report_snapshot'), // Flexible display blob for UI rendering
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
-export const finalReports = pgTable('final_reports', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id').references(() => sessions.id).notNull(),
-  band: varchar('band', { length: 50 }),
-  overallScore: integer('overall_score'),
-  pdfRef: text('pdf_ref'),
-  generatedAt: timestamp('generated_at').defaultNow().notNull(),
-});
-
-export const learningRoadmaps = pgTable('learning_roadmaps', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id').references(() => sessions.id).notNull(),
-  weeksJson: jsonb('weeks_json').default([]),
+export const assessmentRecommendations = pgTable('assessment_recommendations', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  assessmentId: uuid('assessment_id').notNull().references(() => assessments.id, { onDelete: 'cascade' }),
+  weekNumber: integer('week_number').notNull(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
-
-export const careerCoachOutputs = pgTable('career_coach_outputs', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id').references(() => sessions.id).notNull(),
-  adviceText: text('advice_text').notNull(),
-  resources: jsonb('resources').default([]),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-export const emailLogs = pgTable('email_logs', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id').references(() => sessions.id).notNull(),
-  recipient: text('recipient').notNull(),
-  type: varchar('type', { length: 50 }).notNull(),
-  status: varchar('status', { length: 50 }).notNull(),
-  sentAt: timestamp('sent_at').defaultNow().notNull(),
-});
-
-export const retakeRequests = pgTable('retake_requests', {
-  id: serial('id').primaryKey(),
-  candidateId: integer('candidate_id').references(() => candidates.id).notNull(),
-  status: varchar('status', { length: 50 }).notNull().default('pending'), // pending, approved, denied
-  requestedAt: timestamp('requested_at').defaultNow().notNull(),
-  reviewedBy: text('reviewed_by'),
-  reviewedAt: timestamp('reviewed_at'),
-});
-
-// Relations
-export const candidatesRelations = relations(candidates, ({ many }) => ({
-  sessions: many(sessions),
-}));
-
-export const sessionsRelations = relations(sessions, ({ one, many }) => ({
-  candidate: one(candidates, {
-    fields: [sessions.candidateId],
-    references: [candidates.id],
-  }),
-  jobRole: one(jobRoles, {
-    fields: [sessions.jobRoleId],
-    references: [jobRoles.id],
-  }),
-  resumeAnalyses: many(resumeAnalyses),
-  interviewTurns: many(interviewTurns),
-  interviewerNotes: many(interviewerNotes),
-  roundScores: many(roundScores),
-  integrityEvents: many(integrityEvents),
-  finalReports: many(finalReports),
-  learningRoadmaps: many(learningRoadmaps),
-  careerCoachOutputs: many(careerCoachOutputs),
-}));
-
-export const companiesRelations = relations(companies, ({ many }) => ({
-  recruiterUsers: many(recruiterUsers),
-  jobRoles: many(jobRoles),
-}));
-
-export const jobRolesRelations = relations(jobRoles, ({ one, many }) => ({
-  company: one(companies, {
-    fields: [jobRoles.companyId],
-    references: [companies.id],
-  }),
-  sessions: many(sessions),
-  candidateInvites: many(candidateInvites),
-}));

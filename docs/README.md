@@ -1,6 +1,6 @@
-# Traineer Documentation Suite
+# Ravengard AI Recruiter Documentation Suite
 
-Welcome to the official documentation for **Traineer**, an AI-driven interview preparation platform.
+Welcome to the official documentation for **Ravengard AI Recruiter**, an AI-driven interview preparation platform.
 
 ## Documentation Index
 

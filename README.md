@@ -1,6 +1,6 @@
-# Traineer - Phase 1
+# Ravengard AI Recruiter - Phase 1
 
-This is Phase 1 of the Traineer AI interview preparation platform. It includes candidate registration, a consent flow, resume uploading with text extraction, and a minimal dashboard stub.
+This is Phase 1 of the Ravengard AI Recruiter AI interview preparation platform. It includes candidate registration, a consent flow, resume uploading with text extraction, and a minimal dashboard stub.
 
 ## Tech Stack
 - **Frontend**: React (Vite), Tailwind CSS

@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../db/index.ts';
-import { candidates } from '../db/schema.ts';
+import { users } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
 
 export interface AuthRequest extends Request {
-  user?: { uid: string, email?: string, admin?: boolean, candidateId?: number };
+  user?: { uid: string, email?: string, admin?: boolean, candidateId?: string };
 }
 
 export const requireAuth = async (
@@ -18,12 +18,12 @@ export const requireAuth = async (
   }
   const token = authHeader.split('Bearer ')[1];
   try {
-    const [candidate] = await db.select().from(candidates).where(eq(candidates.uid, token));
+    const [candidate] = await db.select().from(users).where(eq(users.id, token));
     
     req.user = { 
       uid: token, 
       email: candidate?.email || '',
-      admin: candidate?.isAdmin || false,
+      admin: false,
       candidateId: candidate?.id
     };
     next();

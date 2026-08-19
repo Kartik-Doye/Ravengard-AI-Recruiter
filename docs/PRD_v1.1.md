@@ -1,4 +1,4 @@
-# TRAINEER
+# RAVENGARD
 ## Product Requirements Document (PRD)
 **AI-Powered Interview Screening Platform — B2B (Hiring & Screening)**
 
@@ -13,7 +13,7 @@
 
 ## 1. Product Vision & Problem Statement
 
-**Vision:** Traineer is an AI interviewer that a company can hand a job requisition to, and get back a ranked, evidence-backed shortlist of candidates — each with a full transcript, scorecard, and integrity report — without a human recruiter sitting through first-round interviews.
+**Vision:** Ravengard AI Recruiter is an AI interviewer that a company can hand a job requisition to, and get back a ranked, evidence-backed shortlist of candidates — each with a full transcript, scorecard, and integrity report — without a human recruiter sitting through first-round interviews.
 
 **Problem it solves for the buyer (company/HR team):**
 - First-round screening interviews are the highest-volume, most repetitive, most time-consuming part of hiring.
@@ -21,7 +21,7 @@
 - Resume shortlisting (ATS) misses good candidates and passes bad ones because it's keyword-only.
 - There's no structured, comparable, auditable record of *why* a candidate was screened in or out.
 
-**What Traineer delivers:** a single locked, automated pipeline — resume intelligence → structured multi-persona interview → scored evaluation → ranked recommendation — that a company can trust as a defensible first-pass filter before a human ever gets involved.
+**What Ravengard AI Recruiter delivers:** a single locked, automated pipeline — resume intelligence → structured multi-persona interview → scored evaluation → ranked recommendation — that a company can trust as a defensible first-pass filter before a human ever gets involved.
 
 **Secondary benefit to the candidate:** a real interview-practice experience, a personalized learning roadmap, and a career coach — which improves candidate experience/brand perception for the hiring company, and is the retention hook for the candidate to come back and use their dashboard again.
 
@@ -116,7 +116,7 @@ REPORT_READY
 COMPLETED
 ```
 
-> **⚠ Open question — persona order conflict:** your two flow diagrams disagree on order. Diagram 1: `Friendly HR → Aptitude → Professional HR → Technical...`. Diagram 2 (the branded "TRAINEER" one, which reads as the more finalized version): `Friendly HR → Professional HR → Aptitude → Technical...`. **This PRD uses Diagram 2's order** (HR-friendly, HR-professional, then the two assessment rounds, then the four expert personas). Confirm before build.
+> **⚠ Open question — persona order conflict:** your two flow diagrams disagree on order. Diagram 1: `Friendly HR → Aptitude → Professional HR → Technical...`. Diagram 2 (the branded "RAVENGARD" one, which reads as the more finalized version): `Friendly HR → Professional HR → Aptitude → Technical...`. **This PRD uses Diagram 2's order** (HR-friendly, HR-professional, then the two assessment rounds, then the four expert personas). Confirm before build.
 
 ---
 
@@ -153,16 +153,16 @@ Recruiter Console (ongoing)
   • Export (CSV of scores, bulk PDF download)
 ```
 
-### 6.2 Candidate Flow — Before Traineer
+### 6.2 Candidate Flow — Before Ravengard AI Recruiter
 
 1. **Landing Page** (branded per company, via the invite link)
 2. **Candidate Registration** — Full Name, Mobile, Email, College, Degree, Graduation Year, Preferred Language. *(Since this is B2B screening, the invite link should pre-fill/lock the email the invite was sent to, to prevent one person taking the assessment on someone else's behalf — flagged as an identity-integrity gap in your original spec.)*
-3. **Welcome Screen** — "Enhance your interview experience," estimated time, requirements checklist (internet/camera/mic/quiet room), **`START TRAINEER`** button.
-4. **Policy & Consent** — Privacy Policy, T&Cs, Camera/Mic permission, AI Evaluation consent, Data Storage consent, Assessment Rules. Checkbox **"I Agree"** → **`ENTER TRAINEER`**.
+3. **Welcome Screen** — "Enhance your interview experience," estimated time, requirements checklist (internet/camera/mic/quiet room), **`START RAVENGARD`** button.
+4. **Policy & Consent** — Privacy Policy, T&Cs, Camera/Mic permission, AI Evaluation consent, Data Storage consent, Assessment Rules. Checkbox **"I Agree"** → **`ENTER RAVENGARD`**.
    - **This is the last free exit point.** Explicit warning shown before the click, exactly as you specified: *"Before clicking: candidate may exit. After clicking: session created, assessment locked — no restart, no skip, no manual phase selection, auto-resume if browser closes."*
-   - Clicking `ENTER TRAINEER` is the exact moment `AssessmentSession` is created server-side and `current_phase` becomes `SESSION_LOCKED`.
+   - Clicking `ENTER RAVENGARD` is the exact moment `AssessmentSession` is created server-side and `current_phase` becomes `SESSION_LOCKED`.
 
-### 6.3 Candidate Flow — Inside Traineer
+### 6.3 Candidate Flow — Inside Ravengard AI Recruiter
 
 | Phase | What happens | Auto-transition trigger |
 |---|---|---|
@@ -241,7 +241,7 @@ Candidate Information · ATS Score · Resume Review · Aptitude Score · Technic
 - **Recruiter-facing view (in-Console, not necessarily downloadable):** everything the candidate sees **plus** rank among other candidates for that Job Role, raw integrity event timeline, and full searchable transcript.
 
 ### 7.9 Candidate Dashboard
-Interview History, Progress History, Reports, PDF Downloads, Learning Roadmaps, Career Coach (persistent, revisitable), Profile Management. Since a candidate may be invited to multiple Traineer assessments by different companies over time, the dashboard should be **candidate-account-scoped**, not session-scoped.
+Interview History, Progress History, Reports, PDF Downloads, Learning Roadmaps, Career Coach (persistent, revisitable), Profile Management. Since a candidate may be invited to multiple Ravengard AI Recruiter assessments by different companies over time, the dashboard should be **candidate-account-scoped**, not session-scoped.
 
 ---
 
@@ -380,7 +380,7 @@ Recruiter side
 
 ## 12. Non-Functional Requirements
 
-- **Compliance:** **confirmed India-first for V1** — candidate PII, resume content, and biometric-adjacent audio/video data are governed by India's **Digital Personal Data Protection Act (DPDP) 2023**: explicit itemized consent (already in your flow), a defined retention period, right to deletion, and a data processing agreement between Traineer and each customer company. Since expansion beyond India is a stated future goal (not this V1), don't hardcode India-only assumptions into the schema or consent logic — keep `data_residency_region`, consent-clause versioning, and currency/locale fields on `Company`/`Candidate` generic now so GDPR (or another regime) is a config addition later, not a schema migration.
+- **Compliance:** **confirmed India-first for V1** — candidate PII, resume content, and biometric-adjacent audio/video data are governed by India's **Digital Personal Data Protection Act (DPDP) 2023**: explicit itemized consent (already in your flow), a defined retention period, right to deletion, and a data processing agreement between Ravengard AI Recruiter and each customer company. Since expansion beyond India is a stated future goal (not this V1), don't hardcode India-only assumptions into the schema or consent logic — keep `data_residency_region`, consent-clause versioning, and currency/locale fields on `Company`/`Candidate` generic now so GDPR (or another regime) is a config addition later, not a schema migration.
 - **Fairness/bias:** because this drives real hiring decisions, scoring logic and prompts should be periodically audited for disparate outcomes across candidate groups. Log enough to support that audit (see Dev Rule §14.10).
 - **Availability:** the live interview is the single point where a mid-session outage is worst — target high uptime specifically for the WS/voice pipeline, with graceful degradation (auto-save + resume, not data loss) rather than pure uptime numbers alone.
 - **Performance:** target end-to-end voice turn latency (candidate stops speaking → AI starts responding) under ~2 seconds to keep the conversation feeling natural.
@@ -448,7 +448,7 @@ These are the rules every persona's prompt must obey, injected identically as gu
 ## 16. Success Metrics (V1)
 
 - **Completion rate:** % of candidates who start and finish the full pipeline without abandoning (this is directly at risk from the time-budget issue flagged in §17 — worth tracking from day one).
-- **Time-to-shortlist:** company's time from "invite sent" to "report reviewed," vs. their pre-Traineer baseline.
+- **Time-to-shortlist:** company's time from "invite sent" to "report reviewed," vs. their pre-Ravengard AI Recruiter baseline.
 - **Recruiter trust signal:** % of AI "Selected"/"Selected with Recommendation" candidates a human recruiter actually advances — a proxy for whether the scoring is trusted, not just delivered.
 - **Session integrity flag rate:** % of sessions with any integrity flag, and false-positive rate on manual review (tune anti-cheat sensitivity against this).
 - **Candidate dashboard return rate:** % of candidates who come back to use the roadmap/coach after their assessment — signals whether the candidate-side retention hook is actually working.

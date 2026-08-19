@@ -1,11 +1,11 @@
-# Traineer - Product Requirements Document (PRD)
+# Ravengard AI Recruiter - Product Requirements Document (PRD)
 
 ## 1. Executive Summary
 **Problem Statement:** 
 Candidates, especially fresh graduates and career switchers, often face severe anxiety and lack realistic practice environments before high-stakes technical and behavioral interviews. Existing solutions are either too generic or lack real-time conversational adaptability.
 
 **Product Goals:**
-Build an AI-driven, multi-round interview simulation platform (Traineer) that dynamically adapts to a candidate's resume and real-time responses. It will provide a safe, proctored environment simulating real-world interviews, followed by actionable, holistic feedback.
+Build an AI-driven, multi-round interview simulation platform (Ravengard AI Recruiter) that dynamically adapts to a candidate's resume and real-time responses. It will provide a safe, proctored environment simulating real-world interviews, followed by actionable, holistic feedback.
 
 **Non-Goals:**
 - We are not building a job board or placement matching system in v1.0.
@@ -59,8 +59,7 @@ Build an AI-driven, multi-round interview simulation platform (Traineer) that dy
 - **FR-031:** The system shall use the Gemini Live API for real-time, streaming conversational interactions.
 - **FR-032:** AI shall generate adaptive follow-up questions based on the candidate's previous answers and resume context.
 - **FR-033:** Candidate is granted exactly 2 "Think Again" passes per session. Using one deducts from the balance and triggers an AI hint.
-- **FR-034:** System shall auto-save transcript and context every 10 seconds.
-- **FR-035 (Anti-Cheat):** System shall detect `visibilitychange` (tab switching) and `resize` (DevTools) and log violations.
+- **FR-034 (Anti-Cheat):** System shall detect `visibilitychange` (tab switching) and `resize` (DevTools). First offense triggers a warning, repeated offenses halt/fail the session. Violations must be audited.
 
 ### Phase 5 - 8: Assessment & Reporting
 - **FR-040:** System shall prompt the candidate for self-reflection post-interview.

@@ -1,4 +1,4 @@
-# Traineer - AI Prompt Library
+# Ravengard AI Recruiter - AI Prompt Library
 
 ## AI-PROMPT-001: Registration Validation
 **Model:** Gemini 1.5 Pro

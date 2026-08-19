@@ -11,7 +11,7 @@ export default function InterviewInstructions({ session, onNext }: { session: an
   useEffect(() => {
     const fetchInstructions = async () => {
       try {
-        const token = localStorage.getItem('traineer_uid');
+        const token = localStorage.getItem('ravengard_uid');
         const res = await fetch(`/api/interview/instructions/confirm`, {
           method: 'POST',
           headers: {
@@ -36,7 +36,7 @@ export default function InterviewInstructions({ session, onNext }: { session: an
     if (!inputText.trim()) return;
     setAiLoading(true);
     try {
-      const token = localStorage.getItem('traineer_uid');
+      const token = localStorage.getItem('ravengard_uid');
       const res = await fetch(`/api/interview/instructions/confirm`, {
         method: 'POST',
         headers: {
@@ -63,7 +63,7 @@ export default function InterviewInstructions({ session, onNext }: { session: an
   const handleProceed = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('traineer_uid');
+      const token = localStorage.getItem('ravengard_uid');
       const res = await fetch(`/api/session/${session.id}/stage`, {
         method: 'POST',
         headers: {

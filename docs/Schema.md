@@ -1,34 +1,16 @@
-# Traineer - Database Schema
+# Ravengard AI Recruiter - Database Schema & Architecture
 
-## 1. Entity Relationship Diagram
-```mermaid
-erDiagram
-    users ||--o{ sessions : has
-    sessions ||--o{ answers : contains
-    sessions ||--o{ violations : logs
-    sessions {
-        uuid id
-        uuid user_id
-        string status
-        int think_again_used
-        jsonb resume_data
-    }
-    answers {
-        uuid id
-        uuid session_id
-        string round
-        string question_text
-        string candidate_answer
-        int score
-    }
-```
+## 1. Core Ownership Model
+The data model treats the `session` as the anchor for all runtime data, enforcing strict phase progression and maintaining a clear boundary for privacy cascades.
 
-## 2. Table Definitions
-- **users:** Stores candidate profile, email, and college details.
-- **sessions:** Tracks the lifecycle of an interview (resume upload -> waiting room -> rounds -> complete).
-- **answers:** Stores the history of generated questions, candidate responses, and round evaluations.
-- **violations:** Logs anti-cheat triggers (e.g., tab switching).
+- **users:** Identity anchor. (Deletions cascade down to all child data to comply with GDPR).
+- **sessions:** Phase authority and runtime anchor. Tracks `current_phase`, `status`, `locked` state, and O(1) anti-cheat counters.
+- **resume_parses:** Session-specific resume snapshot (ATS score, parsed skills).
+- **session_violations:** Detailed event log for anti-cheat breaches.
+- **round_outputs:** Validated, schema-checked round-level AI/candidate exchanges (transient stream chunks are NOT persisted).
+- **assessments:** Final report and holistic scoring.
+- **assessment_recommendations:** Normalized 4-week post-assessment guidance.
 
-## 3. Migration Strategy
+## 2. Implementation
 - Drizzle ORM is used for schema definitions and migrations (`src/db/schema.ts`).
-- Migrations are run incrementally during CI/CD.
+- All foreign keys linked to PII-bearing records use `ON DELETE CASCADE` to ensure clean erasure paths.
