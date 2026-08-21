@@ -90,10 +90,12 @@ export default function DeviceCheck({ session, onNext }: { session: any, onNext:
   const [aiLoading, setAiLoading] = useState(false);
   const [readinessConfirmed, setReadinessConfirmed] = useState(false);
   const [inputText, setInputText] = useState("");
+  const [isCancelled, setIsCancelled] = useState(false);
 
   const checkCompleted = Object.values(checks).every((c: any) => c.status !== 'pending');
   const allPassed = Object.values(checks).every((c: any) => c.status === 'success');
   const anyFailed = Object.values(checks).some((c: any) => c.status === 'error');
+  const hardwarePermanentFailure = checks.camera.status === 'error' || checks.mic.status === 'error';
 
   useEffect(() => {
     if (checkCompleted) {
@@ -200,6 +202,42 @@ export default function DeviceCheck({ session, onNext }: { session: any, onNext:
     }
   };
 
+  const handleCancelSession = async () => {
+    if (!window.confirm("Are you sure you want to cancel? This will mark the session as failed.")) return;
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('ravengard_uid');
+      const res = await fetch(`/api/session/${session.id}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        setIsCancelled(true);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (isCancelled) {
+    return (
+      <div className="max-w-[800px] mx-auto text-center mt-20">
+        <h1 className="text-3xl font-semibold mb-4 text-white">Session Cancelled</h1>
+        <p className="text-white/60 mb-8">
+          This session has been marked as failed due to hardware access denial. You can safely close this window. When you are ready to try again with a working camera and microphone on a different device, please start a new session.
+        </p>
+        <button onClick={() => window.location.reload()} className="bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-8 rounded-md transition-colors border border-white/5">
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
+
   const renderStatusIcon = (status: string) => {
     if (status === 'pending') return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
     if (status === 'success') return <CheckCircle2 className="w-5 h-5 text-emerald-500" />;
@@ -303,9 +341,16 @@ export default function DeviceCheck({ session, onNext }: { session: any, onNext:
               <div className="text-sm text-[var(--color-error)]/90">
                 <strong className="font-semibold block mb-1 text-[var(--color-error)] tracking-wide">Checks Failed</strong>
                 Please fix the errors above and ensure permissions are granted. You cannot proceed until all checks pass.
-                <button onClick={runChecks} className="mt-2 block text-white/70 underline font-medium hover:text-white text-xs tracking-wider uppercase">
-                  Run Checks Again
-                </button>
+                <div className="mt-3 flex gap-2">
+                  <button onClick={runChecks} className="text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-md font-medium text-xs tracking-wider border border-white/5">
+                    Retry Checks
+                  </button>
+                  {hardwarePermanentFailure && (
+                    <button onClick={handleCancelSession} disabled={loading} className="text-[var(--color-error)] bg-[var(--color-error)]/10 hover:bg-[var(--color-error)]/20 px-3 py-1.5 rounded-md font-medium text-xs tracking-wider border border-[var(--color-error)]/30">
+                      Cancel Session
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}

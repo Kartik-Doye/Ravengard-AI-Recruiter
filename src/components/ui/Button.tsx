@@ -1,23 +1,28 @@
 import React, { ButtonHTMLAttributes, forwardRef } from 'react';
 import { motion, HTMLMotionProps } from 'motion/react';
 import { Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "ref"> {
-  variant?: 'primary' | 'secondary' | 'tertiary' | 'destructive';
-  size?: 'sm' | 'md' | 'lg' | 'icon';
+export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "ref" | "type"> {
+  variant?: 'solid' | 'ghost' | 'outline';
+  href?: string;
+  className?: string;
+  type?: 'button' | 'submit' | 'reset';
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   fullWidth?: boolean;
 }
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+export const Button = forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonProps>(
   (
     {
       children,
+      href,
+      onClick,
+      variant = 'solid',
       className = '',
-      variant = 'primary',
-      size = 'md',
+      type = 'button',
       isLoading = false,
       leftIcon,
       rightIcon,
@@ -27,57 +32,53 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
-    let variantClasses = '';
+    const base = 'inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-medium transition focus:outline-none';
+
+    const styles = {
+      solid: 'bg-white text-[#060814]',
+      ghost: 'bg-white/5 text-white hover:bg-white/10 border border-white/10',
+      outline: 'border border-white/15 bg-transparent text-white hover:bg-white/5',
+    }[variant];
+
+    const motionProps = {
+      whileHover: !disabled && !isLoading ? { y: -2, scale: 1.01 } : {},
+      whileTap: !disabled && !isLoading ? { scale: 0.98 } : {},
+      transition: { duration: 0.18, ease: 'easeOut' as any },
+    };
+
+    const widthClass = fullWidth ? 'w-full' : '';
+    const disabledClass = disabled || isLoading ? 'opacity-50 cursor-not-allowed pointer-events-none' : '';
     
-    switch (variant) {
-      case 'primary':
-        variantClasses = 'bg-[var(--color-primary)] text-white hover:bg-violet-500 shadow-[0_0_15px_rgba(139,92,246,0.3)] hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] border border-[var(--color-primary)]/50';
-        break;
-      case 'secondary':
-        variantClasses = 'bg-white/10 text-white hover:bg-white/20 border border-white/10 shadow-[0_4px_15px_rgba(0,0,0,0.2)]';
-        break;
-      case 'tertiary':
-        variantClasses = 'bg-transparent text-white/70 hover:text-white hover:bg-white/5 border border-transparent';
-        break;
-      case 'destructive':
-        variantClasses = 'bg-[var(--color-error)]/20 text-[var(--color-error)] hover:bg-[var(--color-error)]/30 border border-[var(--color-error)]/30 shadow-[0_4px_15px_rgba(239,68,68,0.15)]';
-        break;
-    }
+    const content = (
+      <>
+        {isLoading && <Loader2 className="w-4 h-4 animate-spin shrink-0 mr-2" />}
+        {!isLoading && leftIcon && <span className="shrink-0 mr-2">{leftIcon}</span>}
+        {children}
+        {!isLoading && rightIcon && <span className="shrink-0 ml-2">{rightIcon}</span>}
+      </>
+    );
 
-    let sizeClasses = '';
-    switch (size) {
-      case 'sm':
-        sizeClasses = 'px-3 py-1.5 text-xs';
-        break;
-      case 'md':
-        sizeClasses = 'px-5 py-2.5 text-sm';
-        break;
-      case 'lg':
-        sizeClasses = 'px-8 py-3.5 text-base';
-        break;
-      case 'icon':
-        sizeClasses = 'p-2.5';
-        break;
+    if (href) {
+      return (
+        <motion.div {...motionProps} className={`${widthClass} ${disabledClass} ${className}`}>
+          <Link ref={ref as React.Ref<HTMLAnchorElement>} to={href} className={`${base} ${styles} w-full`} onClick={onClick as any}>
+            {content}
+          </Link>
+        </motion.div>
+      );
     }
-
-    const widthClass = fullWidth ? 'w-full flex justify-center' : 'inline-flex';
-    const disabledClass = disabled || isLoading ? 'opacity-50 cursor-not-allowed saturate-50 pointer-events-none' : '';
 
     return (
       <motion.button
-        ref={ref}
-        whileHover={!disabled && !isLoading ? { scale: 1.02 } : {}}
-        whileTap={!disabled && !isLoading ? { scale: 0.98 } : {}}
-        className={`relative items-center gap-2 rounded-lg font-medium tracking-wide transition-all outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-bg-0)] ${widthClass} ${variantClasses} ${sizeClasses} ${disabledClass} ${className}`}
+        ref={ref as React.Ref<HTMLButtonElement>}
+        type={type}
+        onClick={onClick as any}
         disabled={disabled || isLoading}
+        {...motionProps}
         {...props}
+        className={`${base} ${styles} ${widthClass} ${disabledClass} ${className}`}
       >
-        {isLoading && <Loader2 className="w-4 h-4 animate-spin shrink-0" />}
-        {!isLoading && leftIcon && <span className="shrink-0">{leftIcon}</span>}
-        
-        {children && <span className={size === 'icon' ? 'sr-only' : 'truncate'}>{children}</span>}
-        
-        {!isLoading && rightIcon && <span className="shrink-0">{rightIcon}</span>}
+        {content}
       </motion.button>
     );
   }

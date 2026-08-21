@@ -1,6 +1,6 @@
 import { useVisibilityCheck } from '../hooks/useVisibilityCheck';
 import { useState, useEffect, useRef } from 'react';
-import { Loader2, Mic, StopCircle, User, AlertTriangle } from 'lucide-react';
+import { Loader2, Mic, StopCircle, User, AlertTriangle, RefreshCcw } from 'lucide-react';
 
 function pcmToBase64(float32Array: Float32Array): string {
   const buffer = new ArrayBuffer(float32Array.length * 2);
@@ -32,8 +32,9 @@ export default function Interview({ session, onNext }: { session: any, onNext: (
   const [connected, setConnected] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [time, setTime] = useState(0);
-  const [thinkAgainLeft, setThinkAgainLeft] = useState(2 - (session?.thinkAgainUsed || 0));
+  const [thinkAgainLeft, setThinkAgainLeft] = useState(2 - (session?.thinkAgainUsesLeft || 0));
   const [showWarning, setShowWarning] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useVisibilityCheck(session?.id, () => {
     setShowWarning(true);
@@ -104,6 +105,14 @@ export default function Interview({ session, onNext }: { session: any, onNext: (
 
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
+      
+      if (msg.error === 'failed_validation') {
+         setValidationError('The AI encountered a schema validation error while finalizing the round. Please retry the round.');
+         setConnected(false);
+         ws.close();
+         return;
+      }
+
       if (msg.audio) {
         setIsSpeaking(true);
         const pcm = base64ToPcm(msg.audio);
@@ -180,22 +189,45 @@ export default function Interview({ session, onNext }: { session: any, onNext: (
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ stage: 'dashboard', version: session.version })
+        body: JSON.stringify({ stage: 'completed', version: session.version })
       });
       if (res.ok) {
         const updatedSession = await res.json();
         onNext(updatedSession);
       } else {
         // Mock fallback if offline/no session
-        onNext({ ...session, currentStage: 'dashboard' });
+        onNext({ ...session, currentStage: 'completed' });
       }
     } catch (error) {
       console.error(error);
-      onNext({ ...session, currentStage: 'dashboard' });
+      onNext({ ...session, currentStage: 'completed' });
     } finally {
       setLoading(false);
     }
   };
+
+  const handleRetryRound = () => {
+     window.location.reload();
+  };
+
+  if (validationError) {
+    return (
+      <div className="max-w-[800px] mx-auto text-center mt-20">
+        <h1 className="text-3xl font-semibold mb-4 text-slate-900">Round Output Validation Failed</h1>
+        <p className="text-slate-600 mb-8">
+          {validationError} The backend failed to recover cleanly after generating the round summary. A failure record has been persisted.
+        </p>
+        <div className="flex justify-center gap-4">
+           <button onClick={handleRetryRound} className="bg-slate-900 text-white font-medium py-3 px-8 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-2">
+             <RefreshCcw className="w-5 h-5" /> Retry Round
+           </button>
+           <button onClick={() => window.location.href = 'mailto:support@ravengard.com'} className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium py-3 px-8 rounded-lg transition-colors">
+             Contact Support
+           </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[1000px] mx-auto h-[85vh] flex flex-col relative">

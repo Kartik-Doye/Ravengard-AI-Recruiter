@@ -1,0 +1,38 @@
+export const projects = [
+  {
+    title: "Ravengard Engine",
+    slug: "ravengard",
+    summary: "Premium interview engine with state-machine flow and anti-cheat logic.",
+    category: "Product",
+    year: "2026",
+    role: "Frontend + Systems",
+    outcome: "Built a strict session-driven experience.",
+    tags: ["React", "Framer Motion", "TypeScript"],
+    heroImage: "https://images.unsplash.com/photo-1555949963-aa79dcee57d5?auto=format&fit=crop&q=80&w=800",
+    featured: true,
+  },
+  {
+    title: "Aura UI",
+    slug: "aura-ui",
+    summary: "A high-performance component library built for futuristic web applications.",
+    category: "Design System",
+    year: "2025",
+    role: "Design Engineer",
+    outcome: "Adopted by 5 enterprise teams.",
+    tags: ["Tailwind", "Motion", "Storybook"],
+    heroImage: "https://images.unsplash.com/photo-1618761714954-0b8cd0026356?auto=format&fit=crop&q=80&w=800",
+    featured: false,
+  },
+  {
+    title: "Nexus Terminal",
+    slug: "nexus",
+    summary: "A decentralized developer terminal with real-time collaboration features.",
+    category: "Web App",
+    year: "2024",
+    role: "Full-Stack",
+    outcome: "Scaled to 10k monthly active users.",
+    tags: ["Node.js", "WebSockets", "React"],
+    heroImage: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=800",
+    featured: false,
+  }
+];

@@ -1,9 +1,8 @@
-import React, { HTMLAttributes, forwardRef } from 'react';
+import React, { forwardRef } from 'react';
 import { motion, HTMLMotionProps } from 'motion/react';
 
 export interface CardProps extends Omit<HTMLMotionProps<"div">, "ref"> {
-  variant?: 'base' | 'interactive' | 'elevated' | 'summary';
-  padding?: 'none' | 'sm' | 'md' | 'lg';
+  hover?: boolean;
 }
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
@@ -11,48 +10,17 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
     {
       children,
       className = '',
-      variant = 'base',
-      padding = 'md',
-      onClick,
+      hover = true,
       ...props
     },
     ref
   ) => {
-    let variantClasses = '';
-    switch (variant) {
-      case 'base':
-        variantClasses = 'glass-panel border-white/5';
-        break;
-      case 'interactive':
-        variantClasses = 'glass-panel border-white/5 hover:border-[var(--color-primary)]/30 hover:shadow-[0_8px_32px_rgba(139,92,246,0.15)] cursor-pointer transition-all duration-300';
-        break;
-      case 'elevated':
-        variantClasses = 'glass-panel border-white/10 shadow-[0_16px_40px_rgba(0,0,0,0.6)]';
-        break;
-      case 'summary':
-        variantClasses = 'bg-black/40 border border-white/5 shadow-inner';
-        break;
-    }
-
-    let paddingClasses = '';
-    switch (padding) {
-      case 'none': paddingClasses = 'p-0'; break;
-      case 'sm': paddingClasses = 'p-4'; break;
-      case 'md': paddingClasses = 'p-6 sm:p-8'; break;
-      case 'lg': paddingClasses = 'p-8 sm:p-12'; break;
-    }
-
-    const interactiveProps = onClick || variant === 'interactive' ? {
-      whileHover: { y: -2 },
-      whileTap: { scale: 0.98 },
-      onClick
-    } : {};
-
     return (
       <motion.div
         ref={ref}
-        className={`rounded-xl ${variantClasses} ${paddingClasses} ${className}`}
-        {...interactiveProps}
+        whileHover={hover ? { y: -6, scale: 1.01 } : undefined}
+        transition={{ duration: 0.22, ease: "easeOut" as any }}
+        className={`glass-panel rounded-[28px] border border-white/10 bg-white/5 backdrop-blur-xl ${className}`}
         {...props}
       >
         {children}

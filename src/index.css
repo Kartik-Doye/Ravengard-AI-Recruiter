@@ -1,37 +1,55 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg-0: #0B0D12;
-  --color-bg-1: #11131A;
+  --color-bg-0: #0A0B0E;
+  --color-bg-1: #12141A;
   --color-bg-2: #1A1D27;
   --color-bg-3: #222633;
   
-  --color-glass: rgba(26, 29, 39, 0.4);
-  --color-glass-highlight: rgba(255, 255, 255, 0.05);
+  --color-glass: rgba(18, 20, 26, 0.6);
+  --color-glass-highlight: rgba(255, 255, 255, 0.04);
   
-  --color-primary: #8B5CF6; /* electric violet */
-  --color-secondary: #06B6D4; /* muted cyan */
+  --color-primary: #F3F4F6;
+  --color-primary-muted: #9CA3AF;
+  --color-secondary: #06B6D4;
   --color-success: #10B981;
   --color-warning: #F59E0B;
   --color-error: #EF4444;
+
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+  --font-display: "Playfair Display", serif;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
-@custom-variant high-contrast (&:where(.high-contrast, .high-contrast *));
 
 @layer base {
   body {
-    @apply bg-[var(--color-bg-0)] text-white;
+    @apply bg-[var(--color-bg-0)] text-[#F3F4F6] font-sans antialiased selection:bg-white/20 selection:text-white;
   }
 
-  .high-contrast {
-    @apply bg-black text-yellow-300;
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
   }
-  .high-contrast * {
-    @apply border-yellow-300;
+}
+
+@layer utilities {
+  .paper-scrunch-overlay {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    background-size: 150px 150px;
+    mix-blend-mode: soft-light;
+    opacity: 0.15;
+    will-change: transform, opacity;
   }
-  .high-contrast button, .high-contrast a {
-    @apply bg-yellow-300 text-black outline-2 outline-offset-2 outline-yellow-300 hover:bg-yellow-400;
+
+  .paper-scrunch-overlay--strong {
+    opacity: 0.25;
+    mix-blend-mode: multiply;
+  }
+
+  .secret-card-glow {
+    background:
+      radial-gradient(circle at top, rgba(255,255,255,0.14), transparent 48%),
+      linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
   }
 }
 
@@ -42,5 +60,192 @@
   .glass-panel::before {
     content: '';
     @apply absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent;
+  }
+
+  /* --- Ravengard Symbol (Cube) --- */
+  .cube-loader {
+    position: relative;
+    width: 24px;
+    height: 24px;
+    transform-style: preserve-3d;
+    transform: rotateX(-30deg);
+    animation: animateCube 4s linear infinite;
+  }
+
+  @keyframes animateCube {
+    0% { transform: rotateX(-30deg) rotateY(0); }
+    100% { transform: rotateX(-30deg) rotateY(360deg); }
+  }
+
+  .cube-wrapper {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+  }
+
+  .cube-span {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    transform: rotateY(calc(90deg * var(--i))) translateZ(12px);
+    background: linear-gradient(to bottom,
+              hsl(0, 0%, 0%) 0%,
+              hsl(0, 0%, 0%) 5.5%,
+              hsl(0, 0%, 0%) 12.1%,
+              hsl(0, 0%, 100%) 100%,
+              hsl(0, 0%, 0%) 27.9%,
+              hsl(0, 0%, 0%) 36.6%,
+              hsl(0, 0%, 0%) 45.6%,
+              hsl(0, 0%, 100%) 100%,
+              hsl(0, 0%, 0%) 63.4%,
+              hsl(0, 0%, 0%) 71.7%,
+              hsl(0, 0%, 0%) 79.4%,
+              hsl(0, 0%, 100%) 100%,
+              hsl(0, 0%, 0%) 100%,
+              hsl(0, 0%, 0%) 100%,
+              hsl(0, 0%, 0%) 100%,
+              hsl(0, 0%, 100%) 100%);
+  }
+
+  .cube-top {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    background: hsl(330, 3.13%, 25.1%) 0%;
+    transform: rotateX(90deg) translateZ(12px);
+    transform-style: preserve-3d;
+  }
+
+  .cube-top::before {
+    content: '';
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    background: hsl(0, 0%, 0%) 19.6%;
+    transform: translateZ(-28px);
+    filter: blur(4px);
+    box-shadow: 0 0 4px #323232,
+          0 0 8px hsl(0, 0%, 100%) 19.6%,
+          0 0 12px #323232,
+          0 0 16px hsl(0, 0%, 100%) 19.6%;
+  }
+
+  /* --- Ravengard Eye --- */
+  .ravengard-eye-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ravengard-eye {
+    position: relative;
+    width: 108px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .ravengard-eye::after,
+  .ravengard-eye::before {
+    content: "";
+    display: inline-block;
+    width: 48px;
+    height: 48px;
+    background-color: #fff;
+    background-image: radial-gradient(circle 14px, #0d161b 100%, transparent 0);
+    background-repeat: no-repeat;
+    border-radius: 50%;
+    animation: eyeMove 10s infinite, eyeBlink 10s infinite;
+  }
+  @keyframes eyeMove {
+    0%, 10% { background-position: 0px 0px; }
+    13%, 40% { background-position: -15px 0px; }
+    43%, 70% { background-position: 15px 0px; }
+    73%, 90% { background-position: 0px 15px; }
+    93%, 100% { background-position: 0px 0px; }
+  }
+  @keyframes eyeBlink {
+    0%, 10%, 12%, 20%, 22%, 40%, 42%, 60%, 62%, 70%, 72%, 90%, 92%, 98%, 100% { height: 48px; }
+    11%, 21%, 41%, 61%, 71%, 91%, 99% { height: 18px; }
+  }
+
+  /* --- Theme Switch --- */
+  .custom-toggle-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: scale(0.25);
+    transform-origin: right center;
+    width: 44px; /* Scaled down width */
+    height: 25px; /* Scaled down height */
+  }
+
+  .custom-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    perspective-origin: calc(50% + 10rem) calc(50% - 10rem);
+    perspective: 32em;
+  }
+
+  .custom-toggle [type="checkbox"] {
+    position: absolute;
+    left: -1440px;
+  }
+
+  .custom-toggle [type="checkbox"] + label {
+    --s: 0;
+    position: relative;
+    border: solid 0.625rem #f0f0f0;
+    width: 176px;
+    height: 100px;
+    border-radius: 5rem;
+    transform-style: preserve-3d;
+    transform: rotatex(90deg) rotate(22.5deg) rotatey(22.5deg);
+    box-shadow:
+      0.5rem 0.875rem 0 -0.25rem #73ad6b,
+      0.625rem 0.625rem 0 -0.25rem #b9d6ac,
+      0.5rem 0.875rem 0.625rem -0.125rem rgba(44, 161, 60, 0.75),
+      inset 0.125rem -0.125rem 0.5rem rgba(196, 192, 192, 0.5),
+      inset 0.75rem 0.75rem #51754d,
+      inset 0.75rem 0.75rem 0.75rem rgba(66, 129, 82, 0.85),
+      inset 0 1rem 0.75rem rgba(93, 201, 93, 0.65);
+    color: transparent;
+    font-size: 0;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+  }
+
+  .custom-toggle [type="checkbox"] + label:before,
+  .custom-toggle [type="checkbox"] + label:after {
+    position: absolute;
+    width: 5rem;
+    height: 5rem;
+    border-radius: 50%;
+    transition: 2s cubic-bezier(0.21, 0.61, 0.35, 1);
+    content: "";
+  }
+
+  .custom-toggle [type="checkbox"] + label:before {
+    top: calc(50% + 0.875rem);
+    transform-origin: 100% 0;
+    transform: translate(calc(var(--s) * (100% + 1rem))) scale(0.8) skewx(-22.5deg);
+    background: radial-gradient(at 50% 25%, rgba(160, 160, 160, 0.65), transparent 70%);
+    filter: blur(3px);
+  }
+
+  .custom-toggle [type="checkbox"] + label:after {
+    top: 0.875rem;
+    left: 0.75rem;
+    transform: translate(calc(var(--s) * (100% + 1rem))) rotatey(-22.5deg) rotate(-22.5deg) rotatex(-90deg) translatey(-50%) rotate(45deg);
+    box-shadow: -1px 1px 0.125rem rgba(206, 255, 206, 0.5);
+    background:
+      radial-gradient(at 0 50%, #52a066, transparent 2.5rem) 0 50% / 65% 50% no-repeat,
+      radial-gradient(at 50% 0%, #88d1a0 15%, #68b47d 35%, #66b47b, #77c28e 65%) 50% / 200%;
+    filter: grayscale(calc(1 - var(--s)));
+  }
+
+  .custom-toggle [type="checkbox"]:checked + label {
+    --s: 1;
   }
 }

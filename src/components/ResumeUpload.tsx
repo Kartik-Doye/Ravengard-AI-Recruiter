@@ -54,7 +54,7 @@ export default function ResumeUpload({ session, onNext }: { session: any, onNext
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ stage: 'resume_analysis', version: data.session.version })
+          body: JSON.stringify({ stage: 'pre_flight', version: data.session.version })
         });
         
         if (stageRes.ok) {

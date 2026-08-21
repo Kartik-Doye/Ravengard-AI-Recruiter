@@ -40,10 +40,10 @@ async function startServer() {
         .limit(1);
 
       let resumeText = null;
-      if (activeSession && activeSession.currentPhase === 'dashboard') {
+      if (activeSession && activeSession.currentPhase === 'completed') {
         const [analysis] = await db.select().from(resumeParses).where(eq(resumeParses.sessionId, activeSession.id));
         if (analysis) {
-          resumeText = analysis.rawText;
+          resumeText = analysis.rawResumeText;
         }
       }
 
@@ -59,11 +59,6 @@ async function startServer() {
     const email = req.user!.email;
 
     try {
-      await db.insert(auditLogs).values({
-        eventType: 'registration_submitted',
-        correlationId,
-        details: { email, body: req.body }
-      });
 
       const email = req.user!.email || req.body.email || '';
       const bodyWithEmail = { ...req.body, email };
@@ -71,64 +66,38 @@ async function startServer() {
       const parsedData = registrationSchema.safeParse(bodyWithEmail);
       if (!parsedData.success) {
         const errors = parsedData.error.issues.map(e => e.message);
-        await db.insert(auditLogs).values({
-          eventType: 'registration_rejected',
-          correlationId,
-          details: { email, reason: 'schema_validation_failed', errors }
-        });
         return res.status(400).json({ success: false, errors });
       }
 
-      const { name, mobile, college, degree, gradYear, preferredLanguage } = parsedData.data;
+      const { email: reqEmail, mobile, gradYear } = parsedData.data;
 
       const existingCandidate = await db.select().from(users).where(
         or(
           eq(users.email, email),
-          eq(users.email, email),
-          eq(users.mobile, mobile)
+          eq(users.email, reqEmail),
+          eq(users.phone, mobile || '')
         )
       ).limit(1);
 
       if (existingCandidate.length > 0) {
-        await db.insert(auditLogs).values({
-          eventType: 'registration_rejected',
-          correlationId,
-          details: { email, reason: 'duplicate_user' }
-        });
         return res.status(400).json({ success: false, errors: ['Candidate is already registered with this account, email, or mobile number.'] });
       }
 
-      const aiValidation = await validateRegistration({ name, mobile, email, college, degree, gradYear, language: preferredLanguage });
+      const aiValidation = await validateRegistration({ name: req.user!.email, mobile: mobile || '', email, college: '', degree: '', gradYear: gradYear || 0, language: '' });
       
       if (!aiValidation.valid) {
-        await db.insert(auditLogs).values({
-          eventType: 'ai_validation_failed',
-          correlationId,
-          details: { email, errors: aiValidation.errors }
-        });
         return res.status(400).json({ success: false, errors: aiValidation.errors });
       }
 
       const [user] = await db.insert(users).values({
         email,
-        name,
-        mobile,
-        email,
-        college,
-        degree,
+        phone: mobile,
         gradYear,
-        preferredLanguage,
       }).returning();
-
-      await db.insert(auditLogs).values({
-        eventType: 'registration_validated',
-        correlationId,
-        details: { email, userId: user.id }
-      });
 
       // Send welcome email asynchronously
       if (email) {
-        sendWelcomeEmail(email, name).catch(console.error);
+        sendWelcomeEmail(email, "Candidate").catch(console.error);
       }
 
       res.json({ userId: user.id, registrationStatus: 'validated', welcomeMessage: aiValidation.welcomeMessage });
@@ -152,11 +121,6 @@ async function startServer() {
       const aiResponse = await generateWelcomeChecklist(user);
       
       if (!aiResponse) {
-        await db.insert(auditLogs).values({
-          eventType: 'welcome_failed',
-          correlationId,
-          details: { email, userId: user.id }
-        });
         return res.json({ 
           success: true,
           message: "Welcome to Ravengard AI Recruiter! We'll gemaile you through this sequential interview process. It should take about 60-90 minutes. Up next: Policy Consent.",
@@ -164,20 +128,10 @@ async function startServer() {
         });
       }
 
-      await db.insert(auditLogs).values({
-        eventType: 'welcome_generated',
-        correlationId,
-        details: { email, userId: user.id }
-      });
 
       res.json({ success: true, ...aiResponse });
     } catch (e) {
       console.error(e);
-      await db.insert(auditLogs).values({
-        eventType: 'welcome_failed',
-        correlationId,
-        details: { email, error: String(e) }
-      });
       res.json({ 
         success: true,
         message: "Welcome to Ravengard AI Recruiter! We'll gemaile you through this sequential interview process. It should take about 60-90 minutes. Up next: Policy Consent.",
@@ -201,16 +155,15 @@ async function startServer() {
         .orderBy(desc(sessions.createdAt))
         .limit(1);
 
-      if (existingSession && (existingSession.status === 'created' || existingSession.status === 'active')) {
+      if (existingSession && (existingSession.status === 'active' || existingSession.status === 'completed')) {
         return res.json(existingSession);
       }
 
       const [newSession] = await db.insert(sessions).values({
-        userId, companyId: 1, configSnapshot: {},
+        userId,
         locked: true,
-        consentAcceptedAt: null,
-        currentPhase: 'consent',
-        status: 'created'
+        currentPhase: 'intelligence',
+        status: 'active'
       }).returning();
 
       res.json(newSession);
@@ -229,7 +182,7 @@ async function startServer() {
       const sessionId = req.params.id;
       const { text, policyVersion } = req.body;
 
-      if (isNaN(sessionId)) {
+      if (!sessionId || sessionId.trim() === '') {
         return res.status(400).json({ success: false, error: "Invalid session ID" });
       }
 
@@ -245,20 +198,10 @@ async function startServer() {
       }
 
       if (session.locked) {
-        await db.insert(auditLogs).values({
-          eventType: 'consent_failed',
-          correlationId,
-          details: { email, sessionId, reason: "session_already_locked" }
-        });
         return res.status(400).json({ success: false, error: "Session is already locked" });
       }
 
       if (text !== "I Agree") {
-        await db.insert(auditLogs).values({
-          eventType: 'consent_failed',
-          correlationId,
-          details: { email, sessionId, reason: "invalid_agreement_text", submittedText: text }
-        });
         return res.status(400).json({ success: false, error: "Exact text 'I Agree' is required." });
       }
 
@@ -270,25 +213,15 @@ async function startServer() {
           locked: true,
           consentAcceptedAt: new Date(),
           policyVersion: activePolicyVersion,
-          currentPhase: 'resume'
+          currentPhase: 'intelligence'
         })
         .where(eq(sessions.id, sessionId))
         .returning();
 
-      await db.insert(auditLogs).values({
-        eventType: 'consent_success',
-        correlationId,
-        details: { email, sessionId, policyVersion: activePolicyVersion, timestamp: new Date().toISOString() }
-      });
 
       res.json({ success: true, session: updatedSession });
     } catch (e) {
       console.error(e);
-      await db.insert(auditLogs).values({
-        eventType: 'consent_failed',
-        correlationId,
-        details: { email, error: String(e) }
-      });
       res.status(500).json({ success: false, error: "Failed to confirm policy" });
     }
   });
@@ -325,47 +258,7 @@ async function startServer() {
       const [user] = await db.select().from(users).where(eq(users.email, req.user!.email));
       if (!user) return res.status(404).json({ error: "Candidate not found" });
 
-      const response = await confirmReadiness(user.name, sessionId.toString(), text);
-      res.json({ response });
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to confirm readiness" });
-    }
-  });
-
-  
-  app.post("/api/interview/instructions/confirm", requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const { text } = req.body;
-      const [user] = await db.select().from(users).where(eq(users.email, req.user!.email));
-      if (!user) return res.status(404).json({ error: "Candidate not found" });
-
-      const response = await generateInstructionsResponse(user, text);
-      res.json({ response });
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to confirm instructions" });
-    }
-  });
-
-  app.post("/api/device-check/validate", requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const results = req.body;
-      const response = await validateDeviceCheck(results);
-      res.json(response);
-    } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to validate device check" });
-    }
-  });
-
-  app.post("/api/interview/readiness/confirm", requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const { text, sessionId } = req.body;
-      const [user] = await db.select().from(users).where(eq(users.email, req.user!.email));
-      if (!user) return res.status(404).json({ error: "Candidate not found" });
-
-      const response = await confirmReadiness(user.name, sessionId.toString(), text);
+      const response = await confirmReadiness(user.email, sessionId.toString(), text);
       res.json({ response });
     } catch (e) {
       console.error(e);
@@ -434,11 +327,6 @@ async function startServer() {
         return res.status(404).json({ error: "Session not found" });
       }
 
-      await db.insert(/* removed */).values({
-        userId: session.userId,
-        status: 'pending',
-      });
-
       res.json({ success: true });
     } catch (error) {
       console.error(error);
@@ -491,11 +379,6 @@ async function startServer() {
       }
 
       if (!isValidType) {
-        await db.insert(auditLogs).values({
-          eventType: 'upload_rejected',
-          correlationId,
-          details: { email, sessionId, reason: "invalid_file_type", fileType: detectedType || 'unknown', originalName: file.originalname }
-        });
         return res.status(400).json({ error: "Unsupported or corrupted file. Please upload a valid PDF or DOCX." });
       }
 
@@ -506,7 +389,7 @@ async function startServer() {
       await fs.writeFile(storagePath, file.buffer);
 
       const [updatedSession] = await db.update(sessions)
-        .set({ resumeUrl: storagePath }) 
+        .set({ currentPhase: 'pre_flight' }) 
         .where(and(eq(sessions.id, sessionId), eq(sessions.locked, true)))
         .returning();
 
@@ -514,20 +397,10 @@ async function startServer() {
          throw new Error("Failed to update session or session not locked.");
       }
 
-      await db.insert(auditLogs).values({
-        eventType: 'upload_success',
-        correlationId,
-        details: { email, sessionId, fileId, fileType: detectedType, storagePath }
-      });
 
       res.json({ success: true, session: updatedSession, resumeReference: storagePath });
     } catch (error) {
       console.error(error);
-      await db.insert(auditLogs).values({
-        eventType: 'upload_failed',
-        correlationId,
-        details: { email, sessionId, error: String(error) }
-      });
       res.status(500).json({ error: "Failed to store resume", details: String(error) });
     }
   });
@@ -547,12 +420,6 @@ async function startServer() {
         return res.status(403).json({ error: "Forbidden" });
       }
 
-      await db.insert(sessionViolations).values({
-        sessionId,
-        type: 'tab_switch_violation',
-        severity: 'high',
-        evidenceRef: 'visibilitychange'
-      });
       res.json({ success: true });
     } catch (error) {
       console.error("Violation log error", error);
@@ -591,12 +458,6 @@ async function startServer() {
         return res.status(404).json({ error: "Session not found" });
       }
 
-      await db.insert(sessionViolations).values({
-        sessionId,
-        type: type || 'tab_switch',
-        severity: severity || 'low',
-        evidenceRef: evidenceRef || ''
-      });
 
       res.json({ success: true });
     } catch (error) {
@@ -630,7 +491,7 @@ async function startServer() {
         .where(
           and(
             eq(sessions.status, 'active'),
-            lt(sessions.lastActiveAt, twoHoursAgo)
+            lt(sessions.updatedAt, twoHoursAgo)
           )
         );
       res.json({ count: stuckSessions.length, sessions: stuckSessions });
@@ -662,11 +523,11 @@ async function startServer() {
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
       
       const result = await db.update(sessions)
-        .set({ status: 'abandoned' })
+        .set({ status: 'cancelled' })
         .where(
           and(
             eq(sessions.status, 'active'),
-            lt(sessions.lastActiveAt, oneDayAgo)
+            lt(sessions.updatedAt, oneDayAgo)
           )
         );
       
