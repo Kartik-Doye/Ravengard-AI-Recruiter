@@ -98,44 +98,44 @@ export default function Registration({ user, onComplete }: { user: string, onCom
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">Full Name</label>
-              <input type="text" value={formData.name} onBlur={() => handleBlur('name')} onChange={e => { setFormData({...formData, name: e.target.value}); validateField('name', e.target.value); }} className={`w-full px-4 py-2 border ${errors.name ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
-              {errors.name && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.name}</p>}
+              <label htmlFor="name" className="block text-sm font-medium text-white/80 mb-1">Full Name</label>
+              <input type="text" id="name" aria-invalid={!!errors.name} aria-errormessage="name-error" aria-required="true" value={formData.name} onBlur={() => handleBlur('name')} onChange={e => { setFormData({...formData, name: e.target.value}); validateField('name', e.target.value); }} className={`w-full px-4 py-2 border ${errors.name ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.name && <p id="name-error" className="mt-1 text-xs text-[var(--color-error)]">{errors.name}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">Email Address</label>
-              <input type="email" value={formData.email} onBlur={() => handleBlur('email')} onChange={e => { setFormData({...formData, email: e.target.value}); validateField('email', e.target.value); }} className={`w-full px-4 py-2 border ${errors.email ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
-              {errors.email && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.email}</p>}
+              <label htmlFor="email" className="block text-sm font-medium text-white/80 mb-1">Email Address</label>
+              <input type="email" id="email" aria-invalid={!!errors.email} aria-errormessage="email-error" aria-required="true" value={formData.email} onBlur={() => handleBlur('email')} onChange={e => { setFormData({...formData, email: e.target.value}); validateField('email', e.target.value); }} className={`w-full px-4 py-2 border ${errors.email ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.email && <p id="email-error" className="mt-1 text-xs text-[var(--color-error)]">{errors.email}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">Mobile Number</label>
-              <input type="tel" value={formData.mobile} onBlur={() => handleBlur('mobile')} onChange={e => { setFormData({...formData, mobile: e.target.value}); validateField('mobile', e.target.value); }} className={`w-full px-4 py-2 border ${errors.mobile ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
-              {errors.mobile && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.mobile}</p>}
+              <label htmlFor="mobile" className="block text-sm font-medium text-white/80 mb-1">Mobile Number</label>
+              <input type="tel" id="mobile" aria-invalid={!!errors.mobile} aria-errormessage="mobile-error" aria-required="true" value={formData.mobile} onBlur={() => handleBlur('mobile')} onChange={e => { setFormData({...formData, mobile: e.target.value}); validateField('mobile', e.target.value); }} className={`w-full px-4 py-2 border ${errors.mobile ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.mobile && <p id="mobile-error" className="mt-1 text-xs text-[var(--color-error)]">{errors.mobile}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">College Name</label>
-              <input type="text" value={formData.college} onBlur={() => handleBlur('college')} onChange={e => { setFormData({...formData, college: e.target.value}); validateField('college', e.target.value); }} className={`w-full px-4 py-2 border ${errors.college ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
-              {errors.college && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.college}</p>}
+              <label htmlFor="college" className="block text-sm font-medium text-white/80 mb-1">College Name</label>
+              <input type="text" id="college" aria-invalid={!!errors.college} aria-errormessage="college-error" aria-required="true" value={formData.college} onBlur={() => handleBlur('college')} onChange={e => { setFormData({...formData, college: e.target.value}); validateField('college', e.target.value); }} className={`w-full px-4 py-2 border ${errors.college ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.college && <p id="college-error" className="mt-1 text-xs text-[var(--color-error)]">{errors.college}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">Degree</label>
-              <input type="text" value={formData.degree} onBlur={() => handleBlur('degree')} onChange={e => { setFormData({...formData, degree: e.target.value}); validateField('degree', e.target.value); }} className={`w-full px-4 py-2 border ${errors.degree ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
-              {errors.degree && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.degree}</p>}
+              <label htmlFor="degree" className="block text-sm font-medium text-white/80 mb-1">Degree</label>
+              <input type="text" id="degree" aria-invalid={!!errors.degree} aria-errormessage="degree-error" aria-required="true" value={formData.degree} onBlur={() => handleBlur('degree')} onChange={e => { setFormData({...formData, degree: e.target.value}); validateField('degree', e.target.value); }} className={`w-full px-4 py-2 border ${errors.degree ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.degree && <p id="degree-error" className="mt-1 text-xs text-[var(--color-error)]">{errors.degree}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">Graduation Year</label>
-              <input type="number" value={formData.gradYear} onBlur={() => handleBlur('gradYear')} onChange={e => { setFormData({...formData, gradYear: e.target.value}); validateField('gradYear', e.target.value); }} className={`w-full px-4 py-2 border ${errors.gradYear ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
-              {errors.gradYear && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.gradYear}</p>}
+              <label htmlFor="gradYear" className="block text-sm font-medium text-white/80 mb-1">Graduation Year</label>
+              <input type="number" id="gradYear" aria-invalid={!!errors.gradYear} aria-errormessage="gradYear-error" aria-required="true" value={formData.gradYear} onBlur={() => handleBlur('gradYear')} onChange={e => { setFormData({...formData, gradYear: e.target.value}); validateField('gradYear', e.target.value); }} className={`w-full px-4 py-2 border ${errors.gradYear ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`} />
+              {errors.gradYear && <p id="gradYear-error" className="mt-1 text-xs text-[var(--color-error)]">{errors.gradYear}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1">Preferred Language</label>
-              <select value={formData.preferredLanguage} onBlur={() => handleBlur('preferredLanguage')} onChange={e => { setFormData({...formData, preferredLanguage: e.target.value}); validateField('preferredLanguage', e.target.value); }} className={`w-full px-4 py-2 border ${errors.preferredLanguage ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`}>
+              <label htmlFor="preferredLanguage" className="block text-sm font-medium text-white/80 mb-1">Preferred Language</label>
+              <select id="preferredLanguage" aria-invalid={!!errors.preferredLanguage} aria-errormessage="preferredLanguage-error" aria-required="true" value={formData.preferredLanguage} onBlur={() => handleBlur('preferredLanguage')} onChange={e => { setFormData({...formData, preferredLanguage: e.target.value}); validateField('preferredLanguage', e.target.value); }} className={`w-full px-4 py-2 border ${errors.preferredLanguage ? 'border-[var(--color-error)]' : 'border-white/10'} bg-white/5 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] outline-none text-sm text-white`}>
                 <option className="text-black" value="English">English</option>
                 <option className="text-black" value="Spanish">Spanish</option>
                 <option className="text-black" value="French">French</option>
                 <option className="text-black" value="Hindi">Hindi</option>
               </select>
-              {errors.preferredLanguage && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.preferredLanguage}</p>}
+              {errors.preferredLanguage && <p id="preferredLanguage-error" className="mt-1 text-xs text-[var(--color-error)]">{errors.preferredLanguage}</p>}
             </div>
           </div>
           

@@ -1,5 +1,8 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { GlobalErrorBoundary } from "./components/layout/GlobalErrorBoundary.tsx";
+import { ReducedMotionProvider } from "./components/layout/ReducedMotionProvider.tsx";
+import { ThemeProvider } from "./contexts/ThemeContext.tsx";
 import RootLayout from './components/layout/RootLayout.tsx';
 import { LenisProvider } from './components/layout/LenisProvider.tsx';
 import Home from './pages/Home.tsx';
@@ -14,6 +17,9 @@ import NotFound from './pages/NotFound.tsx';
 
 export default function App() {
   return (
+    <GlobalErrorBoundary>
+    <ReducedMotionProvider>
+    <ThemeProvider>
     <LenisProvider>
       <BrowserRouter>
         <Routes>
@@ -32,5 +38,8 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </LenisProvider>
+    </ThemeProvider>
+    </ReducedMotionProvider>
+    </GlobalErrorBoundary>
   );
 }

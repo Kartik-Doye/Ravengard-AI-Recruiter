@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Shield, ChevronRight } from 'lucide-react';
+import { NetworkStatusBanner } from "./NetworkStatusBanner.tsx";
 import { SmoothLoader } from './SmoothLoader';
 import { SiteHeader } from './SiteHeader';
 import { SiteFooter } from './SiteFooter';
@@ -15,6 +16,7 @@ export default function RootLayout() {
     return (
       <>
         <SmoothLoader />
+        <NetworkStatusBanner />
         <Outlet />
       </>
     );
@@ -23,6 +25,7 @@ export default function RootLayout() {
   return (
     <>
       <SmoothLoader />
+        <NetworkStatusBanner />
       <div className="min-h-screen bg-[var(--color-bg-0)] flex flex-col font-sans text-[#F3F4F6]">
         <SiteHeader />
 

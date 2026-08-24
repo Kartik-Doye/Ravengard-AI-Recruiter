@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield } from 'lucide-react';
+import { CubeLoader } from '../ui/CubeLoader';
 
 export function SmoothLoader() {
   const [isLoading, setIsLoading] = useState(true);
@@ -31,20 +31,11 @@ export function SmoothLoader() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="flex flex-col items-center gap-6"
+            className="flex flex-col items-center gap-12"
           >
-            <div className="relative">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                className="w-16 h-16 rounded-full border border-white/10 border-t-white/40 flex items-center justify-center"
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Shield className="w-6 h-6 text-white/80" />
-              </div>
-            </div>
+            <CubeLoader />
             
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-2 mt-4">
               <h2 className="font-display text-lg tracking-widest uppercase text-white/90">
                 Ravengard
               </h2>

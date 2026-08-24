@@ -19,11 +19,14 @@ import Layout from './../components/Layout.tsx';
 import ErrorBoundary from './../components/ErrorBoundary.tsx';
 import CommandPalette from './../components/CommandPalette.tsx';
 import { Skeleton } from './../components/ui/Skeleton.tsx';
+import { ApiTimeoutFallback } from "../components/layout/ApiTimeoutFallback";
 import { useToast } from './../contexts/ToastContext.tsx';
 
 export default function InterviewGateway() {
   const [user, setUser] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  const [isTimeout, setIsTimeout] = useState(false);
   const [candidate, setCandidate] = useState<any>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
   const [resumeText, setResumeText] = useState<string | null>(null);
@@ -69,12 +72,16 @@ export default function InterviewGateway() {
   const fetchCandidateData = async (uid: string, silent = false) => {
     try {
       if (!silent) setLoading(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => { controller.abort(); setIsTimeout(true); }, 8000);
       const res = await fetch('/api/me', {
+        signal: controller.signal,
         headers: {
           Authorization: `Bearer ${uid}`
         }
       });
       if (res.ok) {
+        clearTimeout(timeoutId);
         const data = await res.json();
         setCandidate(data.candidate);
         setActiveSession(data.activeSession);
@@ -117,6 +124,13 @@ export default function InterviewGateway() {
   };
 
 
+  if (isTimeout) {
+    return (
+      <div className="flex flex-col h-screen bg-[var(--color-bg-0)] justify-center">
+        <ApiTimeoutFallback onRetry={() => { setIsTimeout(false); fetchCandidateData(user || ""); }} />
+      </div>
+    );
+  }
   if (loading) {
     return (
       <div className="flex flex-col h-screen bg-[var(--color-bg-0)]">
@@ -176,7 +190,8 @@ export default function InterviewGateway() {
         });
         
         if (!res.ok) {
-          const data = await res.json();
+          clearTimeout(timeoutId);
+        const data = await res.json();
           addToast('error', data.error || 'Failed to go back');
         } else {
           const updated = await res.json();

@@ -8,7 +8,7 @@ export const projects = [
     role: "Frontend + Systems",
     outcome: "Built a strict session-driven experience.",
     tags: ["React", "Framer Motion", "TypeScript"],
-    heroImage: "https://images.unsplash.com/photo-1555949963-aa79dcee57d5?auto=format&fit=crop&q=80&w=800",
+    heroImage: "/assets/projects/ravengard.webp",
     featured: true,
   },
   {
@@ -20,7 +20,7 @@ export const projects = [
     role: "Design Engineer",
     outcome: "Adopted by 5 enterprise teams.",
     tags: ["Tailwind", "Motion", "Storybook"],
-    heroImage: "https://images.unsplash.com/photo-1618761714954-0b8cd0026356?auto=format&fit=crop&q=80&w=800",
+    heroImage: "/assets/projects/aura.webp",
     featured: false,
   },
   {
@@ -32,7 +32,7 @@ export const projects = [
     role: "Full-Stack",
     outcome: "Scaled to 10k monthly active users.",
     tags: ["Node.js", "WebSockets", "React"],
-    heroImage: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=800",
+    heroImage: "/assets/projects/nexus.webp",
     featured: false,
   }
 ];

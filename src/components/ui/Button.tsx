@@ -32,7 +32,7 @@ export const Button = forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPr
     },
     ref
   ) => {
-    const base = 'inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-medium transition focus:outline-none';
+    const base = 'inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060814]';
 
     const styles = {
       solid: 'bg-white text-[#060814]',

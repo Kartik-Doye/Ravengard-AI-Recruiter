@@ -78,7 +78,7 @@ export function ContactFormSection() {
           <div className="grid md:grid-cols-2 gap-6 relative z-10">
             <motion.div variants={inputVariants} custom={1} className="space-y-2">
               <UiverseInputGroup>
-                <input
+                <input aria-required="true"
                   id="name"
                   required
                   type="text"
@@ -92,7 +92,7 @@ export function ContactFormSection() {
             </motion.div>
             <motion.div variants={inputVariants} custom={2} className="space-y-2">
               <UiverseInputGroup>
-                <input
+                <input aria-required="true"
                   id="email"
                   required
                   type="email"
@@ -108,7 +108,7 @@ export function ContactFormSection() {
           
           <motion.div variants={inputVariants} custom={3} className="space-y-2 relative z-10">
             <UiverseInputGroup>
-              <input
+              <input aria-required="true"
                 id="subject"
                 required
                 type="text"
@@ -123,7 +123,7 @@ export function ContactFormSection() {
 
           <motion.div variants={inputVariants} custom={4} className="space-y-2 relative z-10">
             <UiverseInputGroup>
-              <textarea
+              <textarea aria-required="true"
                 id="message"
                 required
                 rows={5}

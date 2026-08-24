@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
+import { OptimizedImage } from '../ui/OptimizedImage';
 
 export type ProjectItem = {
   title: string;
@@ -37,12 +38,7 @@ export function ProjectGrid({ projects, activeCategories }: ProjectGridProps) {
             className="group overflow-hidden rounded-[30px] border border-white/10 bg-white/5 backdrop-blur-xl"
           >
             <div className="relative aspect-[16/11] overflow-hidden">
-              <div
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                style={{
-                  backgroundImage: `url(${project.image ?? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop"})`,
-                }}
-              />
+              <OptimizedImage src={project.image || "/assets/placeholder-grid.webp"} alt={project.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_55%)]" />
               <div
                 className="absolute inset-0 opacity-80"

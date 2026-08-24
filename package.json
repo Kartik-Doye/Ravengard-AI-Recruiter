@@ -10,6 +10,9 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 0",
+    "qa": "node scripts/qa-check-routes.js",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push"
   },
