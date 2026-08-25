@@ -2,17 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CubeLoader } from '../ui/CubeLoader';
 
-export function SmoothLoader() {
+export function SmoothLoader({ duration = 1200 }: { duration?: number }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Artificial delay for the branded loader experience (per spec: 900ms to 1600ms)
+    // Artificial delay for the branded loader experience
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 1200);
+    }, duration);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [duration]);
 
   return (
     <AnimatePresence>

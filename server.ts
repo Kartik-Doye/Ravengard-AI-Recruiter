@@ -1,13 +1,13 @@
 import express from "express";
+import { extractTextFromFile, analyzeResumeWithAI } from "./src/services/resume-processor.ts";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { requireAuth, AuthRequest } from "./src/middleware/auth.ts";
 import { db } from "./src/db/index.ts";
-import { users, sessions, resumeParses, sessionViolations, roundOutputs, assessments, assessmentRecommendations } from "./src/db/schema.ts";
+import { users, sessions, resumeParses, sessionViolations, roundOutputs, assessments, assessmentRecommendations, contacts } from "./src/db/schema.ts";
 import { eq, and, or, desc, lt } from "drizzle-orm";
 import multer from "multer";
-import { extractText, getDocumentProxy } from "unpdf";
-import mammoth from "mammoth";
+
 import { validateRegistration, analyzeResume, generateWelcomeChecklist, validatePolicyConsent, generateInstructionsResponse, validateDeviceCheck, confirmReadiness } from "./src/lib/ai.ts";
 import { sendWelcomeEmail } from "./src/lib/email.ts";
 import { WebSocketServer } from "ws";
@@ -51,6 +51,27 @@ async function startServer() {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Server error", details: String(error) });
+    }
+  });
+
+  app.post("/api/contact", async (req, res) => {
+    try {
+      const { name, email, message } = req.body;
+      if (!name || !email || !message) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      await db.insert(contacts).values({
+        id: crypto.randomUUID(),
+        name,
+        email,
+        message,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Contact form error:", error);
+      res.status(500).json({ error: "Failed to submit contact form" });
     }
   });
 
@@ -162,7 +183,7 @@ async function startServer() {
       const [newSession] = await db.insert(sessions).values({
         userId,
         locked: true,
-        currentPhase: 'intelligence',
+        currentPhase: 'resume',
         status: 'active'
       }).returning();
 
@@ -213,7 +234,7 @@ async function startServer() {
           locked: true,
           consentAcceptedAt: new Date(),
           policyVersion: activePolicyVersion,
-          currentPhase: 'intelligence'
+          currentPhase: 'resume'
         })
         .where(eq(sessions.id, sessionId))
         .returning();
@@ -282,14 +303,15 @@ async function startServer() {
 
       if (currentSession.locked) {
         const validTransitions: Record<string, string[]> = {
+          'welcome': ['consent'],
+          'consent': ['resume'],
           'resume': ['resume_analysis', 'consent'],
           'resume_analysis': ['instructions', 'resume'],
           'instructions': ['device_check', 'resume_analysis'],
           'device_check': ['waiting_room', 'instructions'],
-          'waiting_room': ['interview', 'device_check'],
-          'interview': ['completed']
+          'waiting_room': ['interview_hr_friendly', 'device_check'],
+          'interview_hr_friendly': ['completed']
         };
-
         const allowedNext = validTransitions[currentSession.currentPhase] || [];
         if (!allowedNext.includes(stage)) {
           return res.status(400).json({ error: `Invalid phase transition from ${currentSession.currentPhase} to ${stage}. Manual phase selection is locked.` });
@@ -388,8 +410,27 @@ async function startServer() {
 
       await fs.writeFile(storagePath, file.buffer);
 
+      let rawResumeText = "";
+      try {
+        rawResumeText = await extractTextFromFile(file.buffer, detectedType as 'pdf' | 'docx');
+      } catch (e) {
+        return res.status(400).json({ error: "Failed to extract text from document." });
+      }
+
+      // Perform Gemini Analysis via service
+      const analysis = await analyzeResumeWithAI(rawResumeText);
+
+      await db.insert(resumeParses).values({
+         id: crypto.randomUUID(),
+         sessionId: sessionId,
+         rawResumeText: rawResumeText,
+         skills: analysis.skills,
+         strengths: analysis.strengths,
+         missingKeywords: analysis.missingKeywords
+      });
+
       const [updatedSession] = await db.update(sessions)
-        .set({ currentPhase: 'pre_flight' }) 
+        .set({ currentPhase: 'resume_analysis' }) 
         .where(and(eq(sessions.id, sessionId), eq(sessions.locked, true)))
         .returning();
 
@@ -483,7 +524,13 @@ async function startServer() {
   });
 
   // Admin endpoint for monitoring stuck sessions
-  app.get("/api/admin/stuck-sessions", async (req, res) => {
+  app.get("/api/admin/stuck-sessions", requireAuth, async (req, res) => {
+    // @ts-ignore
+    const email = req.user.email;
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
     try {
       // Sessions with status 'active' inactive for > 2 hours
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
@@ -614,38 +661,75 @@ async function startServer() {
           }
         }
       });
-      const liveSession = await ai.live.connect({
-        model: "gemini-3.1-flash-live-preview",
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
-          },
-          systemInstruction: `You are the 'Friendly HR' AI interviewer for Ravengard AI Recruiter. 
-          Your goal is to greet the user, break the ice, introduce yourself, and test their communication style. 
-          
-          Candidate Context: ${userContext}
-          
-          Rules:
-          - Ask one question at a time. 
-          - Be warm, low-pressure, and conversational. 
-          - Do NOT reveal live scores, pass/fail status. 
-          - Limit this round to 4-6 turns. 
-          - If the user stops speaking, gently prompt them to continue or move to the next question.
-          - Never fabricate claims about the user.`,
-        },
-        callbacks: {
-          onmessage: (message: LiveServerMessage) => {
-            const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (audio && clientWs.readyState === 1) {
-              clientWs.send(JSON.stringify({ audio }));
+
+      const connectWithRetry = async () => {
+        let lastError: any;
+        const maxRetries = 5;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            if (attempt > 0 && clientWs.readyState === 1) {
+              clientWs.send(JSON.stringify({ type: 'retry_status', attempt, maxAttempts: maxRetries }));
             }
-            if (message.serverContent?.interrupted && clientWs.readyState === 1) {
-              clientWs.send(JSON.stringify({ interrupted: true }));
+            const liveSession = await ai.live.connect({
+              model: "gemini-3.1-flash-live-preview",
+              config: {
+                responseModalities: [Modality.AUDIO],
+                speechConfig: {
+                  voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
+                },
+                systemInstruction: `You are the 'Friendly HR' AI interviewer for Ravengard AI Recruiter. 
+                Your goal is to greet the user, break the ice, introduce yourself, and test their communication style. 
+                
+                Candidate Context: ${userContext}
+                
+                Rules:
+                - Ask one question at a time. 
+                - Be warm, low-pressure, and conversational. 
+                - Do NOT reveal live scores, pass/fail status. 
+                - Limit this round to 4-6 turns. 
+                - If the user stops speaking, gently prompt them to continue or move to the next question.
+                - Never fabricate claims about the user.`,
+              },
+              callbacks: {
+                onmessage: (message: LiveServerMessage) => {
+                  const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+                  if (audio && clientWs.readyState === 1) {
+                    clientWs.send(JSON.stringify({ audio }));
+                  }
+                  if (message.serverContent?.interrupted && clientWs.readyState === 1) {
+                    clientWs.send(JSON.stringify({ interrupted: true }));
+                  }
+                },
+              },
+            });
+            if (attempt > 0 && clientWs.readyState === 1) {
+              clientWs.send(JSON.stringify({ type: 'retry_success' }));
             }
-          },
-        },
-      });
+            return liveSession;
+          } catch (err: any) {
+            lastError = err;
+            const status = err?.status || err?.response?.status;
+            const code = err?.code || err?.error?.code || err?.message;
+
+            const retryable =
+              status === 429 ||
+              status === 503 ||
+              status === 504 ||
+              String(code).includes("RESOURCE_EXHAUSTED");
+
+            if (!retryable || attempt === maxRetries) break;
+
+            const base = 1000;
+            const ceiling = Math.min(base * 2 ** attempt, 60000);
+            const delay = Math.floor(Math.random() * ceiling);
+
+            await new Promise((r) => setTimeout(r, delay));
+          }
+        }
+        throw lastError;
+      };
+
+      const liveSession = await connectWithRetry();
 
       clientWs.on("message", (data) => {
         try {
@@ -663,9 +747,16 @@ async function startServer() {
       clientWs.on("close", () => {
         try { liveSession.close(); } catch(e) {}
       });
-    } catch(e) {
+    } catch(e: any) {
       console.error("Live API connection error:", e);
-      if (clientWs.readyState === 1) clientWs.close();
+      if (clientWs.readyState === 1) {
+        if (e.message?.includes('resource_exhausted') || e.message?.includes('429')) {
+          clientWs.send(JSON.stringify({ error: "AI quota exceeded. Please try again later." }));
+        } else {
+          clientWs.send(JSON.stringify({ error: "Failed to connect to AI service." }));
+        }
+        clientWs.close();
+      }
     }
   });
 }

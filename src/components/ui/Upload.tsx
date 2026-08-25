@@ -112,7 +112,7 @@ export function Upload({
             <p className="text-white/50 text-xs mb-4">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
             
             <Button 
-              variant="tertiary" 
+              variant="ghost" 
               size="sm" 
               onClick={(e) => {
                 e.stopPropagation();

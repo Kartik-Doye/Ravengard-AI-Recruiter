@@ -73,7 +73,7 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
           description="We couldn't parse the profile data correctly. You can still proceed with the interview."
           icon={<ShieldAlert className="w-12 h-12 text-red-500/50" />}
           action={
-            <Button onClick={handleNext} variant="primary">
+            <Button onClick={handleNext} variant="solid">
               Continue to Instructions
             </Button>
           }

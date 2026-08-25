@@ -19,7 +19,7 @@ export default function NotFound() {
           The requested coordinate does not exist in the current sector. Please return to the primary gateway.
         </p>
         <Link to="/">
-          <Button variant="primary" className="px-8 py-3">
+          <Button variant="solid" className="px-8 py-3">
             Return to Gateway
           </Button>
         </Link>

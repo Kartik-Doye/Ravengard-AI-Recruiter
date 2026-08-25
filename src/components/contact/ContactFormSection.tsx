@@ -29,7 +29,7 @@ export function ContactFormSection() {
     visible: (custom: number) => ({
       opacity: 1, 
       y: 0, 
-      transition: { duration: 0.4, delay: custom * 0.1, ease: 'easeOut' }
+      transition: { duration: 0.4, delay: custom * 0.1, ease: 'easeOut' as const }
     })
   };
 
@@ -52,7 +52,7 @@ export function ContactFormSection() {
           <h3 className="text-3xl font-display font-medium mb-4 text-white">Message Received</h3>
           <p className="text-white/60 mb-8 leading-relaxed">Thank you for reaching out. Our team will review your inquiry and connect with you shortly.</p>
           <Button 
-            variant="secondary"
+            variant="outline"
             onClick={() => setStatus('idle')}
             className="px-6 py-3"
           >
@@ -140,7 +140,7 @@ export function ContactFormSection() {
           <motion.div variants={inputVariants} custom={5} className="pt-4 relative z-10">
             <Button
               type="submit"
-              variant="primary"
+              variant="solid"
               isLoading={status === 'submitting'}
               rightIcon={!status ? <ChevronRight className="w-4 h-4" /> : null}
               fullWidth

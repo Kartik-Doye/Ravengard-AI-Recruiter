@@ -1,11 +1,11 @@
 export const transitions = {
   smoothFade: {
     duration: 0.8,
-    ease: [0.16, 1, 0.3, 1], // Custom bezier for smooth out
+    ease: [0.16, 1, 0.3, 1] as [number, number, number, number], // Custom bezier for smooth out
   },
   modalScale: {
     duration: 0.4,
-    ease: [0.16, 1, 0.3, 1],
+    ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
   },
   elementLift: {
     duration: 0.3,

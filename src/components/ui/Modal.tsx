@@ -109,7 +109,7 @@ export function Modal({ isOpen, onClose, title, children, footer, size = 'md', p
               transition={transitions.modalScale}
               className={`w-full ${sizeClass} pointer-events-auto outline-none`}
             >
-              <Card variant="elevated" padding="none" className="overflow-hidden border-[var(--color-primary)]/20 shadow-[0_0_40px_rgba(139,92,246,0.15)]">
+              <Card className="overflow-hidden border-[var(--color-primary)]/20 shadow-[0_0_40px_rgba(139,92,246,0.15)]">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] opacity-50" />
                 
                 <CardBody className="p-6">

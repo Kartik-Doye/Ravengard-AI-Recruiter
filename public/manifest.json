@@ -1,0 +1,28 @@
+{
+  "short_name": "RavenGard",
+  "name": "RavenGard AI Recruiter",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "/favicon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/favicon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#060814",
+  "display": "standalone",
+  "theme_color": "#060814",
+  "description": "Premium AI Interview Engine with state-machine flow."
+}

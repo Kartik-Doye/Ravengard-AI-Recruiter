@@ -19,7 +19,7 @@ export function EmptyState({
   className = '' 
 }: EmptyStateProps) {
   return (
-    <Card variant="base" padding="lg" className={`w-full text-center ${className}`}>
+    <Card className={`w-full text-center ${className}`}>
       <CardBody className="flex flex-col items-center justify-center py-8">
         <motion.div 
           initial={{ scale: 0.9, opacity: 0 }}

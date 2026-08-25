@@ -25,7 +25,7 @@ export function GatewayActions() {
           
           <div className="w-full space-y-4">
             <Button
-              variant="primary"
+              variant="solid"
               fullWidth
               className="py-5"
               onClick={() => navigate('/interview')}
@@ -35,7 +35,7 @@ export function GatewayActions() {
             </Button>
             
             <Button
-              variant="secondary"
+              variant="outline"
               fullWidth
               className="py-5"
               onClick={() => navigate('/assessment-guide')}

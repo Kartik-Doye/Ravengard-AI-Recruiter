@@ -35,6 +35,7 @@ export default function Interview({ session, onNext }: { session: any, onNext: (
   const [thinkAgainLeft, setThinkAgainLeft] = useState(2 - (session?.thinkAgainUsesLeft || 0));
   const [showWarning, setShowWarning] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [retryingStatus, setRetryingStatus] = useState<string | null>(null);
 
   useVisibilityCheck(session?.id, () => {
     setShowWarning(true);
@@ -106,8 +107,18 @@ export default function Interview({ session, onNext }: { session: any, onNext: (
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
       
-      if (msg.error === 'failed_validation') {
-         setValidationError('The AI encountered a schema validation error while finalizing the round. Please retry the round.');
+      if (msg.type === 'retry_status') {
+        setRetryingStatus(`AI quota busy. Retrying... (attempt ${msg.attempt}/${msg.maxAttempts})`);
+        return;
+      }
+      
+      if (msg.type === 'retry_success') {
+        setRetryingStatus(null);
+        return;
+      }
+      
+      if (msg.error) {
+         setValidationError(msg.error === 'failed_validation' ? 'The AI encountered a schema validation error while finalizing the round. Please retry the round.' : msg.error);
          setConnected(false);
          ws.close();
          return;
@@ -245,7 +256,9 @@ export default function Interview({ session, onNext }: { session: any, onNext: (
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Friendly HR <span className="text-slate-400 text-lg font-normal ml-2">(Round 1 of 9)</span></h1>
           <p className="text-slate-500 text-sm flex items-center gap-2">
-            {connected ? (
+            {retryingStatus ? (
+              <><Loader2 className="w-3 h-3 animate-spin text-orange-500" /> <span className="text-orange-600">{retryingStatus}</span></>
+            ) : connected ? (
               <><span className="w-2 h-2 rounded-full bg-emerald-500 block"></span> Connected</>
             ) : (
               <><Loader2 className="w-3 h-3 animate-spin" /> Connecting to AI Engine...</>

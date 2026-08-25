@@ -10,7 +10,7 @@ export interface BackButtonProps extends Omit<ButtonProps, 'children' | 'leftIco
 export function BackButton({ label = 'Back', onClick, className = '', ...props }: BackButtonProps) {
   return (
     <Button
-      variant="tertiary"
+      variant="ghost"
       size="sm"
       leftIcon={<ArrowLeft className="w-4 h-4" />}
       onClick={onClick}

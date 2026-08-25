@@ -47,7 +47,7 @@ export default function Layout({ children, candidate, session, currentStageName,
             {(status === 'in_progress' || status === 'created') && currentStageName !== 'dashboard' && onPauseSession && (
               <div className="ml-2">
                 <Button 
-                  variant="tertiary" 
+                  variant="ghost" 
                   size="sm" 
                   onClick={() => setShowExitModal(true)}
                   className="text-white/50 hover:text-white font-mono uppercase tracking-widest text-xs"
@@ -134,7 +134,7 @@ export default function Layout({ children, candidate, session, currentStageName,
         title="Pause Interview?"
         footer={
           <>
-            <Button variant="tertiary" onClick={() => setShowExitModal(false)}>
+            <Button variant="ghost" onClick={() => setShowExitModal(false)}>
               Cancel
             </Button>
             <Button 

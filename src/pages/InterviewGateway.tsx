@@ -1,9 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Landing from './../components/Landing.tsx';
 import Registration from './../components/Registration.tsx';
 import Welcome from './../components/Welcome.tsx';
@@ -22,6 +18,10 @@ import { Skeleton } from './../components/ui/Skeleton.tsx';
 import { ApiTimeoutFallback } from "../components/layout/ApiTimeoutFallback";
 import { useToast } from './../contexts/ToastContext.tsx';
 
+import { ProtectedRoute } from '../components/interview/ProtectedRoute';
+import { STAGE_ROUTE_MAP, useInterviewFlow } from '../hooks/useInterviewFlow';
+
+
 export default function InterviewGateway() {
   const [user, setUser] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,13 +31,13 @@ export default function InterviewGateway() {
   const [activeSession, setActiveSession] = useState<any>(null);
   const [resumeText, setResumeText] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'dashboard' | 'session'>('dashboard');
-
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark' | 'high-contrast'>(() => {
     return (localStorage.getItem('ravengard_theme') as any) || 'light';
   });
-
   const { addToast } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     document.documentElement.classList.remove('light', 'dark', 'high-contrast');
@@ -80,8 +80,8 @@ export default function InterviewGateway() {
           Authorization: `Bearer ${uid}`
         }
       });
+
       if (res.ok) {
-        clearTimeout(timeoutId);
         const data = await res.json();
         setCandidate(data.candidate);
         setActiveSession(data.activeSession);
@@ -123,6 +123,8 @@ export default function InterviewGateway() {
     await fetchCandidateData(uid);
   };
 
+  
+  const { activeStage } = useInterviewFlow(currentView === 'session' ? activeSession : null, loading || !user || !candidate || currentView === 'dashboard');
 
   if (isTimeout) {
     return (
@@ -131,6 +133,7 @@ export default function InterviewGateway() {
       </div>
     );
   }
+
   if (loading) {
     return (
       <div className="flex flex-col h-screen bg-[var(--color-bg-0)]">
@@ -172,11 +175,10 @@ export default function InterviewGateway() {
     );
   }
 
-  const activeStage = activeSession?.currentStage || 'welcome';
   const handleBackStep = async () => {
     if (!activeSession) return;
     const flowStages = ['welcome', 'consent', 'resume', 'resume_analysis', 'instructions', 'device_check', 'waiting_room', 'interview_hr_friendly'];
-    const currentIndex = flowStages.indexOf(activeSession.currentStage);
+    const currentIndex = flowStages.indexOf(activeStage);
     
     if (currentIndex > 0) {
       const prevStage = flowStages[currentIndex - 1];
@@ -190,8 +192,7 @@ export default function InterviewGateway() {
         });
         
         if (!res.ok) {
-          clearTimeout(timeoutId);
-        const data = await res.json();
+          const data = await res.json();
           addToast('error', data.error || 'Failed to go back');
         } else {
           const updated = await res.json();
@@ -226,13 +227,14 @@ export default function InterviewGateway() {
           addToast('success', `Theme changed to ${newTheme}`);
         }}
       />
+      
       <Layout 
         candidate={candidate} 
         session={activeSession} 
         currentStageName={displayStage}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onPauseSession={() => setCurrentView('dashboard')}
-        onBackStep={activeSession?.currentStage !== 'welcome' ? handleBackStep : undefined}
+        onBackStep={activeStage !== 'welcome' ? handleBackStep : undefined}
       >
         {currentView === 'dashboard' ? (
           <Dashboard
@@ -245,42 +247,19 @@ export default function InterviewGateway() {
             }}
           />
         ) : (
-          <>
-            {!activeSession || activeStage === 'welcome' ? (
-              <Welcome onNext={(session) => { setActiveSession(session); setCurrentView('session'); }} candidate={candidate} />
-            ) : activeStage === 'consent' ? (
-              <Consent session={activeSession} onNext={(session) => { setActiveSession(session); setCurrentView('session'); }} />
-) : activeStage === 'resume' ? (
-              <ResumeUpload session={activeSession} onNext={(session, text) => { 
-                 setActiveSession(session); 
-                 if (text) setResumeText(text);
-                setCurrentView('session'); 
-               }} />
-            ) : activeStage === 'resume_analysis' ? (
-              <ResumeAnalysis session={activeSession} onNext={(session) => { setActiveSession(session); }} />
-            ) : activeStage === 'instructions' ? (
-              <InterviewInstructions session={activeSession} onNext={(session) => { setActiveSession(session); }} />
-            ) : activeStage === 'device_check' ? (
-              <DeviceCheck session={activeSession} onNext={(session) => { setActiveSession(session); }} />
-            ) : activeStage === 'waiting_room' ? (
-              <WaitingRoom session={activeSession} onNext={(session) => { setActiveSession(session); }} />
-            ) : activeStage === 'interview' || activeStage.startsWith('interview_') ? (
-              <Interview session={activeSession} onNext={(session) => { setActiveSession(session); setCurrentView('dashboard'); addToast('success', 'Interview session complete!'); }} />
-            ) : (
-              <Dashboard 
-                candidate={candidate} 
-                session={activeSession} 
-                resumeText={resumeText}
-                onResumeSession={() => {
-                  setCurrentView('session');
-                  addToast('info', 'Resuming session...');
-                }} 
-              />
-            )}
-          </>
+          <Routes>
+             <Route path="welcome" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="welcome"><Welcome onNext={(session) => { setActiveSession(session); setCurrentView('session'); }} candidate={candidate} /></ProtectedRoute>} />
+             <Route path="consent" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="consent"><Consent session={activeSession} onNext={(session) => { setActiveSession(session); setCurrentView('session'); }} /></ProtectedRoute>} />
+             <Route path="upload" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="resume"><ResumeUpload session={activeSession} onNext={(session, text) => { setActiveSession(session); if (text) setResumeText(text); setCurrentView('session'); }} /></ProtectedRoute>} />
+             <Route path="analysis" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["resume_analysis", "intelligence"]}><ResumeAnalysis session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+             <Route path="instructions" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="instructions"><InterviewInstructions session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+             <Route path="device-check" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="device_check"><DeviceCheck session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+             <Route path="waiting" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="waiting_room"><WaitingRoom session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+             <Route path="active" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="interview_hr_friendly"><Interview session={activeSession} onNext={(session) => { setActiveSession(session); setCurrentView('dashboard'); addToast('success', 'Interview session complete!'); }} /></ProtectedRoute>} />
+             <Route path="*" element={<Navigate to={STAGE_ROUTE_MAP[activeStage] || "/interview/welcome"} replace />} />
+          </Routes>
         )}
       </Layout>
     </ErrorBoundary>
   );
 }
-
