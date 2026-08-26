@@ -1,4 +1,6 @@
-import { pgTable, text, integer, boolean, timestamp, jsonb, pgEnum } from "drizzle-orm/pg-core";
+const fs = require('fs');
+
+const schema = `import { pgTable, text, integer, boolean, timestamp, jsonb, pgEnum } from "drizzle-orm/pg-core";
 
 export const stageEnum = pgEnum('session_stage', [
   'resume_upload',
@@ -85,3 +87,6 @@ export const contacts = pgTable('contacts', {
   message: text('message').notNull(),
   createdAt: timestamp('created_at').defaultNow()
 });
+`;
+
+fs.writeFileSync('/app/applet/src/db/schema.ts', schema);

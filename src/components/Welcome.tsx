@@ -44,27 +44,8 @@ export default function Welcome({ onNext, candidate }: { onNext: (session: any) 
     return () => { isMounted = false; };
   }, []);
 
-  const handleStart = async () => {
-    setLoadingStart(true);
-    try {
-      const token = localStorage.getItem('ravengard_uid');
-      const res = await fetch('/api/session/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ candidateId: candidate.id })
-      });
-      if (res.ok) {
-        const session = await res.json();
-        onNext(session);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoadingStart(false);
-    }
+  const handleStart = () => {
+    onNext({ currentStage: 'consent' });
   };
 
   return (

@@ -5,6 +5,7 @@ export const STAGE_ROUTE_MAP: Record<string, string> = {
   'welcome': '/interview/welcome',
   'consent': '/interview/consent',
   'resume': '/interview/upload',
+  'resume_upload': '/interview/upload',
   'intelligence': '/interview/analysis',
   'resume_analysis': '/interview/analysis',
   'instructions': '/interview/instructions',

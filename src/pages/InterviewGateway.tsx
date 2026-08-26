@@ -29,6 +29,7 @@ export default function InterviewGateway() {
   const [isTimeout, setIsTimeout] = useState(false);
   const [candidate, setCandidate] = useState<any>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
+  const [preSessionStage, setPreSessionStage] = useState<'welcome' | 'consent'>('welcome');
   const [resumeText, setResumeText] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'dashboard' | 'session'>('dashboard');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -124,7 +125,7 @@ export default function InterviewGateway() {
   };
 
   
-  const { activeStage } = useInterviewFlow(currentView === 'session' ? activeSession : null, loading || !user || !candidate || currentView === 'dashboard');
+  const { activeStage } = useInterviewFlow(currentView === 'session' ? (activeSession || { currentStage: preSessionStage }) : null, loading || !user || !candidate || currentView === 'dashboard');
 
   if (isTimeout) {
     return (
@@ -248,7 +249,7 @@ export default function InterviewGateway() {
           />
         ) : (
           <Routes>
-             <Route path="welcome" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="welcome"><Welcome onNext={(session) => { setActiveSession(session); setCurrentView('session'); }} candidate={candidate} /></ProtectedRoute>} />
+             <Route path="welcome" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="welcome"><Welcome onNext={(session) => { if(session.currentStage === 'consent') setPreSessionStage('consent'); else setActiveSession(session); setCurrentView('session'); }} candidate={candidate} /></ProtectedRoute>} />
              <Route path="consent" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="consent"><Consent session={activeSession} onNext={(session) => { setActiveSession(session); setCurrentView('session'); }} /></ProtectedRoute>} />
              <Route path="upload" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="resume"><ResumeUpload session={activeSession} onNext={(session, text) => { setActiveSession(session); if (text) setResumeText(text); setCurrentView('session'); }} /></ProtectedRoute>} />
              <Route path="analysis" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["resume_analysis", "intelligence"]}><ResumeAnalysis session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />

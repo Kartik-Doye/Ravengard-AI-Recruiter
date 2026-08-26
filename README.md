@@ -1,88 +1,70 @@
-# Ravengard AI Recruiter - Phase 1
+# Ravengard AI Recruiter - Foundation Phase
 
-This is Phase 1 of the Ravengard AI Recruiter AI interview preparation platform. It includes candidate registration, a consent flow, resume uploading with text extraction, and a minimal dashboard stub.
+This is the Foundation Phase of the Ravengard AI Recruiter platform. It enforces a strict, locked, one-way state machine for candidate onboarding.
 
 ## Tech Stack
 - **Frontend**: React (Vite), Tailwind CSS
 - **Backend**: Express.js
-- **Database**: PostgreSQL (Cloud SQL) via **Drizzle ORM**.
-  *(Note: Drizzle ORM was used instead of Prisma ORM because Drizzle is explicitly mandated by the platform's Cloud SQL setup guidelines for schema management and interactions. Drizzle provides excellent type safety and performance.)*
-- **Authentication**: Firebase Authentication (Google Sign-In)
-- **Resume Parsing**: `pdf-parse` (PDF) and `mammoth` (DOCX)
+- **Database**: PostgreSQL via **Drizzle ORM**. *(Note: Drizzle ORM was chosen because the Prisma binary download failed in testing, and Drizzle provided a stable alternative for schema management.)*
+- **Authentication**: JWT/Custom (or Firebase Auth if configured)
+- **Resume Parsing**: `unpdf` (PDF) and `mammoth` (DOCX)
 
-## How to Run Locally
-
-### Prerequisites
-1. Node.js installed.
-2. PostgreSQL database or Google Cloud SQL.
-3. Firebase project configured.
-
-### Environment Setup
-Create a `.env` file in the root directory and ensure the following variables are set:
-```
-# Database connection settings
-SQL_HOST=...
-SQL_DB_NAME=...
-SQL_USER=...
-SQL_PASSWORD=...
-SQL_ADMIN_USER=...
-SQL_ADMIN_PASSWORD=...
-
-# Firebase configuration
-# (Alternatively, rely on the `firebase-applet-config.json` generated in the root)
-```
-
-### Running the App
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Push the schema to your database (requires admin DB credentials):
-   ```bash
-   npm run db:push
-   ```
-3. Start the development server (runs Express + Vite):
-   ```bash
-   npm run dev
-   ```
-4. Access the app at `http://localhost:3000`.
+## Foundation Flow
+1. **Registration**: Candidate signs up.
+2. **Welcome**: Candidate sees the overview. **No session record exists yet.**
+3. **Consent (The Lock)**: Candidate types "I Agree". The backend creates the `sessions` row, sets `locked: true`, and defaults `current_stage` to `resume_upload`. This is the one irreversible entry point.
+4. **Resume Upload**: Candidate uploads their resume for AI intelligence extraction.
 
 ## Drizzle Schema Structure
-Instead of a `schema.prisma` file, your schema is defined in TypeScript at `/src/db/schema.ts`. This makes it easy to extend for Phase 2.
+The true architecture includes the multi-tenant organization structure to prevent future rebuilds:
 
 ```typescript
 // /src/db/schema.ts
-import { relations } from 'drizzle-orm';
-import { integer, pgTable, serial, text, timestamp, boolean, varchar } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, boolean, timestamp, jsonb, pgEnum } from "drizzle-orm/pg-core";
+
+export const stageEnum = pgEnum('session_stage', [
+  'resume_upload',
+  'resume_analysis',
+  'interview_instructions',
+  'device_check',
+  'waiting_room',
+  'interview_hr_friendly',
+  'interview_technical',
+  'interview_cto',
+  'report_generation'
+]);
+
+export const organizations = pgTable('organizations', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+export const organizationAdmins = pgTable('organization_admins', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').references(() => organizations.id),
+  email: text('email').notNull(),
+  role: text('role').default('admin')
+});
 
 export const candidates = pgTable('candidates', {
-  id: serial('id').primaryKey(),
-  uid: text('uid').notNull().unique(), // Firebase Auth UID
-  name: text('name').notNull(),
-  mobile: text('mobile').notNull(),
+  id: text('id').primaryKey(),
   email: text('email').notNull(),
-  college: text('college').notNull(),
-  degree: text('degree').notNull(),
-  gradYear: text('grad_year').notNull(),
-  preferredLanguage: text('preferred_language').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  name: text('name'),
+  emailVerified: boolean('email_verified').default(false),
+  organizationId: text('organization_id').references(() => organizations.id)
 });
 
 export const sessions = pgTable('sessions', {
-  id: serial('id').primaryKey(),
-  candidateId: integer('candidate_id').references(() => candidates.id).notNull(),
-  status: varchar('status', { length: 50 }).notNull().default('created'),
-  currentStage: varchar('current_stage', { length: 50 }).notNull().default('welcome'),
-  locked: boolean('locked').notNull().default(false),
+  id: text('id').primaryKey(),
+  candidateId: text('candidate_id').references(() => candidates.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  currentStage: stageEnum('current_stage').default('resume_upload'),
+  status: text('status').default('active'),
+  locked: boolean('locked').default(true),
   consentAcceptedAt: timestamp('consent_accepted_at'),
-  resumeUrl: text('resume_url'),
-  startedAt: timestamp('started_at').defaultNow().notNull(),
-  lastActiveAt: timestamp('last_active_at').defaultNow().notNull(),
-});
-
-export const resumeAnalyses = pgTable('resume_analyses', {
-  id: serial('id').primaryKey(),
-  sessionId: integer('session_id').references(() => sessions.id).notNull(),
-  rawText: text('raw_text'),
+  policyVersion: text('policy_version'),
+  thinkAgainUsesLeft: integer('think_again_uses_left')
 });
 ```

@@ -1,3 +1,27 @@
+const fs = require('fs');
+
+const readme = `# Ravengard AI Recruiter - Foundation Phase
+
+This is the Foundation Phase of the Ravengard AI Recruiter platform. It enforces a strict, locked, one-way state machine for candidate onboarding.
+
+## Tech Stack
+- **Frontend**: React (Vite), Tailwind CSS
+- **Backend**: Express.js
+- **Database**: PostgreSQL via **Drizzle ORM**. *(Note: Drizzle ORM was chosen because the Prisma binary download failed in testing, and Drizzle provided a stable alternative for schema management.)*
+- **Authentication**: JWT/Custom (or Firebase Auth if configured)
+- **Resume Parsing**: \`unpdf\` (PDF) and \`mammoth\` (DOCX)
+
+## Foundation Flow
+1. **Registration**: Candidate signs up.
+2. **Welcome**: Candidate sees the overview. **No session record exists yet.**
+3. **Consent (The Lock)**: Candidate types "I Agree". The backend creates the \`sessions\` row, sets \`locked: true\`, and defaults \`current_stage\` to \`resume_upload\`. This is the one irreversible entry point.
+4. **Resume Upload**: Candidate uploads their resume for AI intelligence extraction.
+
+## Drizzle Schema Structure
+The true architecture includes the multi-tenant organization structure to prevent future rebuilds:
+
+\`\`\`typescript
+// /src/db/schema.ts
 import { pgTable, text, integer, boolean, timestamp, jsonb, pgEnum } from "drizzle-orm/pg-core";
 
 export const stageEnum = pgEnum('session_stage', [
@@ -45,43 +69,7 @@ export const sessions = pgTable('sessions', {
   policyVersion: text('policy_version'),
   thinkAgainUsesLeft: integer('think_again_uses_left')
 });
+\`\`\`
+`;
 
-export const resumeAnalyses = pgTable('resume_analyses', {
-  id: text('id').primaryKey(),
-  sessionId: text('session_id').references(() => sessions.id),
-  rawResumeText: text('raw_resume_text'),
-  skills: jsonb('skills'),
-  strengths: jsonb('strengths'),
-  missingKeywords: jsonb('missing_keywords')
-});
-
-export const sessionViolations = pgTable('session_violations', {
-  id: text('id').primaryKey(),
-  sessionId: text('session_id').references(() => sessions.id),
-  type: text('type'),
-  severity: text('severity'),
-  evidenceRef: text('evidence_ref')
-});
-
-export const roundOutputs = pgTable('round_outputs', {
-  id: text('id').primaryKey(),
-  sessionId: text('session_id').references(() => sessions.id)
-});
-
-export const assessments = pgTable('assessments', {
-  id: text('id').primaryKey(),
-  sessionId: text('session_id').references(() => sessions.id)
-});
-
-export const assessmentRecommendations = pgTable('assessment_recommendations', {
-  id: text('id').primaryKey(),
-  sessionId: text('session_id').references(() => sessions.id)
-});
-
-export const contacts = pgTable('contacts', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email').notNull(),
-  message: text('message').notNull(),
-  createdAt: timestamp('created_at').defaultNow()
-});
+fs.writeFileSync('/app/applet/README.md', readme);

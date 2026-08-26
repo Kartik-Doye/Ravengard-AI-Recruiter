@@ -21,7 +21,7 @@ export default function Consent({ session, onNext }: { session: any, onNext: (se
     setLoading(true);
     try {
       const token = localStorage.getItem('ravengard_uid');
-      const res = await fetch(`/api/session/${session.id}/policy-confirm`, {
+      const res = await fetch(`/api/session/confirm-consent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

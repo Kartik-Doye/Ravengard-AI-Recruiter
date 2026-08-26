@@ -5,7 +5,7 @@ import { GoogleGenAI } from '@google/genai';
 export async function extractTextFromFile(buffer: Buffer, fileType: 'pdf' | 'docx'): Promise<string> {
   if (fileType === 'pdf') {
     const { text } = await extractText(buffer);
-    return text || '';
+    return (typeof text === 'string' ? text : text.join('\n')) || '';
   } else if (fileType === 'docx') {
     const result = await mammoth.extractRawText({ buffer });
     return result.value || '';
