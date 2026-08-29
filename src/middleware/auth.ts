@@ -9,8 +9,16 @@ export interface AuthRequest extends Request {
 }
 
 export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  // Stub for requireAuth middleware
-  // We'll bypass auth for now or use a dummy user
-  req.user = { id: "test-user-id", email: "test@example.com", name: "Test User" };
+  const authHeader = req.headers.authorization;
+  let email = "test@example.com";
+  let id = "test-user-id";
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    id = token;
+    email = `${token}@example.com`;
+  }
+
+  req.user = { id, email, name: "Test User" };
   next();
 };

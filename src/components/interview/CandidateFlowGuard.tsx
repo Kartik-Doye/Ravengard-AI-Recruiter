@@ -6,12 +6,8 @@ export const flowRouteMap: Record<string, string> = {
   'welcome': '/interview/welcome',
   'consent': '/interview/consent',
   'resume': '/interview/upload',
-  'resume_analysis': '/interview/analysis',
-  'instructions': '/interview/instructions',
-  'device_check': '/interview/device-check',
-  'waiting_room': '/interview/waiting',
-  'interview_hr_friendly': '/interview/active',
-  'completed': '/interview/report'
+  'resume_upload': '/interview/upload',
+  'resume_analysis': '/interview/analysis'
 };
 
 export function CandidateFlowGuard({ activeSession, loading }: { activeSession: any, loading: boolean }) {

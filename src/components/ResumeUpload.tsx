@@ -47,22 +47,7 @@ export default function ResumeUpload({ session, onNext }: { session: any, onNext
       
       if (res.ok) {
         const data = await res.json();
-        
-        const stageRes = await fetch(`/api/session/${session.id}/stage`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ stage: 'pre_flight', version: data.session.version })
-        });
-        
-        if (stageRes.ok) {
-          const updatedSession = await stageRes.json();
-          onNext(updatedSession);
-        } else {
-          setError("Failed to advance to the next phase.");
-        }
+        onNext(data.session, data.resumeReference);
       } else {
         const errData = await res.json();
         setError(errData.error || "Failed to upload resume");

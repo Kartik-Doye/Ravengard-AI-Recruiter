@@ -165,17 +165,18 @@ async function startServer() {
         college,
         degree,
         gradYear,
-        preferredLanguage
+        preferredLanguage,
+        emailVerified: true
       }).returning();
 
       if (reqEmail) {
-        sendWelcomeEmail().catch(console.error);
+        sendWelcomeEmail(reqEmail, name).catch(console.error);
       }
 
       res.json({ candidateId: user.id, registrationStatus: 'validated', welcomeMessage: 'Welcome!' });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      res.status(500).json({ success: false, errors: ["Registration failed due to a server error."] });
+      res.status(500).json({ success: false, errors: [error.message || "Registration failed due to a server error."] });
     }
   });
 
@@ -412,15 +413,15 @@ async function startServer() {
       if (!ownership) return;
       const { session } = ownership;
 
-      if (session.thinkAgainUsesLeft! >= 2) {
+      if (session.thinkAgainUsesLeft! <= 0) {
         return res.status(400).json({ error: "No think-agains left" });
       }
 
       await db.update(sessions)
-        .set({ thinkAgainUsesLeft: session.thinkAgainUsesLeft! + 1 })
+        .set({ thinkAgainUsesLeft: session.thinkAgainUsesLeft! - 1 })
         .where(eq(sessions.id, sessionId));
 
-      res.json({ success: true, thinkAgainUsesLeft: session.thinkAgainUsesLeft! + 1 });
+      res.json({ success: true, thinkAgainUsesLeft: session.thinkAgainUsesLeft! - 1 });
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Failed to process think again" });

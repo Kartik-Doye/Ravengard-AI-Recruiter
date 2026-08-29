@@ -33,26 +33,8 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
   }, [session.id]);
 
   const handleNext = async () => {
-    setTransitioning(true);
-    try {
-      const token = localStorage.getItem('ravengard_uid');
-      const res = await fetch(`/api/session/${session.id}/stage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ stage: 'instructions', version: session.version })
-      });
-      if (res.ok) {
-        const updatedSession = await res.json();
-        onNext(updatedSession);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setTransitioning(false);
-    }
+    // Phase 1 Freeze: Do not advance to instructions or device check yet.
+    // In a real flow, this would call /api/session/${session.id}/stage with 'interview_instructions'
   };
 
   if (loading) {
@@ -70,11 +52,11 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
       <div className="max-w-[800px] mx-auto py-10">
         <EmptyState 
           title="Analysis Failed" 
-          description="We couldn't parse the profile data correctly. You can still proceed with the interview."
+          description="We couldn't parse the profile data correctly. Phase 1 is currently frozen."
           icon={<ShieldAlert className="w-12 h-12 text-red-500/50" />}
           action={
-            <Button onClick={handleNext} >
-              Continue to Instructions
+            <Button onClick={() => {}} disabled={true}>
+              Phase 1 Complete
             </Button>
           }
         />
@@ -152,7 +134,6 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
             </ul>
           </CardBody>
         </Card>
-
         <Card >
           <CardHeader>
             <h3 className="font-medium tracking-wide text-white flex items-center gap-3 text-lg">
@@ -179,12 +160,10 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
       
       <div className="flex justify-end pt-4">
         <Button
-          onClick={handleNext}
-          disabled={transitioning}
-          isLoading={transitioning}
-          
+          onClick={() => {}}
+          disabled={true}
         >
-          Acknowledge & Continue
+          Phase 1 Foundation Complete
         </Button>
       </div>
     </div>

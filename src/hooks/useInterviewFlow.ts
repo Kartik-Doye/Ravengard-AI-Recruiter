@@ -7,11 +7,7 @@ export const STAGE_ROUTE_MAP: Record<string, string> = {
   'resume': '/interview/upload',
   'resume_upload': '/interview/upload',
   'intelligence': '/interview/analysis',
-  'resume_analysis': '/interview/analysis',
-  'instructions': '/interview/instructions',
-  'device_check': '/interview/device-check',
-  'waiting_room': '/interview/waiting',
-  'interview_hr_friendly': '/interview/active'
+  'resume_analysis': '/interview/analysis'
 };
 
 export function useInterviewFlow(activeSession: any, loading: boolean) {

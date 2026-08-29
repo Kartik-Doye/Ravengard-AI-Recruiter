@@ -178,7 +178,7 @@ export default function InterviewGateway() {
 
   const handleBackStep = async () => {
     if (!activeSession) return;
-    const flowStages = ['welcome', 'consent', 'resume', 'resume_analysis', 'instructions', 'device_check', 'waiting_room', 'interview_hr_friendly'];
+    const flowStages = ['welcome', 'consent', 'resume', 'resume_analysis'];
     const currentIndex = flowStages.indexOf(activeStage);
     
     if (currentIndex > 0) {
@@ -253,10 +253,6 @@ export default function InterviewGateway() {
              <Route path="consent" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="consent"><Consent session={activeSession} onNext={(session) => { setActiveSession(session); setCurrentView('session'); }} /></ProtectedRoute>} />
              <Route path="upload" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="resume"><ResumeUpload session={activeSession} onNext={(session, text) => { setActiveSession(session); if (text) setResumeText(text); setCurrentView('session'); }} /></ProtectedRoute>} />
              <Route path="analysis" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["resume_analysis", "intelligence"]}><ResumeAnalysis session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
-             <Route path="instructions" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="instructions"><InterviewInstructions session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
-             <Route path="device-check" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="device_check"><DeviceCheck session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
-             <Route path="waiting" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="waiting_room"><WaitingRoom session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
-             <Route path="active" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="interview_hr_friendly"><Interview session={activeSession} onNext={(session) => { setActiveSession(session); setCurrentView('dashboard'); addToast('success', 'Interview session complete!'); }} /></ProtectedRoute>} />
              <Route path="*" element={<Navigate to={STAGE_ROUTE_MAP[activeStage] || "/interview/welcome"} replace />} />
           </Routes>
         )}
