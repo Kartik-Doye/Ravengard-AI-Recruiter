@@ -29,6 +29,11 @@ export const candidates = pgTable('candidates', {
   id: text('id').primaryKey(),
   email: text('email').notNull(),
   name: text('name'),
+  mobile: text('mobile'),
+  college: text('college'),
+  degree: text('degree'),
+  gradYear: integer('grad_year'),
+  preferredLanguage: text('preferred_language'),
   emailVerified: boolean('email_verified').default(false),
   organizationId: text('organization_id').references(() => organizations.id)
 });
@@ -49,33 +54,7 @@ export const sessions = pgTable('sessions', {
 export const resumeAnalyses = pgTable('resume_analyses', {
   id: text('id').primaryKey(),
   sessionId: text('session_id').references(() => sessions.id),
-  rawResumeText: text('raw_resume_text'),
-  skills: jsonb('skills'),
-  strengths: jsonb('strengths'),
-  missingKeywords: jsonb('missing_keywords')
-});
-
-export const sessionViolations = pgTable('session_violations', {
-  id: text('id').primaryKey(),
-  sessionId: text('session_id').references(() => sessions.id),
-  type: text('type'),
-  severity: text('severity'),
-  evidenceRef: text('evidence_ref')
-});
-
-export const roundOutputs = pgTable('round_outputs', {
-  id: text('id').primaryKey(),
-  sessionId: text('session_id').references(() => sessions.id)
-});
-
-export const assessments = pgTable('assessments', {
-  id: text('id').primaryKey(),
-  sessionId: text('session_id').references(() => sessions.id)
-});
-
-export const assessmentRecommendations = pgTable('assessment_recommendations', {
-  id: text('id').primaryKey(),
-  sessionId: text('session_id').references(() => sessions.id)
+  rawResumeText: text('raw_resume_text')
 });
 
 export const contacts = pgTable('contacts', {
