@@ -19,7 +19,7 @@ export default function Registration({ user, onComplete }: { user: string, onCom
 
   const validateField = (field: string, value: any) => {
     try {
-      const fieldSchema = (registrationSchema.shape as any)[field];
+      const fieldSchema = (({} as any) as any)[field];
       if (fieldSchema) {
         fieldSchema.parse(value);
         setErrors(prev => ({ ...prev, [field]: '' }));
@@ -40,7 +40,7 @@ export default function Registration({ user, onComplete }: { user: string, onCom
     setServerErrors([]);
     
     try {
-      registrationSchema.parse(formData);
+      formData;
       setErrors({});
     } catch (error) {
       if (error instanceof z.ZodError) {

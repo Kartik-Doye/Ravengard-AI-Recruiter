@@ -48,7 +48,7 @@ export default function Layout({ children, candidate, session, currentStageName,
               <div className="ml-2">
                 <Button 
                   variant="ghost" 
-                  size="sm" 
+                   
                   onClick={() => setShowExitModal(true)}
                   className="text-white/50 hover:text-white font-mono uppercase tracking-widest text-xs"
                 >
@@ -138,7 +138,7 @@ export default function Layout({ children, candidate, session, currentStageName,
               Cancel
             </Button>
             <Button 
-              variant="destructive" 
+              variant="outline" 
               onClick={() => {
                 setShowExitModal(false);
                 if (onPauseSession) onPauseSession();

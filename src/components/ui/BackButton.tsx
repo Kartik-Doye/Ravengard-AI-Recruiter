@@ -11,7 +11,7 @@ export function BackButton({ label = 'Back', onClick, className = '', ...props }
   return (
     <Button
       variant="ghost"
-      size="sm"
+      
       leftIcon={<ArrowLeft className="w-4 h-4" />}
       onClick={onClick}
       className={`text-white/50 hover:text-white font-mono uppercase tracking-widest text-xs ${className}`}

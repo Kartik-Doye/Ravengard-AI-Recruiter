@@ -113,7 +113,7 @@ export function Upload({
             
             <Button 
               variant="ghost" 
-              size="sm" 
+               
               onClick={(e) => {
                 e.stopPropagation();
                 onClear();

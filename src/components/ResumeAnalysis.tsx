@@ -58,7 +58,7 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
   if (loading) {
     return (
       <div className="max-w-[800px] mx-auto text-center py-20 flex flex-col items-center justify-center min-h-[50vh]">
-        <Loader size="lg" className="mb-6 text-[var(--color-primary)]" />
+        <Loader  className="mb-6 text-[var(--color-primary)]" />
         <h2 className="text-xl font-medium text-white tracking-wide">Analyzing Profile Architecture...</h2>
         <p className="text-white/50 mt-2">Extracting skills, projects, and benchmarks.</p>
       </div>
@@ -73,7 +73,7 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
           description="We couldn't parse the profile data correctly. You can still proceed with the interview."
           icon={<ShieldAlert className="w-12 h-12 text-red-500/50" />}
           action={
-            <Button onClick={handleNext} variant="solid">
+            <Button onClick={handleNext} >
               Continue to Instructions
             </Button>
           }
@@ -88,7 +88,7 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
       <p className="text-white/50 mb-10">We've parsed your profile. Your interview will dynamically adapt to explore these areas.</p>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card variant="glass" className="flex flex-col items-center justify-center text-center p-8 border-[var(--color-primary)]/20">
+        <Card  className="flex flex-col items-center justify-center text-center p-8 border-[var(--color-primary)]/20">
           <motion.div 
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -101,7 +101,7 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
           <p className="text-xs text-white/50 mt-1 uppercase tracking-wider">Industry Benchmark</p>
         </Card>
         
-        <Card variant="glass" className="col-span-2">
+        <Card  className="col-span-2">
           <CardHeader>
             <h3 className="font-medium tracking-wide text-white flex items-center gap-3 text-lg">
               <Zap className="w-5 h-5 text-amber-400" />
@@ -128,7 +128,7 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <Card variant="glass">
+        <Card >
           <CardHeader>
             <h3 className="font-medium tracking-wide text-white flex items-center gap-3 text-lg">
               <ShieldAlert className="w-5 h-5 text-rose-400" />
@@ -153,7 +153,7 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
           </CardBody>
         </Card>
 
-        <Card variant="glass">
+        <Card >
           <CardHeader>
             <h3 className="font-medium tracking-wide text-white flex items-center gap-3 text-lg">
               <BookOpen className="w-5 h-5 text-blue-400" />
@@ -169,7 +169,7 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
                   transition={{ delay: 0.6 + i * 0.05 }}
                   key={i}
                 >
-                  <Badge variant="neutral">{k}</Badge>
+                  <Badge >{k}</Badge>
                 </motion.div>
               ))}
             </div>
@@ -182,7 +182,7 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
           onClick={handleNext}
           disabled={transitioning}
           isLoading={transitioning}
-          size="lg"
+          
         >
           Acknowledge & Continue
         </Button>

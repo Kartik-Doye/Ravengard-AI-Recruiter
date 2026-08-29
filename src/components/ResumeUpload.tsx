@@ -80,7 +80,7 @@ export default function ResumeUpload({ session, onNext }: { session: any, onNext
       <h1 className="text-3xl font-semibold mb-2 text-white">Professional Profile</h1>
       <p className="text-white/50 mb-10">Upload your resume to calibrate the analysis engine.</p>
       
-      <Card variant="glass" padding="lg" className="mb-8">
+      <Card   className="mb-8">
         <CardBody className="flex flex-col">
           <Upload
             file={file}
