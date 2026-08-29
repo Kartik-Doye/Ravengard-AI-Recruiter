@@ -16,6 +16,68 @@ import { registrationSchema } from "./src/lib/validation";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
+// --- Shared Helpers ---
+
+async function verifySessionOwnership(req: AuthRequest, sessionId: string, res: express.Response) {
+  const email = req.user!.email;
+  const [user] = await db.select().from(candidates).where(eq(candidates.email, email));
+  if (!user) {
+    res.status(403).json({ error: "Candidate not found" });
+    return null;
+  }
+
+  const [currentSession] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
+  if (!currentSession) {
+    res.status(404).json({ error: "Session not found" });
+    return null;
+  }
+
+  if (currentSession.candidateId !== user.id) {
+    res.status(403).json({ error: "Forbidden: session belongs to another user." });
+    return null;
+  }
+
+  return { user, session: currentSession };
+}
+
+async function transitionSessionStage(sessionId: string, currentStage: string, targetStage: string) {
+  const validTransitions: Record<string, string[]> = {
+    'resume_upload': ['resume_analysis'],
+    'resume_analysis': ['interview_instructions', 'resume_upload'],
+    'interview_instructions': ['device_check', 'resume_analysis'],
+    'device_check': ['waiting_room', 'interview_instructions'],
+    'waiting_room': ['interview_hr_friendly', 'device_check'],
+    'interview_hr_friendly': ['interview_technical'],
+    'interview_technical': ['interview_cto'],
+    'interview_cto': ['report_generation']
+  };
+
+  const allowedNext = validTransitions[currentStage] || [];
+  if (!allowedNext.includes(targetStage)) {
+    throw new Error(`Invalid phase transition from ${currentStage} to ${targetStage}. Manual phase selection is locked.`);
+  }
+
+  // Typecast to any to bypass string vs enum literal TS errors from Drizzle
+  const [updatedSession] = await db.update(sessions)
+    .set({ currentStage: targetStage as any })
+    .where(
+        and(
+          eq(sessions.id, sessionId),
+          eq(sessions.currentStage, currentStage as any),
+          eq(sessions.locked, true)
+        )
+    )
+    .returning();
+
+  if (!updatedSession) {
+      throw new Error("Conflict: Could not update session state or session not locked.");
+  }
+  return updatedSession;
+}
+
+
+// --- Main Server ---
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -232,77 +294,30 @@ async function startServer() {
   app.post("/api/session/:id/stage", requireAuth, async (req: AuthRequest, res) => {
     try {
       const sessionId = req.params.id;
-      const { stage } = req.body;
+      const { stage, currentStage: reqCurrentStage } = req.body;
       
-      const [currentSession] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
-      if (!currentSession) {
-         return res.status(404).json({ error: "Session not found" });
+      const ownership = await verifySessionOwnership(req, sessionId, res);
+      if (!ownership) return;
+      const { session } = ownership;
+
+      if (reqCurrentStage !== undefined && session.currentStage !== reqCurrentStage) {
+         return res.status(409).json({ error: "Conflict: Session state changed", session });
       }
 
-      // Security: verify ownership
-      const [user] = await db.select().from(candidates).where(eq(candidates.email, req.user!.email));
-      if (!user || currentSession.candidateId !== user.id) {
-        return res.status(403).json({ error: "Forbidden: session belongs to another user." });
-      }
-      
-      const currentStage = req.body.currentStage;
-      if (currentStage !== undefined && currentSession.currentStage !== currentStage) {
-         return res.status(409).json({ error: "Conflict: Session state changed", session: currentSession });
-      }
-
-      if (currentSession.locked) {
-        const validTransitions: Record<string, string[]> = {
-          'resume_upload': ['resume_analysis'],
-          'resume_analysis': ['interview_instructions', 'resume_upload'],
-          'interview_instructions': ['device_check', 'resume_analysis'],
-          'device_check': ['waiting_room', 'interview_instructions'],
-          'waiting_room': ['interview_hr_friendly', 'device_check'],
-          'interview_hr_friendly': ['interview_technical'],
-          'interview_technical': ['interview_cto'],
-          'interview_cto': ['report_generation']
-        };
-        const allowedNext = validTransitions[currentSession.currentStage!] || [];
-        if (!allowedNext.includes(stage)) {
-          return res.status(400).json({ error: `Invalid phase transition from ${currentSession.currentStage} to ${stage}. Manual phase selection is locked.` });
-        }
-      }
-
-      const updateData: any = { currentStage: stage };
-
-      const [updatedSession] = await db.update(sessions)
-        .set(updateData)
-        .where(
-           and(
-             eq(sessions.id, sessionId),
-             eq(sessions.currentStage, currentSession.currentStage)
-           )
-        )
-        .returning();
-
-      if (!updatedSession) {
-         return res.status(409).json({ error: "Conflict: Could not update session state" });
-      }
-
+      const updatedSession = await transitionSessionStage(sessionId, session.currentStage!, stage);
       res.json(updatedSession);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      res.status(500).json({ error: "Failed to update session stage", details: String(error) });
+      const status = error.message?.includes("Invalid phase transition") || error.message?.includes("Conflict") ? 409 : 500;
+      res.status(status).json({ error: error.message || "Failed to update session stage" });
     }
   });
 
   app.post("/api/session/:id/request-retake", requireAuth, async (req: AuthRequest, res) => {
     try {
       const sessionId = req.params.id;
-      const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
-      if (!session) {
-        return res.status(404).json({ error: "Session not found" });
-      }
-
-      // Security: verify ownership
-      const [user] = await db.select().from(candidates).where(eq(candidates.email, req.user!.email));
-      if (!user || session.candidateId !== user.id) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
+      const ownership = await verifySessionOwnership(req, sessionId, res);
+      if (!ownership) return;
 
       res.json({ success: true });
     } catch (error) {
@@ -314,14 +329,11 @@ async function startServer() {
   app.get("/api/session/:id/resume-analysis", requireAuth, async (req: AuthRequest, res) => {
     try {
       const sessionId = req.params.id;
+      const ownership = await verifySessionOwnership(req, sessionId, res);
+      if (!ownership) return;
+
       const [analysis] = await db.select().from(resumeAnalyses).where(eq(resumeAnalyses.sessionId, sessionId));
       if (!analysis) return res.status(404).json({ error: "Analysis not found" });
-
-      const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
-      if (!session) return res.status(404).json({ error: "Session not found" });
-
-      const [user] = await db.select().from(candidates).where(eq(candidates.email, req.user!.email));
-      if (!user || session.candidateId !== user.id) return res.status(403).json({ error: "Forbidden" });
 
       res.json(analysis);
     } catch (e) {
@@ -331,20 +343,11 @@ async function startServer() {
   });
 
   app.post("/api/session/:id/upload-resume", requireAuth, upload.single('resume'), async (req: AuthRequest, res) => {
-    const email = req.user!.email;
     const sessionId = req.params.id;
 
     try {
-      // Security: verify ownership
-      const [user] = await db.select().from(candidates).where(eq(candidates.email, email));
-      if (!user) return res.status(403).json({ error: "Candidate not found" });
-
-      const [currentSession] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
-      if (!currentSession) return res.status(404).json({ error: "Session not found" });
-
-      if (currentSession.candidateId !== user.id) {
-        return res.status(403).json({ error: "Forbidden: session belongs to another user." });
-      }
+      const ownership = await verifySessionOwnership(req, sessionId, res);
+      if (!ownership) return;
 
       const file = req.file;
       if (!file) {
@@ -385,55 +388,39 @@ async function startServer() {
         return res.status(400).json({ error: "Failed to extract text from document." });
       }
 
-      // Replaced Gemini intelligence call with direct storage
       await db.insert(resumeAnalyses).values({ 
          id: crypto.randomUUID(),
          sessionId: sessionId,
          rawResumeText: rawResumeText
       });
 
-      // Advance stage to resume_analysis (as governed by state machine)
-      const [updatedSession] = await db.update(sessions)
-        .set({ currentStage: 'resume_analysis' }) 
-        .where(and(
-          eq(sessions.id, sessionId), 
-          eq(sessions.locked, true),
-          eq(sessions.currentStage, 'resume_upload') // strict transition check
-        ))
-        .returning();
-
-      if (!updatedSession) {
-         throw new Error("Failed to update session: state conflict or session not locked.");
-      }
+      // Advance stage to resume_analysis through consolidated helper
+      const updatedSession = await transitionSessionStage(sessionId, 'resume_upload', 'resume_analysis');
 
       res.json({ success: true, session: updatedSession, resumeReference: storagePath });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      res.status(500).json({ error: "Failed to store resume", details: String(error) });
+      const status = error.message?.includes("Invalid phase transition") || error.message?.includes("Conflict") ? 409 : 500;
+      res.status(status).json({ error: error.message || "Failed to store resume" });
     }
   });
 
   app.post("/api/session/:id/think-again", requireAuth, async (req: AuthRequest, res) => {
     try {
       const sessionId = req.params.id;
-      const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
-      if (!session) return res.status(404).json({ error: "Session not found" });
+      const ownership = await verifySessionOwnership(req, sessionId, res);
+      if (!ownership) return;
+      const { session } = ownership;
 
-      // Security: verify ownership
-      const [user] = await db.select().from(candidates).where(eq(candidates.email, req.user!.email));
-      if (!user || session.candidateId !== user.id) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
-      if (session.thinkAgainUsesLeft >= 2) {
+      if (session.thinkAgainUsesLeft! >= 2) {
         return res.status(400).json({ error: "No think-agains left" });
       }
 
       await db.update(sessions)
-        .set({ thinkAgainUsesLeft: session.thinkAgainUsesLeft + 1 })
+        .set({ thinkAgainUsesLeft: session.thinkAgainUsesLeft! + 1 })
         .where(eq(sessions.id, sessionId));
 
-      res.json({ success: true, thinkAgainUsesLeft: session.thinkAgainUsesLeft + 1 });
+      res.json({ success: true, thinkAgainUsesLeft: session.thinkAgainUsesLeft! + 1 });
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Failed to process think again" });
