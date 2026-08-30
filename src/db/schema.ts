@@ -48,7 +48,14 @@ export const sessions = pgTable('sessions', {
   locked: boolean('locked').default(true),
   consentAcceptedAt: timestamp('consent_accepted_at'),
   policyVersion: text('policy_version'),
-  thinkAgainUsesLeft: integer('think_again_uses_left')
+  thinkAgainUsesLeft: integer('think_again_uses_left'),
+  deviceCheckStatus: text('device_check_status'),
+  cameraPermission: text('camera_permission'),
+  microphonePermission: text('microphone_permission'),
+  speakerTestPassed: boolean('speaker_test_passed'),
+  browserSupported: boolean('browser_supported'),
+  deviceCheckCompletedAt: timestamp('device_check_completed_at'),
+  deviceCheckMeta: jsonb('device_check_meta')
 });
 
 export const resumeAnalyses = pgTable('resume_analyses', {

@@ -43,9 +43,9 @@ async function verifySessionOwnership(req: AuthRequest, sessionId: string, res: 
 async function transitionSessionStage(sessionId: string, currentStage: string, targetStage: string) {
   const validTransitions: Record<string, string[]> = {
     'resume_upload': ['resume_analysis'],
-    'resume_analysis': ['interview_instructions', 'resume_upload'],
+    'resume_analysis': ['interview_instructions', 'device_check', 'resume_upload'],
     'interview_instructions': ['device_check', 'resume_analysis'],
-    'device_check': ['waiting_room', 'interview_instructions'],
+    'device_check': ['waiting_room', 'interview_instructions', 'resume_analysis'],
     'waiting_room': ['interview_hr_friendly', 'device_check'],
     'interview_hr_friendly': ['interview_technical'],
     'interview_technical': ['interview_cto'],
@@ -266,6 +266,38 @@ async function startServer() {
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Failed to confirm instructions" });
+    }
+  });
+
+  app.post("/api/device-check/save", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const email = req.user!.email;
+      const { sessionId, status, camera, mic, speaker, browser, meta } = req.body;
+      
+      const [candidate] = await db.select().from(candidates).where(eq(candidates.email, email));
+      if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+
+      const [updatedSession] = await db.update(sessions)
+        .set({
+          deviceCheckStatus: status,
+          cameraPermission: camera,
+          microphonePermission: mic,
+          speakerTestPassed: speaker,
+          browserSupported: browser,
+          deviceCheckCompletedAt: new Date(),
+          deviceCheckMeta: meta
+        })
+        .where(
+          and(
+            eq(sessions.id, sessionId),
+            eq(sessions.candidateId, candidate.id)
+          )
+        ).returning();
+
+      res.json({ success: true, session: updatedSession });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to save device check status" });
     }
   });
 

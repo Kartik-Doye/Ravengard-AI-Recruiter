@@ -91,14 +91,57 @@ async function runTest() {
     headers: { 'Authorization': `Bearer ${uid}` },
     body: form
   });
+  let currentVersion = consentData.session.version;
   if (!uploadRes.ok) {
      console.log("   ⚠️ Resume Upload Failed:", await uploadRes.text());
   } else {
      const uploadData = await uploadRes.json();
      console.log("   ✅ Resume Uploaded & Parsed. Stage:", uploadData.session.currentStage);
+     currentVersion = uploadData.session.version;
   }
+
+  // 6. Transition to device_check
+  console.log("6. Transitioning to device_check...");
+  const devCheckTransRes = await fetch(`${BASE_URL}/api/session/${sessionId}/stage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${uid}` },
+    body: JSON.stringify({ stage: 'device_check', version: currentVersion })
+  });
+  if (!devCheckTransRes.ok) throw new Error(`Transition to device check failed: ${await devCheckTransRes.text()}`);
+  const devCheckTransData = await devCheckTransRes.json();
+  console.log("   ✅ Stage is now:", devCheckTransData.currentStage);
+  currentVersion = devCheckTransData.version;
+
+  // 7. Save device check status (Success path)
+  console.log("7. Testing Device Check API (Success)...");
+  const devCheckSaveRes = await fetch(`${BASE_URL}/api/device-check/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${uid}` },
+    body: JSON.stringify({
+      sessionId,
+      status: 'passed',
+      camera: 'granted',
+      mic: 'granted',
+      speaker: true,
+      browser: true,
+      meta: {}
+    })
+  });
+  if (!devCheckSaveRes.ok) throw new Error(`Failed to save device check: ${await devCheckSaveRes.text()}`);
+  const devCheckSaveData = await devCheckSaveRes.json();
+  console.log("   ✅ Device check saved, status:", devCheckSaveData.session.deviceCheckStatus);
   
-  console.log("🎉 E2E Phase 1 Frozen Test Completed Successfully!");
+  // 8. Transition to waiting_room
+  console.log("8. Transitioning to waiting_room...");
+  const waitTransRes = await fetch(`${BASE_URL}/api/session/${sessionId}/stage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${uid}` },
+    body: JSON.stringify({ stage: 'waiting_room', version: currentVersion })
+  });
+  if (!waitTransRes.ok) throw new Error(`Transition to waiting room failed: ${await waitTransRes.text()}`);
+  console.log("   ✅ Reached Waiting Room:", (await waitTransRes.json()).currentStage);
+
+  console.log("🎉 E2E Phase 2 Device Check Flow Completed Successfully!");
 }
 
 runTest().catch(console.error);

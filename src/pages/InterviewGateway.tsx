@@ -253,6 +253,7 @@ export default function InterviewGateway() {
              <Route path="consent" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="consent"><Consent session={activeSession} onNext={(session) => { setActiveSession(session); setCurrentView('session'); }} /></ProtectedRoute>} />
              <Route path="upload" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="resume"><ResumeUpload session={activeSession} onNext={(session, text) => { setActiveSession(session); if (text) setResumeText(text); setCurrentView('session'); }} /></ProtectedRoute>} />
              <Route path="analysis" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["resume_analysis", "intelligence"]}><ResumeAnalysis session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+             <Route path="device-check" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="device_check"><DeviceCheck session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
              <Route path="*" element={<Navigate to={STAGE_ROUTE_MAP[activeStage] || "/interview/welcome"} replace />} />
           </Routes>
         )}

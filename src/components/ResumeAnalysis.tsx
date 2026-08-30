@@ -33,8 +33,28 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
   }, [session.id]);
 
   const handleNext = async () => {
-    // Phase 1 Freeze: Do not advance to instructions or device check yet.
-    // In a real flow, this would call /api/session/${session.id}/stage with 'interview_instructions'
+    setTransitioning(true);
+    try {
+      const token = localStorage.getItem('ravengard_uid');
+      const res = await fetch(`/api/session/${session.id}/stage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ stage: 'device_check', version: session.version })
+      });
+      if (res.ok) {
+        const updatedSession = await res.json();
+        onNext(updatedSession);
+      } else {
+        console.error("Failed to advance stage");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTransitioning(false);
+    }
   };
 
   if (loading) {
@@ -52,11 +72,11 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
       <div className="max-w-[800px] mx-auto py-10">
         <EmptyState 
           title="Analysis Failed" 
-          description="We couldn't parse the profile data correctly. Phase 1 is currently frozen."
+          description="We couldn't parse the profile data correctly, but you can still proceed to the interview."
           icon={<ShieldAlert className="w-12 h-12 text-red-500/50" />}
           action={
-            <Button onClick={() => {}} disabled={true}>
-              Phase 1 Complete
+            <Button onClick={handleNext} disabled={transitioning}>
+              {transitioning ? 'Advancing...' : 'Proceed to Device Check'}
             </Button>
           }
         />
@@ -160,10 +180,10 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
       
       <div className="flex justify-end pt-4">
         <Button
-          onClick={() => {}}
-          disabled={true}
+          onClick={handleNext}
+          disabled={transitioning}
         >
-          Phase 1 Foundation Complete
+          {transitioning ? 'Advancing...' : 'Proceed to Device Check'}
         </Button>
       </div>
     </div>
