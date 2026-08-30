@@ -413,15 +413,16 @@ async function startServer() {
       if (!ownership) return;
       const { session } = ownership;
 
-      if (session.thinkAgainUsesLeft! <= 0) {
+      const currentUses = session.thinkAgainUsesLeft ?? 3;
+      if (currentUses <= 0) {
         return res.status(400).json({ error: "No think-agains left" });
       }
 
       await db.update(sessions)
-        .set({ thinkAgainUsesLeft: session.thinkAgainUsesLeft! - 1 })
+        .set({ thinkAgainUsesLeft: currentUses - 1 })
         .where(eq(sessions.id, sessionId));
 
-      res.json({ success: true, thinkAgainUsesLeft: session.thinkAgainUsesLeft! - 1 });
+      res.json({ success: true, thinkAgainUsesLeft: currentUses - 1 });
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: "Failed to process think again" });
