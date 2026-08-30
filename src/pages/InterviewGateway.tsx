@@ -8,7 +8,8 @@ import ResumeUpload from './../components/ResumeUpload.tsx';
 import ResumeAnalysis from './../components/ResumeAnalysis.tsx';
 import InterviewInstructions from './../components/InterviewInstructions.tsx';
 import DeviceCheck from './../components/DeviceCheck.tsx';
-import WaitingRoom from './../components/WaitingRoom.tsx';
+
+import WaitingRoom from './WaitingRoom.tsx';
 import Interview from './../components/Interview.tsx';
 import Dashboard from './../components/Dashboard.tsx';
 import Layout from './../components/Layout.tsx';
@@ -254,6 +255,7 @@ export default function InterviewGateway() {
              <Route path="upload" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="resume"><ResumeUpload session={activeSession} onNext={(session, text) => { setActiveSession(session); if (text) setResumeText(text); setCurrentView('session'); }} /></ProtectedRoute>} />
              <Route path="analysis" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["resume_analysis", "intelligence"]}><ResumeAnalysis session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
              <Route path="device-check" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="device_check"><DeviceCheck session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+             <Route path="waiting-room" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="waiting_room"><WaitingRoom session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
              <Route path="*" element={<Navigate to={STAGE_ROUTE_MAP[activeStage] || "/interview/welcome"} replace />} />
           </Routes>
         )}

@@ -138,3 +138,52 @@ These rules are mandatory for all development on this project. The agent must st
 * Any database change shall require a migration and schema update.
 * Any prompt change shall require version increment and sample validation.
 * Any scope change shall require explicit approval.
+
+## Project Phase Definitions (The Roadmap)
+
+### Phase 1 — Foundation
+This phase is the locked candidate onboarding core. It covers the path from registration up to resume analysis, and nothing beyond that should leak into it.
+*   **Included:** Registration, Welcome screen, Policy consent, Locked session creation, Resume upload, Resume parsing and resume intelligence, Session recovery through the candidate state endpoint, Route guarding for allowed steps only.
+*   **Exit condition:** The whole locked journey works end to end. No Phase 2 logic appears in the foundation. The flow is signed off and frozen.
+
+### Phase 2 — Device Check
+This is the first expansion after Phase 1 sign-off. It validates whether the candidate device is ready before the interview journey can continue.
+*   **Included:** Camera permission check, Microphone permission check, Speaker test, Browser compatibility check, Permission blocked/denied fallback handling, Session persistence for device readiness, Route protection to prevent bypass.
+*   **Exit condition:** Device check passes reliably. Blocked and denied states are handled cleanly. The candidate can only continue when readiness is confirmed.
+
+### Phase 3 — Waiting Room
+This is the controlled holding stage before the interview begins.
+*   **Included:** Post-device-check waiting state, Auto-transition setup, Candidate readiness confirmation, Final pre-interview holding screen.
+*   **Exit condition:** Candidate is prepared and the system can safely start the interview flow.
+
+### Phase 4 — Interview Engine
+This phase contains the actual interview experience.
+*   **Included:** Auto-start interview stages, Stage sequencing, Round-specific logic, Adaptive progression if used, Candidate response capture.
+*   **Exit condition:** Interview stages complete and outputs are saved correctly.
+
+### Phase 5 — Anti-Cheat / Integrity Layer
+This phase protects interview trust and evaluation quality.
+*   **Included:** Suspicious behavior detection, Integrity signals, Cheat-risk tracking, Candidate monitoring rules, Fallback or alert generation when issues occur.
+*   **Exit condition:** Integrity checks are active and logged with the interview flow.
+
+### Phase 6 — Final Report
+This phase turns the interview outcome into a reviewable result.
+*   **Included:** Score generation, Summary report, Strengths and gaps, Candidate performance analysis, Final structured output.
+*   **Exit condition:** Report is generated and stored successfully.
+
+### Phase 7 — Admin Access
+This phase is separate from the candidate journey and should stay isolated from the foundation.
+*   **Included:** Admin login, Role-based access, Candidate/session/report review, Internal dashboards, Protected admin routes.
+*   **Exit condition:** Admin can securely access internal views without exposing candidate flows.
+
+### Phase Separation Rule
+The important rule is that each phase should be **strictly gated** by the previous one. Candidate routes, backend session state, and database flags should enforce this order so no later phase can be entered early.
+
+### Simple Order Map
+1. Foundation
+2. Device Check
+3. Waiting Room
+4. Interview Engine
+5. Anti-Cheat / Integrity
+6. Final Report
+7. Admin Access

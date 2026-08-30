@@ -1,0 +1,4 @@
+#!/bin/bash
+sed -i 's|import DeviceCheck from '\''./../components/DeviceCheck.tsx'\'';|import DeviceCheck from '\''./../components/DeviceCheck.tsx'\'';\nimport WaitingRoom from '\''./../components/WaitingRoom.tsx'\'';|g' src/pages/InterviewGateway.tsx
+
+sed -i 's|<Route path="device-check".*|<Route path="device-check" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="device_check"><DeviceCheck session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />\n             <Route path="waiting-room" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="waiting_room"><WaitingRoom session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />|g' src/pages/InterviewGateway.tsx

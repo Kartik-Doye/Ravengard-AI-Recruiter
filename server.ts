@@ -41,6 +41,14 @@ async function verifySessionOwnership(req: AuthRequest, sessionId: string, res: 
 }
 
 async function transitionSessionStage(sessionId: string, currentStage: string, targetStage: string) {
+  const [sessionRecord] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
+  if (!sessionRecord) throw new Error("Session not found");
+  
+  // Gate: Verify device readiness before allowing entry into the interview engine
+  if (targetStage === 'interview_hr_friendly' && sessionRecord.deviceCheckStatus !== 'passed') {
+    throw new Error("Cannot enter interview engine: Device check not passed.");
+  }
+
   const validTransitions: Record<string, string[]> = {
     'resume_upload': ['resume_analysis'],
     'resume_analysis': ['interview_instructions', 'device_check', 'resume_upload'],
