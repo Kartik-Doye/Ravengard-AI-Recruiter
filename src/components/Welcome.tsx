@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Clock, CheckCircle2 } from 'lucide-react';
+import { Clock, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export default function Welcome({ onNext, candidate }: { onNext: (session: any) => void, candidate: any }) {
   const [loadingStart, setLoadingStart] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState(true);
   const [aiData, setAiData] = useState<{ message: string, checklist?: string[] } | null>(null);
   
+  // Use the live email_verified field provided by the backend from the token
+  const isEmailVerified = candidate?.email_verified === true;
+
   useEffect(() => {
     let isMounted = true;
     const fetchAiMessage = async () => {
@@ -45,6 +48,7 @@ export default function Welcome({ onNext, candidate }: { onNext: (session: any) 
   }, []);
 
   const handleStart = () => {
+    if (!isEmailVerified) return;
     onNext({ currentStage: 'consent' });
   };
 
@@ -56,6 +60,21 @@ export default function Welcome({ onNext, candidate }: { onNext: (session: any) 
         <span>ESTIMATED TIME: 60-90 MINUTES</span>
       </div>
       
+      {!isEmailVerified && (
+        <div className="glass-panel border border-[var(--color-error)]/30 rounded-xl p-6 mb-8 flex gap-4 items-start bg-[var(--color-error)]/5">
+          <ShieldAlert className="w-6 h-6 text-[var(--color-error)] shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-medium text-[var(--color-error)] tracking-wide mb-1">Email Verification Required</h3>
+            <p className="text-white/70 text-sm leading-relaxed mb-3">
+              We've sent a verification link to your email address via Firebase Auth. You must verify your email before you can proceed to the policy consent phase.
+            </p>
+            <p className="text-white/50 text-xs">
+              Check your inbox (and spam folder) for the verification link. Once clicked, refresh this page.
+            </p>
+          </div>
+        </div>
+      )}
+
       {loadingMessage ? (
         <div className="glass-panel border border-white/5 rounded-xl p-8 shadow-[0_8px_32px_rgba(0,0,0,0.4)] mb-8 animate-pulse">
           <div className="h-4 bg-white/10 rounded w-1/3 mb-4"></div>
@@ -86,10 +105,10 @@ export default function Welcome({ onNext, candidate }: { onNext: (session: any) 
 
       <button
         onClick={handleStart}
-        disabled={loadingMessage || loadingStart}
+        disabled={loadingMessage || loadingStart || !isEmailVerified}
         className="bg-[var(--color-primary)] text-white font-semibold py-3 px-8 rounded-md hover:bg-violet-500 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(139,92,246,0.3)] tracking-wider"
       >
-        {loadingStart ? 'INITIALIZING...' : 'CONTINUE TO POLICY'}
+        {loadingStart ? 'INITIALIZING...' : (isEmailVerified ? 'CONTINUE TO POLICY' : 'VERIFY EMAIL TO PROCEED')}
       </button>
     </div>
   );

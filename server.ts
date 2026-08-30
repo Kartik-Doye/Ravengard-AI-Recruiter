@@ -106,7 +106,8 @@ async function startServer() {
         }
       }
 
-      res.json({ user, activeSession, resumeText });
+      // Pass the live email_verified field to the frontend
+      res.json({ user: { ...user, email_verified: req.user!.email_verified }, activeSession, resumeText });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Server error", details: String(error) });
@@ -165,8 +166,7 @@ async function startServer() {
         college,
         degree,
         gradYear,
-        preferredLanguage,
-        emailVerified: true
+        preferredLanguage
       }).returning();
 
       if (reqEmail) {
@@ -211,6 +211,11 @@ async function startServer() {
 
   app.post("/api/session/confirm-consent", requireAuth, async (req: AuthRequest, res) => {
     try {
+      // 3. Block if email is not verified by Firebase Auth
+      if (!req.user!.email_verified) {
+        return res.status(403).json({ success: false, error: "Email verification is required before confirming consent." });
+      }
+
       const email = req.user!.email;
       const { text, policyVersion } = req.body;
       
@@ -246,7 +251,7 @@ async function startServer() {
         policyVersion: activePolicyVersion,
         currentStage: 'resume_upload',
         status: 'active',
-        thinkAgainUsesLeft: 3
+        thinkAgainUsesLeft: 2
       }).returning();
 
       res.json({ success: true, session: newSession });
@@ -445,7 +450,7 @@ async function startServer() {
       if (!ownership) return;
       const { session } = ownership;
 
-      const currentUses = session.thinkAgainUsesLeft ?? 3;
+      const currentUses = session.thinkAgainUsesLeft ?? 2;
       if (currentUses <= 0) {
         return res.status(400).json({ error: "No think-agains left" });
       }
