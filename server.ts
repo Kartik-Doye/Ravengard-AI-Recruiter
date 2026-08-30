@@ -170,7 +170,19 @@ async function startServer() {
       }).returning();
 
       if (reqEmail) {
-        sendWelcomeEmail(reqEmail, name).catch(console.error);
+        let verificationLink;
+        try {
+          if (process.env.NODE_ENV !== "production" && req.headers.authorization?.includes('test-uid')) {
+            // E2E Test bypass: no real link generated
+          } else {
+            // 1. Generate Firebase Email Verification Link natively via Admin SDK
+            verificationLink = await getAuth().generateEmailVerificationLink(reqEmail);
+          }
+        } catch (authErr) {
+          console.warn("Failed to generate Firebase verification link (Auth may not be initialized):", authErr);
+        }
+        
+        sendWelcomeEmail(reqEmail, name, verificationLink).catch(console.error);
       }
 
       res.json({ candidateId: user.id, registrationStatus: 'validated', welcomeMessage: 'Welcome!' });
