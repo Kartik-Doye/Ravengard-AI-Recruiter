@@ -53,7 +53,7 @@ export default function WaitingRoom({ session, onNext }: { session: any, onNext:
 
         <div className="relative z-10 flex flex-col items-center">
           <div className="mb-6 relative">
-            <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center border border-white/20">
+            <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center border border-white/20 animate-subtle-pulse">
               {confirmed ? (
                 <CheckCircle2 className="w-10 h-10 text-green-400" />
               ) : (

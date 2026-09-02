@@ -9,7 +9,12 @@ export const STAGE_ROUTE_MAP: Record<string, string> = {
   'intelligence': '/interview/analysis',
   'resume_analysis': '/interview/analysis',
   'device_check': '/interview/device-check',
-  'waiting_room': '/interview/waiting-room'
+  'waiting_room': '/interview/waiting-room',
+  'interview_hr_friendly': '/interview/engine',
+  'interview_technical': '/interview/engine',
+  'interview_cto': '/interview/engine',
+  'report_generation': '/interview/report',
+
 };
 
 export function useInterviewFlow(activeSession: any, loading: boolean) {

@@ -39,12 +39,12 @@ export default function Layout({ children, candidate, session, currentStageName,
             </div>
             <span className="text-lg font-medium tracking-widest text-white/90">RAVENGARD</span>
             
-            {(status === 'in_progress' || status === 'created') && currentStageName !== 'dashboard' && onBackStep && (
+            {(status === 'active' || status === 'created') && currentStageName !== 'dashboard' && onBackStep && (
               <div className="ml-4 pl-4 border-l border-white/10">
                 <BackButton label="Step Back" onClick={onBackStep} />
               </div>
             )}
-            {(status === 'in_progress' || status === 'created') && currentStageName !== 'dashboard' && onPauseSession && (
+            {(status === 'active' || status === 'created') && currentStageName !== 'dashboard' && onPauseSession && (
               <div className="ml-2">
                 <Button 
                   variant="ghost" 
@@ -60,10 +60,10 @@ export default function Layout({ children, candidate, session, currentStageName,
 
           <div className="flex items-center gap-4 text-sm hidden sm:flex">
             <div className="glass-panel px-4 py-1.5 rounded-full text-white/70 border border-white/5 flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${status === 'in_progress' || status === 'created' ? 'bg-[var(--color-success)] text-[var(--color-success)]' : 'bg-white/40'}`}></div>
+              <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${status === 'active' || status === 'created' ? 'bg-[var(--color-success)] text-[var(--color-success)]' : 'bg-white/40'}`}></div>
               <span className="tracking-widest text-xs font-medium">SESSION: {status.replace('_', ' ').toUpperCase()}</span>
             </div>
-            {session?.locked && status === 'in_progress' && (
+            {session?.locked && status === 'active' && (
               <div className="glass-panel px-3 py-1.5 rounded-full border border-[var(--color-error)]/30 flex items-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
                  <span className="text-[var(--color-error)] font-bold flex items-center gap-1 text-xs tracking-widest">🔒 LOCKED</span>
               </div>

@@ -25,12 +25,12 @@ export default function App() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setInitialLoad(false);
-    }, 15000);
+    }, 5000);
     return () => clearTimeout(timer);
   }, []);
 
   if (initialLoad) {
-    return <SmoothLoader duration={15000} />;
+    return <SmoothLoader duration={5000} />;
   }
 
   return (

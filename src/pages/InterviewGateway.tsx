@@ -10,6 +10,7 @@ import InterviewInstructions from './../components/InterviewInstructions.tsx';
 import DeviceCheck from './../components/DeviceCheck.tsx';
 
 import WaitingRoom from './WaitingRoom.tsx';
+import FinalReport from './FinalReport';
 import Interview from './../components/Interview.tsx';
 import Dashboard from './../components/Dashboard.tsx';
 import Layout from './../components/Layout.tsx';
@@ -34,21 +35,12 @@ export default function InterviewGateway() {
   const [resumeText, setResumeText] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<'dashboard' | 'session'>('dashboard');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark' | 'high-contrast'>(() => {
-    return (localStorage.getItem('ravengard_theme') as any) || 'light';
-  });
-  const { addToast } = useToast();
+    const { addToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-
+  
   useEffect(() => {
-    document.documentElement.classList.remove('light', 'dark', 'high-contrast');
-    document.documentElement.classList.add(theme);
-    localStorage.setItem('ravengard_theme', theme);
-  }, [theme]);
-
-  useEffect(() => {
-    if (activeSession?.locked && activeSession?.status === 'in_progress') {
+    if (activeSession?.locked && activeSession?.status === 'active') {
       setCurrentView('session');
     }
   }, [activeSession]);
@@ -90,13 +82,13 @@ export default function InterviewGateway() {
         setResumeText(data.resumeText || null);
         
         if (!silent) {
-          if (data.activeSession?.locked && data.activeSession?.status === 'in_progress') {
+          if (data.activeSession?.locked && data.activeSession?.status === 'active') {
             setCurrentView('session');
             addToast('info', 'Session resumed.');
           } else {
             setCurrentView('dashboard');
           }
-        } else if (data.activeSession?.status === 'abandoned' && activeSession?.status === 'in_progress') {
+        } else if (data.activeSession?.status === 'abandoned' && activeSession?.status === 'active') {
             setCurrentView('dashboard');
             addToast('error', 'Session was abandoned by the system.');
         }
@@ -214,7 +206,7 @@ export default function InterviewGateway() {
         isOpen={isCommandPaletteOpen} 
         setIsOpen={setIsCommandPaletteOpen} 
         onNavigate={(view: any) => {
-          if (view === 'dashboard' && activeSession?.locked && activeSession?.status === 'in_progress') {
+          if (view === 'dashboard' && activeSession?.locked && activeSession?.status === 'active') {
             setCurrentView('session');
             addToast('info', 'Switched to active session.');
           } else if (view === 'dashboard') {
@@ -224,10 +216,7 @@ export default function InterviewGateway() {
             addToast('error', 'Navigation to ' + view + ' is part of Phase 2!');
           }
         }}
-        onThemeChange={(newTheme: any) => {
-          setTheme(newTheme);
-          addToast('success', `Theme changed to ${newTheme}`);
-        }}
+        
       />
       
       <Layout 
@@ -256,6 +245,8 @@ export default function InterviewGateway() {
              <Route path="analysis" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["resume_analysis", "intelligence"]}><ResumeAnalysis session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
              <Route path="device-check" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="device_check"><DeviceCheck session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
              <Route path="waiting-room" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="waiting_room"><WaitingRoom session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+                          <Route path="engine" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["interview_hr_friendly", "interview_technical", "interview_cto"]}><InterviewEngine session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+                          <Route path="report" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["report_generation", "completed"]}><FinalReport session={activeSession} /></ProtectedRoute>} />
              <Route path="*" element={<Navigate to={STAGE_ROUTE_MAP[activeStage] || "/interview/welcome"} replace />} />
           </Routes>
         )}

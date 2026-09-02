@@ -1,10 +1,12 @@
+import { getAuth } from "firebase-admin/auth";
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { extractTextFromFile } from "./src/services/resume-processor";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
 import { db } from "./src/db/index";
-import { candidates, sessions, resumeAnalyses, organizationAdmins, contacts } from "./src/db/schema";
+import { candidates, sessions, resumeAnalyses, organizationAdmins, contacts, interviewSessions, interviewQuestions, interviewResponses, integritySignals, interviewReports } from "./src/db/schema";
 import { eq, and, or, desc, lt } from "drizzle-orm";
 import multer from "multer";
 
@@ -13,6 +15,7 @@ import { sendWelcomeEmail } from "./src/lib/email";
 import crypto from "crypto";
 import fs from "fs/promises";
 import { registrationSchema } from "./src/lib/validation";
+import adminRoutes from "./src/routes/admin";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -88,6 +91,38 @@ async function transitionSessionStage(sessionId: string, currentStage: string, t
 
 async function startServer() {
   const app = express();
+  app.set("trust proxy", 1);
+
+
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next, options) => {
+    const err = new Error(options.message.error || 'Too Many Requests');
+    (err as any).status = 429;
+    next(err);
+  }
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res, next, options) => {
+    const err = new Error(options.message.error || 'Too Many Requests');
+    (err as any).status = 429;
+    next(err);
+  }
+});
+
+app.use(globalLimiter);
+// We don't apply adminLimiter globally, we'll apply it to a new /api/admin router later, or directly to routes starting with /api/admin.
+app.use("/api/admin", adminLimiter);
+app.use("/api/admin", adminRoutes);
+
   const PORT = 3000;
 
   app.use(express.json());
@@ -525,6 +560,242 @@ async function startServer() {
     });
   }
 
+  
+  // --- Phase 4: Interview Engine Endpoints ---
+  app.post("/api/interview/:id/start", requireAuth, async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const ownership = await verifySessionOwnership(req, sessionId, res);
+      if (!ownership) return;
+      const { session } = ownership;
+
+      if (!session.currentStage.startsWith('interview_')) {
+        return res.status(403).json({ error: "Session is not in an interview stage" });
+      }
+
+      let [interviewSession] = await db.select().from(interviewSessions).where(eq(interviewSessions.sessionId, sessionId)).orderBy(desc(interviewSessions.startedAt)).limit(1);
+
+      if (!interviewSession || interviewSession.status === 'completed') {
+        [interviewSession] = await db.insert(interviewSessions).values({
+          id: crypto.randomUUID(),
+          sessionId,
+          roundType: session.currentStage === 'interview_hr_friendly' ? 'hr' : 'technical',
+        }).returning();
+      }
+
+      res.json({ success: true, interviewSession });
+    } catch (error) {
+      console.error("Failed to start interview:", error);
+      res.status(500).json({ error: "Failed to start interview" });
+    }
+  });
+
+  app.get("/api/interview/:id/stream-question", async (req, res) => {
+    const token = req.query.token;
+    if (!token) return res.status(401).json({ error: "Missing token" });
+
+    let userId;
+    try {
+      if (process.env.NODE_ENV !== "production" && token.length < 500) {
+        userId = token;
+      } else {
+        const decodedToken = await getAuth().verifyIdToken(token);
+        userId = decodedToken.uid;
+      }
+    } catch (e) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const sessionId = req.params.id;
+    try {
+      const [session] = await db.select().from(sessions).where(eq(sessions.id, sessionId));
+      if (!session || session.candidateId !== userId) {
+         return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      const [interviewSession] = await db.select().from(interviewSessions).where(eq(interviewSessions.sessionId, sessionId)).orderBy(desc(interviewSessions.startedAt)).limit(1);
+      if (!interviewSession) return res.status(404).json({ error: "Interview session not found" });
+
+      const prevQuestions = await db.select().from(interviewQuestions).where(eq(interviewQuestions.interviewSessionId, interviewSession.id)).orderBy(interviewQuestions.questionIndex);
+      const questionIndex = prevQuestions.length + 1;
+
+      const [question] = await db.insert(interviewQuestions).values({
+        id: crypto.randomUUID(),
+        interviewSessionId: interviewSession.id,
+        questionIndex,
+        questionText: ''
+      }).returning();
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const prompt = `You are conducting a ${interviewSession.roundType} interview. This is question #${questionIndex}. 
+      Previous questions: ${prevQuestions.map(q => q.questionText).join(" | ")}. 
+      Ask a professional, concise interview question. Only output the question text, no pleasantries.`;
+
+      const responseStream = await ai.models.generateContentStream({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
+
+      let fullText = "";
+      for await (const chunk of responseStream) {
+        const text = chunk.text;
+        fullText += text;
+        res.write(`data: ${JSON.stringify({ text })}
+
+`);
+      }
+
+      await db.update(interviewQuestions).set({ questionText: fullText }).where(eq(interviewQuestions.id, question.id));
+      res.write(`data: ${JSON.stringify({ done: true, questionId: question.id })}
+
+`);
+      res.end();
+    } catch (error) {
+      console.error("Failed to stream question:", error);
+      res.write(`data: ${JSON.stringify({ error: "Failed to generate question" })}
+
+`);
+      res.end();
+    }
+  });
+
+  app.post("/api/interview/:id/answer", requireAuth, async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const ownership = await verifySessionOwnership(req, sessionId, res);
+      if (!ownership) return;
+
+      const { questionId, responseText } = req.body;
+      if (!questionId || !responseText) return res.status(400).json({ error: "Missing required fields" });
+
+      const [response] = await db.insert(interviewResponses, integritySignals, interviewReports).values({
+        id: crypto.randomUUID(),
+        questionId,
+        responseText
+      }).returning();
+
+      res.json({ success: true, response });
+    } catch (error) {
+      console.error("Failed to submit answer:", error);
+      res.status(500).json({ error: "Failed to submit answer" });
+    }
+  });
+
+  
+  // --- Phase 5: Anti-Cheat Signal Hook ---
+  app.post("/api/interview/:id/signal", requireAuth, async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const ownership = await verifySessionOwnership(req, sessionId, res);
+      if (!ownership) return;
+
+      const { signalType, metadata, interviewSessionId } = req.body;
+      if (!signalType) return res.status(400).json({ error: "Missing signalType" });
+
+      await db.insert(integritySignals, interviewReports).values({
+        id: crypto.randomUUID(),
+        sessionId,
+        interviewSessionId,
+        signalType,
+        metadata: metadata ? JSON.stringify(metadata) : null
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to log integrity signal:", error);
+      res.status(500).json({ error: "Failed to log signal" });
+    }
+  });
+
+  
+  // --- Phase 6: Final Report Hooks ---
+  app.post("/api/interview/:id/generate-report", requireAuth, async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const ownership = await verifySessionOwnership(req, sessionId, res);
+      if (!ownership) return;
+      const { session } = ownership;
+
+      const [existingReport] = await db.select().from(interviewReports).where(eq(interviewReports.sessionId, sessionId));
+      if (existingReport) {
+        return res.json({ success: true, report: existingReport });
+      }
+
+      const sessionData = await db.select({
+        questionText: interviewQuestions.questionText,
+        responseText: interviewResponses.responseText,
+      })
+      .from(interviewQuestions)
+      .leftJoin(interviewResponses, eq(interviewQuestions.id, interviewResponses.questionId))
+      .innerJoin(interviewSessions, eq(interviewQuestions.interviewSessionId, interviewSessions.id))
+      .where(eq(interviewSessions.sessionId, sessionId));
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const prompt = `Evaluate the candidate based on these interview questions and answers:
+      ${JSON.stringify(sessionData)}
+      
+      Provide a JSON report with:
+      - overallScore (0-100)
+      - breakdown (object with keys like 'technical', 'communication', 'problem_solving' containing 0-100 scores)
+      - strengths (array of strings)
+      - weaknesses (array of strings)
+      - recommendation (a short string paragraph)`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json"
+        }
+      });
+
+      const parsed = JSON.parse(response.text || '{}');
+
+      const [report] = await db.insert(interviewReports).values({
+        id: crypto.randomUUID(),
+        sessionId,
+        overallScore: parsed.overallScore || 0,
+        breakdown: parsed.breakdown || {},
+        strengths: parsed.strengths || [],
+        weaknesses: parsed.weaknesses || [],
+        recommendation: parsed.recommendation || "no_hire",
+        rubricVersion: 'v1.0',
+        evidence: parsed.evidence || []
+      }).returning();
+      
+      await db.update(sessions).set({ currentStage: 'report_generation', status: 'completed' }).where(eq(sessions.id, sessionId));
+      
+      res.json({ success: true, report });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to generate report" });
+    }
+  });
+
+  app.get("/api/interview/:id/report", requireAuth, async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const ownership = await verifySessionOwnership(req, sessionId, res);
+      if (!ownership) return;
+
+      const [report] = await db.select().from(interviewReports).where(eq(interviewReports.sessionId, sessionId));
+      if (!report) return res.status(404).json({ error: "Report not found" });
+
+      res.json({ success: true, report });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to fetch report" });
+    }
+  });
+
   setInterval(async () => {
     try {
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -546,7 +817,19 @@ async function startServer() {
      console.log(`Cron: Checking cumulative LLM API spend against threshold...`);
   }, 24 * 60 * 60 * 1000); 
 
+  
+  // Global error handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err.status === 429 || err.statusCode === 429 || err.message === 'Too Many Requests') {
+      res.status(429).json({ error: "Too many requests, please try again later.", retryAfter: res.getHeader('Retry-After') });
+      return;
+    }
+    console.error("Global Error Handler:", err);
+    res.status(err.status || 500).json({ error: err.message || "Internal Server Error" });
+  });
+
   const server = app.listen(PORT, "0.0.0.0", () => {
+
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
