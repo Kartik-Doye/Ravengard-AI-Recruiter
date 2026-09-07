@@ -17,18 +17,16 @@ export default function Registration({ user, onComplete }: { user: string, onCom
   const [isAdult, setIsAdult] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const validateField = (field: string, value: any) => {
-    try {
-      const fieldSchema = (({} as any) as any)[field];
-      if (fieldSchema) {
-        fieldSchema.parse(value);
-        setErrors(prev => ({ ...prev, [field]: '' }));
-      }
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        setErrors(prev => ({ ...prev, [field]: error.issues[0].message }));
+  const validateField = (field, value) => {
+    const result = registrationSchema.safeParse({ ...formData, [field]: value });
+    if (!result.success) {
+      const fieldError = result.error.issues.find(err => err.path[0] === field);
+      if (fieldError) {
+        setErrors(prev => ({ ...prev, [field]: fieldError.message }));
+        return;
       }
     }
+    setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
   const handleBlur = (field: string) => {
@@ -39,22 +37,30 @@ export default function Registration({ user, onComplete }: { user: string, onCom
     e.preventDefault();
     setServerErrors([]);
     
-    try {
-      formData;
-      setErrors({});
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {};
-        error.issues.forEach(err => {
-          if (err.path[0]) {
-            newErrors[err.path[0] as string] = err.message;
-          }
-        });
-        setErrors(newErrors);
-        return;
-      }
+    const result = registrationSchema.safeParse(formData);
+    let newErrors = {};
+    let hasErrors = false;
+    
+    if (!result.success) {
+      hasErrors = true;
+      result.error.issues.forEach(err => {
+        if (err.path[0]) {
+          newErrors[err.path[0]] = err.message;
+        }
+      });
     }
-
+    
+    if (!isAdult) {
+      hasErrors = true;
+      newErrors['isAdult'] = 'You must confirm you are 18 or older.';
+    }
+    
+    if (hasErrors) {
+      setErrors(newErrors);
+      return;
+    }
+    
+    setErrors({});
     setLoading(true);
     try {
       const token = user;
@@ -154,8 +160,9 @@ export default function Registration({ user, onComplete }: { user: string, onCom
             </span>
           </label>
 
+          {errors.isAdult && <p className="text-[var(--color-error)] text-xs mt-1 ml-7">{errors.isAdult}</p>}
           <div className="pt-4 border-t border-white/10 mt-6">
-            <button disabled={loading || !isAdult} type="submit" className="w-full bg-[var(--color-primary)] text-white font-semibold py-3 px-4 rounded-md hover:bg-violet-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-[0_0_15px_rgba(139,92,246,0.3)]">
+            <button disabled={loading} type="submit" className="w-full bg-[var(--color-primary)] text-white font-semibold py-3 px-4 rounded-md hover:bg-violet-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-[0_0_15px_rgba(139,92,246,0.3)]">
               {loading ? 'Validating...' : 'Complete Profile'}
             </button>
           </div>

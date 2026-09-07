@@ -9,9 +9,9 @@ import ResumeAnalysis from './../components/ResumeAnalysis.tsx';
 import InterviewInstructions from './../components/InterviewInstructions.tsx';
 import DeviceCheck from './../components/DeviceCheck.tsx';
 
+import InterviewEngine from "./InterviewEngine";
 import WaitingRoom from './WaitingRoom.tsx';
 import FinalReport from './FinalReport';
-import Interview from './../components/Interview.tsx';
 import Dashboard from './../components/Dashboard.tsx';
 import Layout from './../components/Layout.tsx';
 import ErrorBoundary from './../components/ErrorBoundary.tsx';
@@ -67,7 +67,7 @@ export default function InterviewGateway() {
     try {
       if (!silent) setLoading(true);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => { controller.abort(); setIsTimeout(true); }, 8000);
+      const timeoutId = setTimeout(() => { controller.abort(); setIsTimeout(true); }, 25000);
       const res = await fetch('/api/me', {
         signal: controller.signal,
         headers: {

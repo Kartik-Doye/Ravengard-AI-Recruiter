@@ -74,10 +74,10 @@ export function ProjectGrid({ projects, activeCategories }: ProjectGridProps) {
                 </div>
 
                 <Link
-                  to={`/projects/${project.slug}`}
+                  to={`/features#${project.slug}`}
                   className="mt-6 inline-flex text-sm font-medium text-white underline underline-offset-4"
                 >
-                  Open case study
+                  View Details
                 </Link>
               </div>
             </div>

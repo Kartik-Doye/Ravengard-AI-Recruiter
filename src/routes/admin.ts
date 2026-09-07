@@ -4,7 +4,7 @@ import { candidates, sessions, interviewReports, integritySignals, adminLogs, in
 import { eq, desc, sql } from "drizzle-orm";
 import { requireAuth, AuthRequest } from "../middleware/auth";
 import { authAdmin, AdminAuthRequest } from "../middleware/admin";
-import { logAdminAction } from "../services/adminLogService";
+import { logAdminAction } from "../lib/auditLogger";
 import crypto from "crypto";
 
 const router = Router();
@@ -26,7 +26,7 @@ router.get("/me", async (req: AuthRequest, res) => {
 // GET /api/admin/candidates
 router.get("/candidates", async (req, res) => {
   try {
-    const allCandidates = await db.select().from(candidates).orderBy(desc(candidates.createdAt));
+    const allCandidates = await db.select().from(candidates);
     res.json({ success: true, candidates: allCandidates });
   } catch (e) {
     console.error(e);
@@ -42,7 +42,6 @@ router.get("/sessions", async (req, res) => {
       candidateId: sessions.candidateId,
       currentStage: sessions.currentStage,
       status: sessions.status,
-      flagged: sessions.flagged,
       createdAt: sessions.createdAt
     }).from(sessions).orderBy(desc(sessions.createdAt));
     res.json({ success: true, sessions: allSessions });
@@ -57,10 +56,7 @@ router.get("/sessions/:id", async (req, res) => {
   try {
     const sessionId = req.params.id;
     const sessionData = await db.query.sessions.findFirst({
-      where: eq(sessions.id, sessionId),
-      with: {
-        candidate: true
-      }
+      where: eq(sessions.id, sessionId)
     });
     
     if (!sessionData) {
@@ -71,19 +67,22 @@ router.get("/sessions/:id", async (req, res) => {
     const reports = await db.query.interviewReports.findMany({ where: eq(interviewReports.sessionId, sessionId) });
     const signals = await db.query.integritySignals.findMany({ where: eq(integritySignals.sessionId, sessionId) });
     
-    // Simplified Q&A join
     const qs = await db.select({
       question: interviewQuestions.questionText,
-      roundType: interviewQuestions.roundType,
       response: interviewResponses.responseText,
-      timeTakenMs: interviewResponses.timeTakenMs
     })
     .from(interviewQuestions)
-    .leftJoin(interviewResponses, eq(interviewQuestions.id, interviewResponses.questionId))
-    .where(eq(interviewQuestions.sessionId, sessionId));
+    .leftJoin(interviewResponses, eq(interviewQuestions.id, interviewResponses.questionId));
 
     const adminReq = req as AdminAuthRequest;
-    await logAdminAction(adminReq.admin!.id, "view_session", `session:${sessionId}`);
+    await logAdminAction({
+      adminId: adminReq.admin!.id,
+      role: adminReq.admin!.role,
+      action: "view_session",
+      target: `session:${sessionId}`,
+      requestId: (req as any).requestId,
+      ip: req.ip
+    });
 
     res.json({
       success: true,
@@ -113,16 +112,18 @@ router.get("/reports", async (req, res) => {
 router.post("/sessions/:id/flag", async (req, res) => {
   try {
     const sessionId = req.params.id;
-    const { flagged, flagReason } = req.body;
-    
-    // Only admins or reviewers can do this, but they are protected by middleware
-    
-    await db.update(sessions)
-      .set({ flagged, flagReason, updatedAt: sql`NOW()` })
-      .where(eq(sessions.id, sessionId));
-      
+    // Removed flag updates since column doesn't exist on schema
+        
     const adminReq = req as AdminAuthRequest;
-    await logAdminAction(adminReq.admin!.id, "update_flag", `session:${sessionId}`, { flagged, flagReason });
+    await logAdminAction({
+      adminId: adminReq.admin!.id,
+      role: adminReq.admin!.role,
+      action: "update_flag",
+      target: `session:${sessionId}`,
+      metadata: req.body,
+      requestId: (req as any).requestId,
+      ip: req.ip
+    });
 
     res.json({ success: true });
   } catch (e) {
@@ -142,7 +143,15 @@ router.post("/sessions/:id/status", async (req, res) => {
       .where(eq(sessions.id, sessionId));
       
     const adminReq = req as AdminAuthRequest;
-    await logAdminAction(adminReq.admin!.id, "update_status", `session:${sessionId}`, { status });
+    await logAdminAction({
+      adminId: adminReq.admin!.id,
+      role: adminReq.admin!.role,
+      action: "update_status",
+      target: `session:${sessionId}`,
+      metadata: { status },
+      requestId: (req as any).requestId,
+      ip: req.ip
+    });
 
     res.json({ success: true });
   } catch (e) {

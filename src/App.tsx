@@ -25,12 +25,12 @@ export default function App() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setInitialLoad(false);
-    }, 5000);
+    }, 1500);
     return () => clearTimeout(timer);
   }, []);
 
   if (initialLoad) {
-    return <SmoothLoader duration={5000} />;
+    return <SmoothLoader duration={1500} />;
   }
 
   return (
@@ -49,6 +49,7 @@ export default function App() {
                       <Route path="/projects" element={<Projects />} />
                       <Route path="/contact" element={<Contact />} />
                       <Route path="/gateway" element={<Gateway />} />
+                      <Route path="/demo" element={<Gateway />} />
                       <Route path="/assessment-guide" element={<AssessmentGuide />} />
                       {/* Interview Gateway renders without standard layout wrappers based on location in RootLayout */}
                       

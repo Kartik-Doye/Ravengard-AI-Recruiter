@@ -14,20 +14,23 @@ export function FinalCtaSection() {
       >
         <p className="text-xs uppercase tracking-[0.3em] text-white/50">Next step</p>
         <h2 className="mt-4 text-3xl font-semibold tracking-tight md:text-5xl">
-          Ready to enter the session?
+          Ready to experience the future of hiring?
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-white/70">
-          Start the interactive experience or explore the project index to see
+          Start the interactive interview gateway or explore the platform's features to see
           the system in detail.
         </p>
 
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link to="/gateway" className="rounded-full bg-white px-5 py-3 text-sm font-medium text-[#060814]">
-            Start Session
-          </Link>
-          <Link to="/projects" className="rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-medium text-white">
-            View Projects
-          </Link>
+        <div className="mt-8 flex flex-col items-center justify-center gap-3">
+          <div className="flex flex-wrap justify-center gap-3">
+            <Link to="/gateway" className="rounded-full bg-white px-6 py-3.5 text-sm font-medium text-[#060814] hover:bg-white/90 transition-colors">
+              Run candidate test drive
+            </Link>
+            <Link to="/demo" className="rounded-full border border-white/15 bg-white/5 px-6 py-3.5 text-sm font-medium text-white hover:bg-white/10 transition-colors">
+              Watch 2-min demo
+            </Link>
+          </div>
+          <p className="text-xs text-white/40 mt-2">2-minute interactive demo • No login required</p>
         </div>
       </motion.div>
     </section>

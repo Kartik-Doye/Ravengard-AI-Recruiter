@@ -9,8 +9,8 @@ type AnimatedCharacterProps = {
 };
 
 export function AnimatedCharacter({
-  title = "Guide",
-  subtitle = "A small motion companion for the home hero.",
+  title = "Integrity",
+  subtitle = "Monitoring candidate behavior and ensuring a secure session.",
   className = "",
 }: AnimatedCharacterProps) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -70,7 +70,7 @@ export function AnimatedCharacter({
         <div className="pb-4">
           <p className="text-xs uppercase tracking-[0.28em] text-white/50">{title}</p>
           <h3 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-            System Overseer
+            Session Overseer
           </h3>
           <p className="mt-3 max-w-sm text-sm leading-6 text-white/65">{subtitle}</p>
         </div>

@@ -20,7 +20,6 @@ export default function RootLayout() {
           <title>RavenGard | Assessment Gateway</title>
           <meta name="description" content="Secure interview assessment gateway." />
         </Helmet>
-        <SmoothLoader />
         <NetworkStatusBanner />
         <Outlet />
       </>
@@ -49,7 +48,6 @@ export default function RootLayout() {
         <meta property="og:description" content="Premium AI Interview Engine with state-machine flow and anti-cheat logic." />
         <meta property="og:type" content="website" />
       </Helmet>
-      <SmoothLoader />
       <NetworkStatusBanner />
       <div className="min-h-screen bg-[var(--color-bg-0)] flex flex-col font-sans text-[#F3F4F6]">
         <SiteHeader />

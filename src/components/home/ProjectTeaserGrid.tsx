@@ -4,19 +4,19 @@ import { Link } from 'react-router-dom';
 
 const projects = [
   {
-    title: "Ravengard Engine",
-    summary: "State-driven interview flow with locked transitions.",
-    href: "/projects/ravengard",
+    title: "AI Interview Engine",
+    summary: "State-driven, conversational interview flow with locked session integrity.",
+    href: "/features#engine",
   },
   {
-    title: "Motion UI Shell",
-    summary: "Layered hero, reveal cards, and parallax depth.",
-    href: "/projects/motion-ui-shell",
+    title: "Behavioral Analytics",
+    summary: "Real-time risk scoring, gaze tracking, and integrity signals.",
+    href: "/features#analytics",
   },
   {
-    title: "Gateway Experience",
-    summary: "Clean entry page with smooth loading and action focus.",
-    href: "/projects/gateway-experience",
+    title: "Automated Reporting",
+    summary: "Comprehensive zero-shot extraction scorecards and detailed insights.",
+    href: "/features#reporting",
   },
 ];
 
@@ -25,9 +25,9 @@ export function ProjectTeaserGrid() {
     <section className="px-6 py-20 md:px-10 z-10 relative bg-[var(--color-bg-0)]">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8">
-          <p className="text-xs uppercase tracking-[0.3em] text-white/50">Selected work</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-white/50">Core Capabilities</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
-             Preview the case studies.
+             Explore the platform features.
           </h2>
         </div>
 
@@ -45,7 +45,7 @@ export function ProjectTeaserGrid() {
                 to={project.href}
                 className="mt-6 inline-flex text-sm font-medium text-white underline underline-offset-4"
               >
-                Open case study
+                Learn more
               </Link>
             </motion.div>
           ))}

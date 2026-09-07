@@ -17,9 +17,9 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
     // Start interview session
     const startSession = async () => {
       try {
-        const res = await fetch(\`/api/interview/\${session.id}/start\`, {
+        const res = await fetch(`/api/interview/${session.id}/start`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': \`Bearer \${token}\` }
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
         });
         const data = await res.json();
         if (data.success) {
@@ -33,20 +33,22 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
     startSession();
   }, [session.id, token]);
 
-  const fetchNextQuestion = () => {
+    const fetchNextQuestion = (attempt = 1) => {
     setLoading(false);
     setIsStreaming(true);
-    setQuestionText('');
-    setQuestionId(null);
-    setResponse('');
-
-    const eventSource = new EventSource(\`/api/interview/\${session.id}/stream-question?token=\${token}\`);
-    
+    if (attempt === 1) {
+      setQuestionText('');
+      setQuestionId(null);
+      setResponse('');
+    }
+    const eventSource = new EventSource(`/api/interview/${session.id}/stream-question?token=${token}`);
+        
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.error) {
         setIsStreaming(false);
         eventSource.close();
+        handleRetryFetchQuestion(attempt);
       } else if (data.done) {
         setQuestionId(data.questionId);
         setIsStreaming(false);
@@ -55,11 +57,22 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
         setQuestionText(prev => prev + data.text);
       }
     };
-
+    
     eventSource.onerror = () => {
       setIsStreaming(false);
       eventSource.close();
+      handleRetryFetchQuestion(attempt);
     };
+  };
+
+  const handleRetryFetchQuestion = (attempt) => {
+    if (attempt < 4) {
+      setQuestionText(`Connection lost. Retrying... (Attempt ${attempt}/3)`);
+      setTimeout(() => fetchNextQuestion(attempt + 1), 2000 * attempt);
+    } else {
+      setIsStreaming(false);
+      setQuestionText("Connection failed. Please check your network and refresh the page to continue.");
+    }
   };
 
   
@@ -86,22 +99,35 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
     if (!response.trim() || !questionId) return;
     setIsSubmitting(true);
     
-    try {
-      const res = await fetch(`/api/interview/${session.id}/answer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ questionId, responseText: response })
-      });
-      
-      const data = await res.json();
-      if (data.success) {
-        fetchNextQuestion();
+    let success = false;
+    let attempts = 0;
+    
+    while (!success && attempts < 3) {
+      attempts++;
+      try {
+        const res = await fetch(`/api/interview/${session.id}/answer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ questionId, responseText: response })
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+          success = true;
+          fetchNextQuestion();
+        } else {
+          throw new Error('Failed to submit');
+        }
+      } catch (e) {
+        console.error(`Submit error (Attempt ${attempts}):`, e);
+        if (attempts === 3) {
+          alert("Failed to submit answer due to a network error. Please try again.");
+        } else {
+          await new Promise(r => setTimeout(r, 2000));
+        }
       }
-    } catch (e) {
-      console.error("Submit error", e);
-    } finally {
-      setIsSubmitting(false);
     }
+    setIsSubmitting(false);
   };
 
   if (loading) {

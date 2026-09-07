@@ -23,9 +23,9 @@ export function ParallaxStorySection() {
 
       <div className="relative mx-auto grid max-w-7xl gap-10 md:grid-cols-3">
         <motion.div style={{ y: fgY }} className="md:col-span-1">
-          <p className="text-xs uppercase tracking-[0.3em] text-white/50">Story</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-white/50">Experience</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">
-            Scroll-driven narrative depth.
+            Candidate experience meets compliance.
           </h2>
         </motion.div>
 
@@ -34,9 +34,7 @@ export function ParallaxStorySection() {
           className="md:col-span-2 rounded-[32px] border border-white/10 bg-white/5 p-8 backdrop-blur-xl"
         >
           <p className="max-w-3xl text-base leading-8 text-white/75 md:text-lg">
-            This section uses layered motion to make the page feel cinematic.
-            The background drifts slower than the content, which gives the
-            layout depth without making it hard to read.
+            A premium, accessible interview environment that establishes credibility with top talent, while standardizing evaluation criteria to reduce bias and protect against fraud. Every session is fully auditable.
           </p>
         </motion.div>
       </div>

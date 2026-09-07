@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
+import { ArrowLeft } from "lucide-react";
 import { RavengardSymbol } from "../ui/RavengardSymbol";
-import { ThemeSwitch } from "../ui/ThemeSwitch";
 
 type NavLink = {
   label: string;
@@ -10,15 +10,16 @@ type NavLink = {
 };
 
 const links: NavLink[] = [
-  { label: "Home", href: "/" },
-  { label: "About", href: "/about" },
-  { label: "Projects", href: "/projects" },
-  { label: "Features", href: "/features" },
+  { label: "Product", href: "/features" },
+  { label: "Security", href: "/security" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "Resources", href: "/resources" },
   { label: "Contact", href: "/contact" },
 ];
 
 export function SiteHeader() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -37,25 +38,37 @@ export function SiteHeader() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[var(--color-bg-0)]/80 backdrop-blur-xl">
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
-        <Link to="/" className="text-sm font-semibold tracking-[0.2em] text-white flex items-center gap-4">
-          <div className="w-8 h-8 flex items-center justify-center">
-            <RavengardSymbol />
-          </div>
-          RAVENGARD
-        </Link>
-
+        <div className="flex items-center gap-6">
+          <Link to="/" className="text-sm font-semibold tracking-[0.2em] text-white flex items-center gap-4">
+            <div className="w-8 h-8 flex items-center justify-center">
+              <RavengardSymbol />
+            </div>
+            RAVENGARD
+          </Link>
+          
+          {location.pathname !== '/' && (
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 text-sm font-medium text-white/50 hover:text-white transition-colors border-l border-white/10 pl-4 md:pl-6"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+          )}
+        </div>
+        
         <div className="flex items-center gap-4">
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="hidden items-center gap-2 md:flex">
             {links.map((link) => {
               const isActive = activePath === link.href;
               return (
                 <Link
                   key={link.href}
                   to={link.href}
-                  className={`rounded-full px-4 py-2 text-sm transition ${
+                  className={`px-3 py-2 text-sm transition-colors ${
                     isActive
-                      ? "bg-white text-black font-medium"
-                      : "text-white/70 hover:bg-white/10 hover:text-white"
+                      ? "text-white font-semibold underline underline-offset-8 decoration-white/40"
+                      : "text-white/70 hover:text-white"
                   }`}
                 >
                   {link.label}
@@ -64,10 +77,13 @@ export function SiteHeader() {
             })}
           </nav>
           
-          <div className="hidden md:block border-l border-white/10 pl-4 ml-2">
-            <ThemeSwitch />
-          </div>
-
+          <Link
+            to="/gateway"
+            className="hidden md:inline-flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black hover:bg-white/90 transition-colors ml-4 shadow-sm"
+          >
+            Book a Demo
+          </Link>
+          
           <button
             type="button"
             aria-label="Toggle menu"
