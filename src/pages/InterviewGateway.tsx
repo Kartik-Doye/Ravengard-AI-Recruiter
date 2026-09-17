@@ -56,25 +56,25 @@ export default function InterviewGateway() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !candidate) return;
     const interval = setInterval(() => {
       fetchCandidateData(user, true); // silent fetch
-    }, 10000); // Polling every 10 seconds for real-time like experience
+    }, 60000); 
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, candidate]);
 
   const fetchCandidateData = async (uid: string, silent = false) => {
+    let timeoutId: any;
     try {
       if (!silent) setLoading(true);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => { controller.abort(); setIsTimeout(true); }, 25000);
+      timeoutId = setTimeout(() => { controller.abort(); if (!silent) setIsTimeout(true); }, 600000);
       const res = await fetch('/api/me', {
         signal: controller.signal,
         headers: {
           Authorization: `Bearer ${uid}`
         }
       });
-
       if (res.ok) {
         const data = await res.json();
         setCandidate(data.candidate);
@@ -95,10 +95,13 @@ export default function InterviewGateway() {
       } else {
         if (!silent) setCandidate(null);
       }
-    } catch (e) {
-      console.error("Failed to fetch user data", e);
-      if (!silent) addToast('error', 'Failed to fetch user data');
+    } catch (e: any) {
+      if (e.name !== 'AbortError') {
+        console.error("Failed to fetch user data", e);
+        if (!silent) addToast('error', 'Failed to fetch user data');
+      }
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       if (!silent) setLoading(false);
     }
   };

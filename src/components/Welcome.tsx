@@ -66,7 +66,7 @@ export default function Welcome({ onNext, candidate }: { onNext: (session: any) 
           <div>
             <h3 className="font-medium text-[var(--color-error)] tracking-wide mb-1">Email Verification Required</h3>
             <p className="text-white/70 text-sm leading-relaxed mb-3">
-              We've sent a verification link to your email address via Firebase Auth. You must verify your email before you can proceed to the policy consent phase.
+              We've sent a verification link to your email address . You must verify your email before you can proceed to the policy consent phase.
             </p>
             <p className="text-white/50 text-xs">
               Check your inbox (and spam folder) for the verification link. Once clicked, refresh this page.
