@@ -2,13 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import Dashboard from './Dashboard';
 import SessionDetail from './SessionDetail';
+import { CandidatesPage } from './CandidatesPage';
+import { CandidateDetail } from './CandidateDetail';
+import { ReportsPage } from './ReportsPage';
+import { FlagQueue } from './FlagQueue';
 
 export default function AdminGateway() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {
     const checkAdmin = async () => {
-      const token = localStorage.getItem('ravengard_uid');
+      const token = localStorage.getItem('ravengard_admin_token');
       if (!token) {
         setIsAdmin(false);
         return;
@@ -56,7 +60,7 @@ export default function AdminGateway() {
               });
               if (res.ok) {
                 const data = await res.json();
-                localStorage.setItem('ravengard_uid', data.token);
+                localStorage.setItem('ravengard_admin_token', data.token);
                 setIsAdmin(true);
               } else {
                 alert('Invalid credentials');
@@ -86,16 +90,29 @@ export default function AdminGateway() {
   return (
     <div className="min-h-screen bg-[var(--color-bg-0)] text-white font-sans">
       <nav className="border-b border-white/10 px-6 py-4 flex justify-between items-center bg-black/20">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-display tracking-widest uppercase text-white">Ravengard</h1>
-          <span className="px-2 py-1 bg-[var(--color-secondary)]/20 text-[var(--color-secondary)] text-xs rounded border border-[var(--color-secondary)]/30 font-mono">ADMIN</span>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 border-r border-white/10 pr-6">
+            <h1 className="text-xl font-display tracking-widest uppercase text-white">Ravengard</h1>
+            <span className="px-2 py-1 bg-[var(--color-secondary)]/20 text-[var(--color-secondary)] text-xs rounded border border-[var(--color-secondary)]/30 font-mono">ADMIN</span>
+          </div>
+          <div className="flex gap-4 text-sm text-[var(--color-text-secondary)]">
+             <a href="/admin" className="hover:text-[var(--color-text-primary)] transition-colors">Dashboard</a>
+             <a href="/admin/candidates" className="hover:text-[var(--color-text-primary)] transition-colors">Candidates</a>
+             <a href="/admin/reports" className="hover:text-[var(--color-text-primary)] transition-colors">Reports</a>
+             <a href="/admin/flags" className="hover:text-[var(--color-text-primary)] transition-colors">Review Queue</a>
+          </div>
         </div>
         <a href="/" className="text-sm text-white/50 hover:text-white transition-colors">Exit Dashboard</a>
       </nav>
       <div className="p-6 max-w-7xl mx-auto">
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/session/:id" element={<SessionDetail />} />
+          <Route path="/candidates" element={<CandidatesPage />} />
+          <Route path="/candidates/:id" element={<CandidateDetail />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/flags" element={<FlagQueue />} />
+          <Route path="/sessions/:id" element={<SessionDetail />} />
+          <Route path="/session/:id" element={<SessionDetail />} /> {/* Legacy route alias */}
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </div>

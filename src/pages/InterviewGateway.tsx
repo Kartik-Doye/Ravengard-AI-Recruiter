@@ -108,16 +108,36 @@ export default function InterviewGateway() {
 
   const handleSignIn = async () => {
     setLoading(true);
-    let uid = localStorage.getItem('ravengard_uid');
-    if (!uid) {
-      uid = crypto.randomUUID();
-      localStorage.setItem('ravengard_uid', uid);
-      addToast('success', 'Account created successfully.');
+    let token = localStorage.getItem('ravengard_uid');
+    
+    if (!token) {
+      try {
+        const res = await fetch('/api/auth/candidate-mock-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: `test-${crypto.randomUUID().slice(0,8)}@example.com`, name: 'Test Candidate' })
+        });
+        const data = await res.json();
+        if (data.success && data.token) {
+          token = data.token;
+          localStorage.setItem('ravengard_uid', token);
+          addToast('success', 'Account created successfully.');
+        } else {
+           addToast('error', 'Login failed');
+           setLoading(false);
+           return;
+        }
+      } catch(e) {
+          addToast('error', 'Login failed');
+          setLoading(false);
+          return;
+      }
     } else {
       addToast('success', 'Signed in successfully.');
     }
-    setUser(uid);
-    await fetchCandidateData(uid);
+    
+    setUser(token);
+    await fetchCandidateData(token);
   };
 
   

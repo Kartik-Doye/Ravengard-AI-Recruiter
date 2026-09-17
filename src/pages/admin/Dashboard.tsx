@@ -7,7 +7,7 @@ export default function Dashboard() {
   
   useEffect(() => {
     const fetchSessions = async () => {
-      const token = localStorage.getItem('ravengard_uid');
+      const token = localStorage.getItem('ravengard_admin_token');
       if (!token) return;
       const res = await fetch('/api/admin/sessions', {
         headers: { 'Authorization': `Bearer ${token}` }

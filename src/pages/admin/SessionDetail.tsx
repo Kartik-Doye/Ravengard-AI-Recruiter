@@ -9,7 +9,7 @@ export default function SessionDetail() {
 
   useEffect(() => {
     const fetchSession = async () => {
-      const token = localStorage.getItem('ravengard_uid');
+      const token = localStorage.getItem('ravengard_admin_token');
       if (!token) return;
       try {
         const res = await fetch(`/api/admin/sessions/${id}`, {

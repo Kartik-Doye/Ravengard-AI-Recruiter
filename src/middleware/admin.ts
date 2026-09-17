@@ -3,41 +3,104 @@ import { AuthRequest } from "./auth";
 import { db } from "../db/index";
 import { adminUsers } from "../db/schema";
 import { eq } from "drizzle-orm";
+import jwt from "jsonwebtoken";
+
+export type AdminRole = "admin" | "reviewer" | "viewer";
 
 export interface AdminAuthRequest extends AuthRequest {
   admin?: {
     id: string;
-    role: "admin" | "reviewer" | "viewer";
+    role: AdminRole;
   };
 }
 
-export const authAdmin = async (req: AdminAuthRequest, res: Response, next: NextFunction) => {
-  // Must be called AFTER requireAuth
+/**
+ * Verifies that the bearer token is an admin JWT and that the user
+ * exists in admin_users table. Must be called AFTER requireAuth.
+ *
+ * Permission matrix (from AGENTS.md / handoff spec):
+ *   admin    — full access: read + update flags + update status + manage users
+ *   reviewer — read + update flags + update status
+ *   viewer   — read-only
+ *
+ * Individual routes enforce specific role minimums via requireRole().
+ */
+export const authAdmin = async (
+  req: AdminAuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   if (!req.user || !req.user.email) {
     return res.status(401).json({ error: "Unauthorized: Missing user context" });
   }
 
+  // Verify admin claim in JWT
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Unauthorized: Missing token" });
+  }
+
+  const token = authHeader.substring(7);
+  const JWT_SECRET = process.env.JWT_SECRET;
+
+  if (!JWT_SECRET) {
+    console.error("FATAL: JWT_SECRET is not set.");
+    return res.status(500).json({ error: "Server misconfiguration." });
+  }
+
+  let decoded: any;
+  try {
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch {
+    return res.status(401).json({ error: "Unauthorized: Invalid or expired admin token." });
+  }
+
+  if (!decoded.isAdmin) {
+    return res.status(403).json({ error: "Forbidden: Not an admin token." });
+  }
+
   try {
     const adminRecord = await db.query.adminUsers.findFirst({
-      where: eq(adminUsers.email, req.user.email)
+      where: eq(adminUsers.email, req.user.email),
     });
 
     if (!adminRecord) {
-      return res.status(403).json({ error: "Forbidden: Not an admin" });
+      return res.status(403).json({ error: "Forbidden: Not an admin account." });
     }
 
-    if (adminRecord.role !== "admin") {
-      return res.status(403).json({ error: "Forbidden: Admin role required" });
+    const validRoles: AdminRole[] = ["admin", "reviewer", "viewer"];
+    if (!validRoles.includes(adminRecord.role as AdminRole)) {
+      return res.status(403).json({ error: "Forbidden: Unknown admin role." });
     }
 
     req.admin = {
       id: adminRecord.id,
-      role: adminRecord.role as "admin" | "reviewer" | "viewer"
+      role: adminRecord.role as AdminRole,
     };
 
     next();
   } catch (error) {
     console.error("Admin verification error:", error);
-    return res.status(500).json({ error: "Internal Server Error during admin verification" });
+    return res.status(500).json({ error: "Internal Server Error during admin verification." });
   }
+};
+
+/**
+ * Route-level role guard. Use after authAdmin.
+ * Example: router.post('/sessions/:id/flag', requireRole('reviewer'), handler)
+ *
+ * Role hierarchy: admin > reviewer > viewer
+ */
+export const requireRole = (...allowedRoles: AdminRole[]) => {
+  return (req: AdminAuthRequest, res: Response, next: NextFunction) => {
+    if (!req.admin) {
+      return res.status(401).json({ error: "Unauthorized: No admin context." });
+    }
+    if (!allowedRoles.includes(req.admin.role)) {
+      return res.status(403).json({
+        error: `Forbidden: This action requires one of: [${allowedRoles.join(", ")}]. Your role: ${req.admin.role}.`,
+      });
+    }
+    next();
+  };
 };

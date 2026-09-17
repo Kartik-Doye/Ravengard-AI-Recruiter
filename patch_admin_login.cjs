@@ -1,2 +1,0 @@
-const fs = require('fs'); let code = fs.readFileSync('server.ts', 'utf8'); code = code.replace('app.use("/api/admin", adminRoutes);', 'app.post("/api/admin/login", async (req, res) => { const { email, password } = req.body; if (email === "admin@ravengard.com" && password === "admin123") { res.json({ success: true, token: "ADMIN_" + crypto.randomUUID() }); } else { res.status(401).json({ success: false, error: "Invalid credentials" }); } });
-app.use("/api/admin", adminRoutes);'); fs.writeFileSync('server.ts', code);

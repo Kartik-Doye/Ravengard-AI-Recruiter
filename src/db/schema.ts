@@ -35,7 +35,8 @@ export const candidates = pgTable('candidates', {
   gradYear: integer('grad_year'),
   preferredLanguage: text('preferred_language'),
   emailVerified: boolean('email_verified').default(false),
-  organizationId: text('organization_id').references(() => organizations.id)
+  organizationId: text('organization_id').references(() => organizations.id),
+  createdAt: timestamp('created_at').defaultNow()
 });
 
 export const sessions = pgTable('sessions', {
@@ -55,7 +56,9 @@ export const sessions = pgTable('sessions', {
   speakerTestPassed: boolean('speaker_test_passed'),
   browserSupported: boolean('browser_supported'),
   deviceCheckCompletedAt: timestamp('device_check_completed_at'),
-  deviceCheckMeta: jsonb('device_check_meta')
+  deviceCheckMeta: jsonb('device_check_meta'),
+  flagged: boolean('flagged').default(false),
+  flagReason: text('flag_reason')
 });
 
 export const resumeAnalyses = pgTable('resume_analyses', {
@@ -150,6 +153,7 @@ export const adminUsers = pgTable('admin_users', {
   email: text('email').notNull().unique(),
   name: text('name').notNull(),
   role: text('role').notNull().default('viewer'),
+  passwordHash: text('password_hash'),
   createdAt: timestamp('created_at').defaultNow()
 });
 
