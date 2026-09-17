@@ -15,6 +15,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   loading, 
   allowedStage 
 }) => {
+  const location = useLocation();
   const { activeStage, expectedRoute } = useInterviewFlow(activeSession, loading);
 
   if (loading) {
@@ -26,6 +27,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     : allowedStage === activeStage;
 
   if (!isAllowed) {
+    if (location.pathname === expectedRoute) {
+      // Prevent infinite loop if the expected route itself rejects the stage
+      return <div className="p-8 text-center text-red-500">Error: Invalid stage transition detected.</div>;
+    }
     return <Navigate to={expectedRoute} replace />;
   }
 

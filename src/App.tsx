@@ -16,6 +16,7 @@ const Contact = lazy(() => import('./pages/Contact.tsx'));
 const Gateway = lazy(() => import('./pages/Gateway.tsx'));
 const AssessmentGuide = lazy(() => import('./pages/AssessmentGuide.tsx'));
 const InterviewGateway = lazy(() => import('./pages/InterviewGateway.tsx'));
+const AdminGateway = lazy(() => import('./pages/admin/AdminGateway.tsx'));
 const NotFound = lazy(() => import('./pages/NotFound.tsx'));
 
 
@@ -54,6 +55,7 @@ export default function App() {
                       {/* Interview Gateway renders without standard layout wrappers based on location in RootLayout */}
                       
                       <Route path="/interview/*" element={<InterviewGateway />} />
+                      <Route path="/admin/*" element={<AdminGateway />} />
                       <Route path="*" element={<NotFound />} />
                     </Route>
                   </Routes>

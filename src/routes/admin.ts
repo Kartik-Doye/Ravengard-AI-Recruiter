@@ -40,10 +40,18 @@ router.get("/sessions", async (req, res) => {
     const allSessions = await db.select({
       id: sessions.id,
       candidateId: sessions.candidateId,
+      candidateName: candidates.name,
       currentStage: sessions.currentStage,
       status: sessions.status,
-      createdAt: sessions.createdAt
-    }).from(sessions).orderBy(desc(sessions.createdAt));
+      createdAt: sessions.createdAt,
+      overallScore: interviewReports.overallScore,
+      recommendation: interviewReports.recommendation
+    })
+    .from(sessions)
+    .leftJoin(candidates, eq(sessions.candidateId, candidates.id))
+    .leftJoin(interviewReports, eq(sessions.id, interviewReports.sessionId))
+    .orderBy(desc(sessions.createdAt));
+    
     res.json({ success: true, sessions: allSessions });
   } catch (e) {
     console.error(e);
@@ -72,7 +80,8 @@ router.get("/sessions/:id", async (req, res) => {
       response: interviewResponses.responseText,
     })
     .from(interviewQuestions)
-    .leftJoin(interviewResponses, eq(interviewQuestions.id, interviewResponses.questionId));
+    .leftJoin(interviewResponses, eq(interviewQuestions.id, interviewResponses.questionId))
+    .where(eq(interviewQuestions.sessionId, sessionId));
 
     const adminReq = req as AdminAuthRequest;
     await logAdminAction({

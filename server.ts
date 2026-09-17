@@ -7,7 +7,7 @@ import { requireAuth, AuthRequest } from "./src/middleware/auth";
 import { correlationIdMiddleware } from "./src/middleware/correlationId";
 import { adminLimiter } from "./src/middleware/adminRateLimit";
 import { db } from "./src/db/index";
-import { candidates, sessions, resumeAnalyses, organizationAdmins, contacts, interviewSessions, interviewQuestions, interviewResponses, integritySignals, interviewReports } from "./src/db/schema";
+import { candidates, sessions, resumeAnalyses, organizationAdmins, contacts, interviewSessions, interviewQuestions, interviewResponses, integritySignals, interviewReports, adminUsers } from "./src/db/schema";
 import { eq, and, or, desc, lt } from "drizzle-orm";
 import multer from "multer";
 
@@ -111,6 +111,26 @@ const globalLimiter = rateLimit({
 app.use(globalLimiter);
 // We don't apply adminLimiter globally, we'll apply it to a new /api/admin router later, or directly to routes starting with /api/admin.
 app.use("/api/admin", adminLimiter);
+app.post("/api/admin/login", async (req, res) => {
+  const { email, password } = req.body;
+  if (email === "admin@ravengard.com" && password === "admin123") {
+    const token = "ADMIN_" + crypto.randomUUID();
+    // Ensure admin user exists in DB
+    const existing = await db.select().from(adminUsers).where(eq(adminUsers.email, email)).limit(1);
+    if (existing.length === 0) {
+      await db.insert(adminUsers).values({
+        id: "admin-" + crypto.randomUUID(),
+        email: email,
+        name: "Super Admin",
+        role: "admin",
+      });
+    }
+    res.json({ success: true, token });
+  } else {
+    res.status(401).json({ success: false, error: "Invalid credentials" });
+  }
+});
+
 app.use("/api/admin", adminRoutes);
 
   const PORT = 3000;

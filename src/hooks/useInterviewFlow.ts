@@ -14,6 +14,7 @@ export const STAGE_ROUTE_MAP: Record<string, string> = {
   'interview_technical': '/interview/engine',
   'interview_cto': '/interview/engine',
   'report_generation': '/interview/report',
+  'completed': '/interview/report',
 
 };
 

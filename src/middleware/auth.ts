@@ -19,15 +19,21 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
   const token = authHeader.substring(7);
 
   // Mock the auth session completely using the UUID token
-  req.user = { 
-    id: token, 
-    // We append a domain just so it's a valid email structure, 
-    // but in server.ts we should be querying by ID where possible, 
-    // or just let it use this mocked email.
-    email: `${token}@mock.local`, 
-    name: "Mock User",
-    email_verified: true
-  };
+  if (token.startsWith('ADMIN_')) {
+    req.user = {
+      id: token,
+      email: 'admin@ravengard.com',
+      name: "Admin User",
+      email_verified: true
+    };
+  } else {
+    req.user = { 
+      id: token, 
+      email: `${token}@mock.local`, 
+      name: "Mock User",
+      email_verified: true
+    };
+  }
   
   return next();
 };
