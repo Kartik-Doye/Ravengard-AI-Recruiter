@@ -377,22 +377,6 @@ app.use("/api/admin", adminRoutes);
     }
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  
   // --- Phase 4: Interview Engine Endpoints ---
   app.post("/api/interview/:id/start", requireAuth, async (req: AuthRequest, res) => {
     try {
@@ -642,6 +626,21 @@ app.use("/api/admin", adminRoutes);
       res.status(500).json({ error: "Failed to fetch report" });
     }
   });
+
+  // Vite middleware for development (placed strictly AFTER all API routes)
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*all', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
 
   setInterval(async () => {
     try {

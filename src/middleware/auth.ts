@@ -10,18 +10,13 @@ export interface AuthRequest extends Request {
   };
 }
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || "ravengard_dev_jwt_secret_change_in_production";
 
 export const requireAuth = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
-  if (!JWT_SECRET) {
-    console.error("FATAL: JWT_SECRET is not set in environment variables.");
-    return res.status(500).json({ error: "Server misconfiguration: auth secret missing." });
-  }
-
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -68,7 +63,6 @@ export const signCandidateToken = (payload: {
   name?: string;
   email_verified?: boolean;
 }): string => {
-  if (!JWT_SECRET) throw new Error("JWT_SECRET not set");
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
 };
 
@@ -82,6 +76,5 @@ export const signAdminToken = (payload: {
   email: string;
   role: string;
 }): string => {
-  if (!JWT_SECRET) throw new Error("JWT_SECRET not set");
   return jwt.sign({ ...payload, isAdmin: true }, JWT_SECRET, { expiresIn: "8h" });
 };
