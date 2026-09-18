@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Landing from './../components/Landing.tsx';
 import Registration from './../components/Registration.tsx';
@@ -31,19 +31,29 @@ export default function InterviewGateway() {
   const [isTimeout, setIsTimeout] = useState(false);
   const [candidate, setCandidate] = useState<any>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
-  const [preSessionStage, setPreSessionStage] = useState<'welcome' | 'consent'>('welcome');
-  const [resumeText, setResumeText] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<'dashboard' | 'session'>('dashboard');
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-    const { addToast } = useToast();
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+
+  const isInterviewSubRoute = location.pathname.startsWith('/interview/') && location.pathname !== '/interview/dashboard';
+  const initialStage = location.pathname.includes('/consent') ? 'consent' : 'welcome';
+  const [preSessionStage, setPreSessionStage] = useState<'welcome' | 'consent'>(initialStage);
+  const [resumeText, setResumeText] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<'dashboard' | 'session'>(() => isInterviewSubRoute ? 'session' : 'dashboard');
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  
+  // Flag to ensure session resumption toast executes exactly once across mounts/renders
+  const hasRestoredRef = useRef(false);
   
   useEffect(() => {
     if (activeSession?.locked && activeSession?.status === 'active') {
       setCurrentView('session');
+      if (!hasRestoredRef.current) {
+        hasRestoredRef.current = true;
+        addToast('info', 'Resuming session...');
+      }
     }
-  }, [activeSession]);
+  }, [activeSession?.id, activeSession?.locked, activeSession?.status]);
 
   useEffect(() => {
     const uid = localStorage.getItem('ravengard_uid');
@@ -61,7 +71,7 @@ export default function InterviewGateway() {
       fetchCandidateData(user, true); // silent fetch
     }, 60000); 
     return () => clearInterval(interval);
-  }, [user, candidate]);
+  }, [user, candidate?.id]);
 
   const fetchCandidateData = async (uid: string, silent = false) => {
     let timeoutId: any;
@@ -84,7 +94,12 @@ export default function InterviewGateway() {
         if (!silent) {
           if (data.activeSession?.locked && data.activeSession?.status === 'active') {
             setCurrentView('session');
-            addToast('info', 'Session resumed.');
+            if (!hasRestoredRef.current) {
+              hasRestoredRef.current = true;
+              addToast('info', 'Resuming session...');
+            }
+          } else if (location.pathname.startsWith('/interview/') && location.pathname !== '/interview/dashboard') {
+            setCurrentView('session');
           } else {
             setCurrentView('dashboard');
           }
@@ -141,7 +156,15 @@ export default function InterviewGateway() {
   };
 
   
-  const { activeStage } = useInterviewFlow(currentView === 'session' ? (activeSession || { currentStage: preSessionStage }) : null, loading || !user || !candidate || currentView === 'dashboard');
+  const effectiveSession = useMemo(() => {
+    if (activeSession) return activeSession;
+    return { currentStage: preSessionStage, currentPhase: preSessionStage, locked: false, status: 'pending' };
+  }, [activeSession, preSessionStage]);
+  
+  const { activeStage } = useInterviewFlow(
+    currentView === 'session' ? effectiveSession : null,
+    loading || !user || !candidate || currentView === 'dashboard'
+  );
 
   if (isTimeout) {
     return (
@@ -257,19 +280,22 @@ export default function InterviewGateway() {
             resumeText={resumeText}
             onResumeSession={() => {
               setCurrentView('session');
-              addToast('info', 'Resuming session...');
+              if (!hasRestoredRef.current) {
+                hasRestoredRef.current = true;
+                addToast('info', 'Resuming session...');
+              }
             }}
           />
         ) : (
           <Routes>
-             <Route path="welcome" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="welcome"><Welcome onNext={(session) => { if(session.currentStage === 'consent') setPreSessionStage('consent'); else setActiveSession(session); setCurrentView('session'); }} candidate={candidate} /></ProtectedRoute>} />
-             <Route path="consent" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="consent"><Consent session={activeSession} onNext={(session) => { setActiveSession(session); setCurrentView('session'); }} /></ProtectedRoute>} />
-             <Route path="upload" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["resume", "resume_upload"]}><ResumeUpload session={activeSession} onNext={(session, text) => { setActiveSession(session); if (text) setResumeText(text); setCurrentView('session'); }} /></ProtectedRoute>} />
-             <Route path="analysis" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["resume_analysis", "intelligence"]}><ResumeAnalysis session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
-             <Route path="device-check" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="device_check"><DeviceCheck session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
-             <Route path="waiting-room" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage="waiting_room"><WaitingRoom session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
-                          <Route path="engine" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["interview_hr_friendly", "interview_technical", "interview_cto"]}><InterviewEngine session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
-                          <Route path="report" element={<ProtectedRoute activeSession={activeSession} loading={loading} allowedStage={["report_generation", "completed"]}><FinalReport session={activeSession} /></ProtectedRoute>} />
+             <Route path="welcome" element={<ProtectedRoute activeSession={effectiveSession} loading={loading} allowedStage="welcome"><Welcome onNext={(session) => { if(session.currentStage === 'consent') setPreSessionStage('consent'); else setActiveSession(session); setCurrentView('session'); }} candidate={candidate} /></ProtectedRoute>} />
+             <Route path="consent" element={<ProtectedRoute activeSession={effectiveSession} loading={loading} allowedStage="consent"><Consent session={effectiveSession} onNext={(session) => { setActiveSession(session); setCurrentView('session'); }} /></ProtectedRoute>} />
+             <Route path="upload" element={<ProtectedRoute activeSession={effectiveSession} loading={loading} allowedStage={["resume", "resume_upload"]}><ResumeUpload session={activeSession} onNext={(session, text) => { setActiveSession(session); if (text) setResumeText(text); setCurrentView('session'); }} /></ProtectedRoute>} />
+             <Route path="analysis" element={<ProtectedRoute activeSession={effectiveSession} loading={loading} allowedStage={["resume_analysis", "intelligence"]}><ResumeAnalysis session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+             <Route path="device-check" element={<ProtectedRoute activeSession={effectiveSession} loading={loading} allowedStage="device_check"><DeviceCheck session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+             <Route path="waiting-room" element={<ProtectedRoute activeSession={effectiveSession} loading={loading} allowedStage="waiting_room"><WaitingRoom session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+             <Route path="engine" element={<ProtectedRoute activeSession={effectiveSession} loading={loading} allowedStage={["interview_hr_friendly", "interview_technical", "interview_cto"]}><InterviewEngine session={activeSession} onNext={(session) => { setActiveSession(session); }} /></ProtectedRoute>} />
+             <Route path="report" element={<ProtectedRoute activeSession={effectiveSession} loading={loading} allowedStage={["report_generation", "completed"]}><FinalReport session={activeSession} /></ProtectedRoute>} />
              <Route path="*" element={<Navigate to={STAGE_ROUTE_MAP[activeStage] || "/interview/welcome"} replace />} />
           </Routes>
         )}

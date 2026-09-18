@@ -32,7 +32,7 @@ export function useInterviewFlow(activeSession: any, loading: boolean) {
     if (location.pathname !== expectedRoute && location.pathname.startsWith('/interview')) {
       navigate(expectedRoute, { replace: true });
     }
-  }, [activeSession, loading, location.pathname, expectedRoute, navigate]);
+  }, [activeStage, loading, location.pathname, expectedRoute, navigate, !activeSession]);
 
   useEffect(() => {
     enforceFlow();
