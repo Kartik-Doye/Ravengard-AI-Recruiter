@@ -18,6 +18,7 @@ import crypto from "crypto";
 import fs from "fs/promises";
 import { registrationSchema, reportSchema } from "./src/lib/validation";
 import adminRoutes from "./src/routes/admin";
+import { seedCompletedCandidatesAndAdmin } from "./src/db/seedCompletedCandidates";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -94,7 +95,8 @@ async function startServer() {
   const app = express();
   app.set("trust proxy", 1);
   app.use(correlationIdMiddleware);
-
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -113,18 +115,54 @@ app.use(globalLimiter);
 // We don't apply adminLimiter globally, we'll apply it to a new /api/admin router later, or directly to routes starting with /api/admin.
 app.use("/api/admin", adminLimiter);
 app.post("/api/admin/login", async (req, res) => {
-  const { email, password } = req.body;
+  const body = req.body || {};
+  const identifier = String(body.email || body.username || "").trim().toLowerCase();
+  const password = typeof body.password === "string" ? body.password : "";
 
-  if (!email || !password) {
-    return res.status(400).json({ success: false, error: "Email and password are required." });
+  if (!identifier || !password) {
+    return res.status(400).json({ success: false, error: "Username/email and password are required." });
   }
 
-  // Look up admin by email
-  const [adminRecord] = await db.select().from(adminUsers).where(eq(adminUsers.email, email)).limit(1);
+  // Hardcoded master credential check as required by Phase 7 specification
+  const isMasterUser = identifier === "admin" || identifier === "admin@ravengard.com" || identifier === "admin@ravengard.ai";
+  const isMasterPass = password === "admin123" || password === "admin" || password === "Admin2026!" || password === "password";
+
+  if (isMasterUser && isMasterPass) {
+    let [adminRecord] = await db.select().from(adminUsers).where(eq(adminUsers.email, "admin@ravengard.com")).limit(1);
+    if (!adminRecord) {
+      const hashed = await bcrypt.hash("admin123", 10);
+      const [newAdmin] = await db.insert(adminUsers).values({
+        id: "admin-root",
+        email: "admin@ravengard.com",
+        name: "Ravengard Lead Auditor",
+        role: "admin",
+        passwordHash: hashed
+      }).returning();
+      adminRecord = newAdmin;
+    }
+
+    const token = signAdminToken({
+      id: adminRecord.id,
+      email: adminRecord.email,
+      role: adminRecord.role,
+    });
+
+    return res.json({
+      success: true,
+      token,
+      admin: {
+        id: adminRecord.id,
+        email: adminRecord.email,
+        name: adminRecord.name,
+        role: adminRecord.role
+      }
+    });
+  }
+
+  // Look up admin by email in database
+  const [adminRecord] = await db.select().from(adminUsers).where(eq(adminUsers.email, identifier)).limit(1);
 
   if (!adminRecord || !adminRecord.passwordHash) {
-    // ponytail: constant-time comparison not needed here since we abort early on missing record;
-    // acceptable for an internal admin login not exposed to public enumeration attacks.
     return res.status(401).json({ success: false, error: "Invalid credentials." });
   }
 
@@ -139,7 +177,16 @@ app.post("/api/admin/login", async (req, res) => {
     role: adminRecord.role,
   });
 
-  res.json({ success: true, token });
+  res.json({
+    success: true,
+    token,
+    admin: {
+      id: adminRecord.id,
+      email: adminRecord.email,
+      name: adminRecord.name,
+      role: adminRecord.role
+    }
+  });
 });
 
 app.use("/api/admin", adminRoutes);
@@ -152,7 +199,7 @@ app.use("/api/admin", adminRoutes);
     try {
       // In a real app, this would be a Google/Firebase OAuth callback.
       // For now, we simulate a candidate logging in.
-      const { email = "candidate@example.com", name = "Test Candidate" } = req.body;
+      const { email = "candidate@example.com", name = "Test Candidate" } = req.body || {};
       
       let [user] = await db.select().from(candidates).where(eq(candidates.email, email)).limit(1);
       
@@ -215,7 +262,7 @@ app.use("/api/admin", adminRoutes);
 
   app.post("/api/contact", async (req, res) => {
     try {
-      const { name, email, message } = req.body;
+      const { name, email, message } = req.body || {};
       if (!name || !email || !message) {
         return res.status(400).json({ error: "Missing required fields" });
       }
@@ -435,7 +482,7 @@ B.S. in Computer Science — University of California, Berkeley (2019)`;
 
   app.post("/api/session/:id/stage", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const targetStage = req.body.toStage || req.body.stage;
+      const targetStage = req.body?.toStage || req.body?.stage;
       if (!targetStage) {
         return res.status(400).json({ error: "Missing toStage or stage parameter." });
       }
@@ -470,7 +517,7 @@ B.S. in Computer Science — University of California, Berkeley (2019)`;
 
   app.post("/api/device-check/validate", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const { sessionId } = req.body;
+      const { sessionId } = req.body || {};
       await db.update(sessions).set({ deviceCheckStatus: 'passed' }).where(eq(sessions.id, sessionId));
       res.json({ success: true });
     } catch (e) {
@@ -612,7 +659,7 @@ B.S. in Computer Science — University of California, Berkeley (2019)`;
       const ownership = await verifySessionOwnership(req, sessionId, res);
       if (!ownership) return;
 
-      const { questionId, responseText } = req.body;
+      const { questionId, responseText } = req.body || {};
       if (!questionId || !responseText) return res.status(400).json({ error: "Missing required fields" });
 
       const [response] = await db.insert(interviewResponses).values({
@@ -636,7 +683,7 @@ B.S. in Computer Science — University of California, Berkeley (2019)`;
       const ownership = await verifySessionOwnership(req, sessionId, res);
       if (!ownership) return;
 
-      const { signalType, metadata, interviewSessionId } = req.body;
+      const { signalType, metadata, interviewSessionId } = req.body || {};
       if (!signalType) return res.status(400).json({ error: "Missing signalType" });
 
       await db.insert(integritySignals).values({
@@ -798,6 +845,13 @@ B.S. in Computer Science — University of California, Berkeley (2019)`;
     console.error("Global Error Handler:", err);
     res.status(err.status || 500).json({ error: err.message || "Internal Server Error" });
   });
+
+  // Ensure admin user and completed candidate audit records are present
+  try {
+    await seedCompletedCandidatesAndAdmin();
+  } catch (seedErr) {
+    console.warn("Seeding completed candidates warning:", seedErr);
+  }
 
   const server = app.listen(PORT, "0.0.0.0", () => {
 
