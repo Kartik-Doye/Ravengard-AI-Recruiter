@@ -42,11 +42,11 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ stage: 'device_check', version: session.version })
+        body: JSON.stringify({ toStage: 'interview_instructions', stage: 'interview_instructions', version: session?.version })
       });
       if (res.ok) {
-        const updatedSession = await res.json();
-        onNext(updatedSession);
+        const data = await res.json();
+        onNext(data.session || data);
       } else {
         console.error("Failed to advance stage");
       }
@@ -183,7 +183,7 @@ export default function ResumeAnalysis({ session, onNext }: { session: any, onNe
           onClick={handleNext}
           disabled={transitioning}
         >
-          {transitioning ? 'Advancing...' : 'Proceed to Device Check'}
+          {transitioning ? 'Advancing...' : 'Proceed to Instructions'}
         </Button>
       </div>
     </div>

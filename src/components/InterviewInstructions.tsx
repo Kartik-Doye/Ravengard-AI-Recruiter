@@ -70,11 +70,11 @@ export default function InterviewInstructions({ session, onNext }: { session: an
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ stage: 'device_check', version: session.version })
+        body: JSON.stringify({ stage: 'device_check', toStage: 'device_check', version: session?.version })
       });
       if (res.ok) {
-        const updatedSession = await res.json();
-        onNext(updatedSession);
+        const data = await res.json();
+        onNext(data.session || data);
       }
     } catch (error) {
       console.error(error);
@@ -85,62 +85,62 @@ export default function InterviewInstructions({ session, onNext }: { session: an
 
   return (
     <div className="max-w-[800px] mx-auto">
-      <h1 className="text-3xl font-semibold mb-2 text-slate-900">Interview Instructions</h1>
-      <p className="text-slate-500 mb-8">Please read these rules carefully. They explain how the AI interviewer will evaluate you.</p>
+      <h1 className="text-3xl font-semibold mb-2 text-white">Interview Instructions</h1>
+      <p className="text-white/50 mb-8">Please review these operational guidelines carefully before entering the assessment room.</p>
         
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="glass-panel border border-white/10 rounded-xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
               <Info className="w-5 h-5" />
             </div>
-            <h3 className="font-semibold text-slate-900">AI Follow-up Questions</h3>
+            <h3 className="font-semibold text-white">AI Follow-up Questions</h3>
           </div>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            Our AI adapts to your answers. If you give a brief or vague answer, the AI may ask a follow-up question to probe deeper. Answer naturally and fully, just like you would in a real interview.
+          <p className="text-sm text-white/70 leading-relaxed">
+            Our AI adapts dynamically to your answers. If you provide a high-level summary, the interviewer may probe deeper into architecture, tradeoffs, or edge-cases. Answer naturally and with technical precision.
           </p>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="glass-panel border border-white/10 rounded-xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+            <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400">
               <RotateCcw className="w-5 h-5" />
             </div>
-            <h3 className="font-semibold text-slate-900">"Think Again" Feature</h3>
+            <h3 className="font-semibold text-white">"Think Again" Feature</h3>
           </div>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            You have <strong>2 "Think Again" uses</strong> for the entire interview. If you stumble or want to rephrase, you can use one to discard your current recording and start your answer over. Use them wisely!
+          <p className="text-sm text-white/70 leading-relaxed">
+            You have <strong>2 "Think Again" uses</strong> across the entire session. If you want to rephrase or rethink an answer, you can invoke one before submitting.
           </p>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="glass-panel border border-white/10 rounded-xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
               <Clock className="w-5 h-5" />
             </div>
-            <h3 className="font-semibold text-slate-900">Silence & Timeouts</h3>
+            <h3 className="font-semibold text-white">Response Timing & Pace</h3>
           </div>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            If you remain silent for too long, the AI will prompt you to speak. If you continue to remain silent, it will automatically move to the next question. Do not leave the tab idle.
+          <p className="text-sm text-white/70 leading-relaxed">
+            Each question provides adequate preparation and speaking time. Stay engaged and do not switch away from the assessment tab during active rounds.
           </p>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+        <div className="glass-panel border border-white/10 rounded-xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+            <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400">
               <AlertTriangle className="w-5 h-5" />
             </div>
-            <h3 className="font-semibold text-slate-900">Auto-Save & Disconnects</h3>
+            <h3 className="font-semibold text-white">Auto-Save & Disconnects</h3>
           </div>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            Your progress is saved continuously. If your browser crashes or network drops, simply return to this link. You will resume from exactly where you left off.
+          <p className="text-sm text-white/70 leading-relaxed">
+            Your progress is locked and persisted to the cloud continuously. If your network or browser interrupts, simply reopen the portal to resume your exact stage.
           </p>
         </div>
       </div>
 
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-8">
+      <div className="glass-panel border border-white/10 rounded-xl p-6 mb-8">
         <div className="flex flex-col space-y-4">
-          <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg text-slate-800 whitespace-pre-line text-sm">
+          <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg text-blue-200 whitespace-pre-line text-sm">
             {aiMessage}
           </div>
           
@@ -150,13 +150,13 @@ export default function InterviewInstructions({ session, onNext }: { session: an
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               disabled={agreed || aiLoading}
-              placeholder={agreed ? "Instructions Understood" : "Type 'I Understand' or ask a question..."}
-              className="flex-1 px-4 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none text-sm disabled:bg-slate-100"
+              placeholder={agreed ? "Instructions Understood (Ready to proceed)" : "Type 'I Understand' or ask a question..."}
+              className="flex-1 px-4 py-2.5 bg-white/5 border border-white/20 rounded-md focus:ring-2 focus:ring-[var(--color-primary)] outline-none text-sm text-white placeholder:text-white/40 disabled:opacity-50"
             />
             <button 
               type="submit" 
               disabled={agreed || aiLoading || !inputText.trim()}
-              className="bg-slate-800 text-white px-4 py-2 rounded-md hover:bg-slate-700 disabled:opacity-50"
+              className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white px-5 py-2.5 rounded-md transition-colors disabled:opacity-40 cursor-pointer flex items-center justify-center"
             >
               <Send className="w-4 h-4" />
             </button>
@@ -164,13 +164,15 @@ export default function InterviewInstructions({ session, onNext }: { session: an
         </div>
       </div>
 
-      <button
-        onClick={handleProceed}
-        disabled={!agreed || loading}
-        className="bg-blue-600 text-white font-semibold py-3 px-8 rounded-md hover:bg-blue-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? 'Processing...' : 'PROCEED TO DEVICE CHECK'}
-      </button>
+      <div className="flex justify-end">
+        <button
+          onClick={handleProceed}
+          disabled={!agreed || loading}
+          className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white font-medium py-3 px-8 rounded-lg transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-lg"
+        >
+          {loading ? 'Processing...' : 'PROCEED TO DEVICE CHECK'}
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, BarChart } from 'lucide-react';
+import { Settings, BarChart, Sparkles } from 'lucide-react';
 import { Upload } from './ui/Upload';
 import { Button } from './ui/Button';
 import { Card, CardBody } from './ui/Card';
@@ -7,6 +7,7 @@ import { Card, CardBody } from './ui/Card';
 export default function ResumeUpload({ session, onNext }: { session: any, onNext: (session: any, text?: string) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleFileSelect = (selectedFile: File) => {
@@ -26,6 +27,33 @@ export default function ResumeUpload({ session, onNext }: { session: any, onNext
   const handleClear = () => {
     setFile(null);
     setError(null);
+  };
+
+  const handleUseSampleResume = async () => {
+    setDemoLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('ravengard_uid');
+      const res = await fetch(`/api/session/${session.id}/demo-resume`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onNext(data.session, data.resumeReference);
+      } else {
+        const errData = await res.json();
+        setError(errData.error || "Failed to seed demo resume");
+      }
+    } catch (e) {
+      console.error(e);
+      setError("Network error while seeding demo resume");
+    } finally {
+      setDemoLoading(false);
+    }
   };
 
   const handleUpload = async () => {
@@ -60,18 +88,27 @@ export default function ResumeUpload({ session, onNext }: { session: any, onNext
     }
   };
 
+  const isDevOrPreview = Boolean(
+    (import.meta as any).env?.DEV || 
+    typeof window !== 'undefined' && (
+      window.location.hostname.includes('ais-') || 
+      window.location.hostname.includes('localhost') ||
+      window.location.hostname.includes('127.0.0.1')
+    )
+  );
+
   return (
     <div className="max-w-[700px] mx-auto">
       <h1 className="text-3xl font-semibold mb-2 text-white">Professional Profile</h1>
       <p className="text-white/50 mb-10">Upload your resume to calibrate the analysis engine.</p>
       
-      <Card   className="mb-8">
+      <Card className="mb-8">
         <CardBody className="flex flex-col">
           <Upload
             file={file}
             onFileSelect={handleFileSelect}
             onClear={handleClear}
-            loading={loading}
+            loading={loading || demoLoading}
             error={error}
             accept=".pdf,.docx"
             label="Resume Document"
@@ -79,14 +116,30 @@ export default function ResumeUpload({ session, onNext }: { session: any, onNext
             className="mb-8"
           />
           
-          <div className="flex justify-end">
-            <Button
-              onClick={handleUpload}
-              disabled={!file || loading}
-              isLoading={loading}
-            >
-              Upload & Continue
-            </Button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-2 border-t border-white/10">
+            {isDevOrPreview ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleUseSampleResume}
+                disabled={loading || demoLoading}
+                isLoading={demoLoading}
+                className="border-white/20 text-white hover:bg-white/10 hover:border-white/40 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 mr-2 text-[var(--color-secondary)] shrink-0" />
+                Use Sample Engineering Resume
+              </Button>
+            ) : <div />}
+
+            <div className="flex justify-end">
+              <Button
+                onClick={handleUpload}
+                disabled={!file || loading || demoLoading}
+                isLoading={loading}
+              >
+                Upload & Continue
+              </Button>
+            </div>
           </div>
         </CardBody>
       </Card>
