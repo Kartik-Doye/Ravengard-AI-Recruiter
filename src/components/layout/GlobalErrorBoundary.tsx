@@ -23,9 +23,21 @@ export class GlobalErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log errors appropriately for a production environment.
     console.error('React Router Render Boundary Error:', error, errorInfo);
+
+    // Auto-recover from dynamic chunk load errors after dev server restarts or deployments
+    const isDynamicImportError = 
+      error?.message?.includes('Failed to fetch dynamically imported module') ||
+      error?.message?.includes('dynamically imported module') ||
+      error?.name === 'ChunkLoadError';
+
+    if (isDynamicImportError && !sessionStorage.getItem('chunk_load_retried')) {
+      sessionStorage.setItem('chunk_load_retried', 'true');
+      window.location.reload();
+    }
   }
 
   private handleReset = () => {
+    sessionStorage.removeItem('chunk_load_retried');
     this.setState({ hasError: false, error: undefined });
     window.location.reload();
   };

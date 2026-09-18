@@ -8,16 +8,16 @@ import { LenisProvider } from './components/layout/LenisProvider.tsx';
 import { SmoothLoader } from './components/layout/SmoothLoader.tsx';
 import { HelmetProvider } from 'react-helmet-async';
 
-const Home = lazy(() => import('./pages/Home.tsx'));
-const About = lazy(() => import('./pages/About.tsx'));
-const Features = lazy(() => import('./pages/Features.tsx'));
-const Projects = lazy(() => import('./pages/Projects.tsx'));
-const Contact = lazy(() => import('./pages/Contact.tsx'));
-const Gateway = lazy(() => import('./pages/Gateway.tsx'));
-const AssessmentGuide = lazy(() => import('./pages/AssessmentGuide.tsx'));
-const InterviewGateway = lazy(() => import('./pages/InterviewGateway.tsx'));
-const AdminGateway = lazy(() => import('./pages/admin/AdminGateway.tsx'));
-const NotFound = lazy(() => import('./pages/NotFound.tsx'));
+const Home = lazy(() => import('./pages/Home'));
+const About = lazy(() => import('./pages/About'));
+const Features = lazy(() => import('./pages/Features'));
+const Projects = lazy(() => import('./pages/Projects'));
+const Contact = lazy(() => import('./pages/Contact'));
+const Gateway = lazy(() => import('./pages/Gateway'));
+const AssessmentGuide = lazy(() => import('./pages/AssessmentGuide'));
+const InterviewGateway = lazy(() => import('./pages/InterviewGateway'));
+const AdminGateway = lazy(() => import('./pages/admin/AdminGateway'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 
 export default function App() {
