@@ -29,6 +29,8 @@ const ResumeAnalysisSchema = z.object({
   experienceLevel: z.enum(['entry', 'mid', 'senior', 'executive']).optional(),
 });
 
+type ResumeAnalysisResult = z.infer<typeof ResumeAnalysisSchema>;
+
 /**
  * Analyze resume text to extract structured metadata using LLM
  * @param rawResumeText - The extracted text from the resume
@@ -60,7 +62,7 @@ export async function analyzeResume(rawResumeText: string): Promise<z.infer<type
   ${rawResumeText}`;
 
   try {
-    const result = await llmRouter.structuredOutput(
+    const result = await llmRouter.structuredOutput<ResumeAnalysisResult>(
       {
         model: 'gemini-2.5-flash', // Primary model
         messages: [

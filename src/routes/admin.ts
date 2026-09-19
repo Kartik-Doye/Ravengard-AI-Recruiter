@@ -4,10 +4,10 @@ import {
   candidates,
   sessions,
   interviewReports,
-  integritySignals,
   interviewSessions,
   interviewQuestions,
   interviewResponses,
+  questionScores,
 } from "../db/schema";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
@@ -112,44 +112,21 @@ router.get("/sessions", async (req, res) => {
       .leftJoin(interviewReports, eq(sessions.id, interviewReports.sessionId))
       .orderBy(desc(sessions.createdAt));
 
-    // Fetch integrity signals to calculate/provide AI Fairness Score per session
-    const allSignals = await db.select().from(integritySignals);
-
     const enrichedSessions = allSessions.map((s) => {
-      const sessionSignals = allSignals.filter((sig) => sig.sessionId === s.id);
-      
-      // Extract or compute AI Fairness Score
-      let fairnessScore = 98.5;
-      for (const sig of sessionSignals) {
-        if (sig.metadata) {
-          try {
-            const parsed = typeof sig.metadata === 'string' ? JSON.parse(sig.metadata) : sig.metadata;
-            if (parsed && typeof parsed.fairnessScore === 'number') {
-              fairnessScore = parsed.fairnessScore;
-              break;
-            }
-          } catch {}
-        }
-      }
-
-      if (sessionSignals.length > 0 && fairnessScore === 98.5) {
-        fairnessScore = Math.max(88.0, 98.5 - sessionSignals.length * 3.7);
-      }
-
-      // Normalize recommendation strictly to 'Proceed' | 'Review' | 'Reject'
-      let normalizedRec = s.recommendation;
-      if (s.recommendation === 'strong_hire' || s.recommendation === 'hire' || s.recommendation === 'Proceed') {
-        normalizedRec = 'Proceed';
-      } else if (s.recommendation === 'weak_hire' || s.recommendation === 'Review') {
-        normalizedRec = 'Review';
-      } else if (s.recommendation === 'no_hire' || s.recommendation === 'Reject') {
-        normalizedRec = 'Reject';
+      // Opt-in copilot digest: No automated hire/reject decision tags
+      let recruiterStatus = "Portfolio Ready";
+      if (s.flagged) {
+        recruiterStatus = "Human Review Flagged";
+      } else if (s.status === "in_progress") {
+        recruiterStatus = "Walkthrough In Progress";
+      } else if (s.overallScore !== null) {
+        recruiterStatus = "Ready for Panel Review";
       }
 
       return {
         ...s,
-        recommendation: normalizedRec,
-        fairnessScore: s.overallScore !== null ? Number(fairnessScore.toFixed(1)) : null,
+        recommendation: recruiterStatus,
+        fairnessScore: null,
       };
     });
 
@@ -187,12 +164,6 @@ router.get("/sessions/:id", async (req, res) => {
       .from(interviewReports)
       .where(eq(interviewReports.sessionId, sessionId));
 
-    const signals = await db
-      .select()
-      .from(integritySignals)
-      .where(eq(integritySignals.sessionId, sessionId))
-      .orderBy(desc(integritySignals.timestamp));
-
     // Correct join path: sessions → interview_sessions → interview_questions → interview_responses
     const interviewSessionRows = await db
       .select()
@@ -216,31 +187,10 @@ router.get("/sessions/:id", async (req, res) => {
 
     const activeReport = reports[0] || null;
 
-    // Compute or extract AI fairness score
-    let fairnessScore = 98.5;
-    for (const sig of signals) {
-      if (sig.metadata) {
-        try {
-          const parsed = typeof sig.metadata === 'string' ? JSON.parse(sig.metadata) : sig.metadata;
-          if (parsed && typeof parsed.fairnessScore === 'number') {
-            fairnessScore = parsed.fairnessScore;
-            break;
-          }
-        } catch {}
-      }
-    }
-    if (signals.length > 0 && fairnessScore === 98.5) {
-      fairnessScore = Math.max(88.0, 98.5 - signals.length * 3.7);
-    }
-
-    let normalizedRec = activeReport?.recommendation || null;
-    if (normalizedRec === 'strong_hire' || normalizedRec === 'hire' || normalizedRec === 'Proceed') {
-      normalizedRec = 'Proceed';
-    } else if (normalizedRec === 'weak_hire' || normalizedRec === 'Review') {
-      normalizedRec = 'Review';
-    } else if (normalizedRec === 'no_hire' || normalizedRec === 'Reject') {
-      normalizedRec = 'Reject';
-    }
+    const sessionQuestionScores = await db
+      .select()
+      .from(questionScores)
+      .where(eq(questionScores.sessionId, sessionId));
 
     const adminReq = req as AdminAuthRequest;
     await logAdminAction({
@@ -256,8 +206,13 @@ router.get("/sessions/:id", async (req, res) => {
       success: true,
       session: sessionData,
       candidate: candidate || null,
-      report: activeReport ? { ...activeReport, recommendation: normalizedRec, fairnessScore: Number(fairnessScore.toFixed(1)) } : null,
-      signals,
+      report: activeReport ? {
+        ...activeReport,
+        recruiterNotes: "Candidate showcase completed. All evaluations serve solely as structured notes for human recruiters and panel interviewers.",
+        recommendation: "Human Review Pending",
+      } : null,
+      questionScores: sessionQuestionScores,
+      signals: [], // Proctoring telemetry completely deleted
       transcript,
     });
   } catch (e) {
@@ -294,26 +249,26 @@ router.get("/reports", async (req, res) => {
 });
 
 // ─── GET /api/admin/flags ─────────────────────────────────────────────────────
-// Sessions that have integrity signals — the review queue.
+// Human recruiter review queue (sessions manually flagged for panel review)
 // Minimum role: viewer
 router.get("/flags", async (req, res) => {
   try {
-    // Fetch all sessions that have at least one integrity signal
+    // Fetch sessions flagged by human reviewers
     const flaggedSessions = await db
       .select({
-        sessionId: integritySignals.sessionId,
-        signalType: integritySignals.signalType,
-        signalTimestamp: integritySignals.timestamp,
+        sessionId: sessions.id,
+        flagReason: sessions.flagReason,
+        flaggedAt: sessions.createdAt,
         candidateName: candidates.name,
         candidateEmail: candidates.email,
         sessionStatus: sessions.status,
         sessionFlagged: sessions.flagged,
         currentStage: sessions.currentStage,
       })
-      .from(integritySignals)
-      .leftJoin(sessions, eq(integritySignals.sessionId, sessions.id))
+      .from(sessions)
       .leftJoin(candidates, eq(sessions.candidateId, candidates.id))
-      .orderBy(desc(integritySignals.timestamp));
+      .where(eq(sessions.flagged, true))
+      .orderBy(desc(sessions.createdAt));
 
     res.json({ success: true, flags: flaggedSessions });
   } catch (e) {

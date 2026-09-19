@@ -3,7 +3,6 @@ import {
   candidates,
   sessions,
   interviewReports,
-  integritySignals,
   interviewSessions,
   interviewQuestions,
   interviewResponses,
@@ -12,9 +11,14 @@ import {
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { ensureDefaultRubric } from "../services/rubricService";
 
 export async function seedCompletedCandidatesAndAdmin() {
   try {
+    // 0. Ensure Default Rubrics (v1.0 and v2.4-enterprise-strict)
+    await ensureDefaultRubric("v1.0");
+    await ensureDefaultRubric("v2.4-enterprise-strict");
+
     // 1. Ensure Root Admin exists
     const [existingAdmin] = await db.select().from(adminUsers).where(eq(adminUsers.email, 'admin@ravengard.com')).limit(1);
     if (!existingAdmin) {
@@ -29,9 +33,9 @@ export async function seedCompletedCandidatesAndAdmin() {
       console.log('Seeded root admin: admin@ravengard.com / admin123');
     }
 
-    // 2. Check if completed interview reports exist
-    const existingReports = await db.select().from(interviewReports);
-    if (existingReports.length > 0) {
+    // 2. Check if completed candidates exist
+    const existingCandidates = await db.select().from(candidates).limit(3);
+    if (existingCandidates.length >= 3) {
       return;
     }
 
@@ -146,22 +150,6 @@ export async function seedCompletedCandidatesAndAdmin() {
       generatedAt: s1Date
     });
 
-    await db.insert(integritySignals).values({
-      id: crypto.randomUUID(),
-      sessionId: s1Id,
-      interviewSessionId: iv1Id,
-      signalType: "bias_audit_baseline",
-      timestamp: s1Date,
-      metadata: JSON.stringify({
-        status: "verified_neutral",
-        demographicBiasSkew: 0.0,
-        cadenceUniformity: "99.4%",
-        speechLatencyDeviation: "140ms (Optimal Human Range)",
-        tabSwitches: 0,
-        fairnessScore: 99.2
-      })
-    });
-
     // Candidate 2: Marcus Chen (Review)
     const c2Id = crypto.randomUUID();
     await db.insert(candidates).values({
@@ -227,7 +215,7 @@ export async function seedCompletedCandidatesAndAdmin() {
       breakdown: {
         databaseOptimization: 78,
         apiDesign: 75,
-        integrityConfidence: 72,
+        tradeOffAnalysis: 74,
         communicationPrecision: 79
       },
       strengths: [
@@ -235,7 +223,6 @@ export async function seedCompletedCandidatesAndAdmin() {
         "Clear knowledge of tenant isolation and table partitioning fundamentals"
       ],
       weaknesses: [
-        "One tab blur event recorded during Question 1 requiring recruiter review",
         "Could provide deeper consideration for distributed query caching"
       ],
       evidence: [
@@ -245,29 +232,15 @@ export async function seedCompletedCandidatesAndAdmin() {
           notes: "Step 1/2: Accurate description of composite B-tree indexes and tenant partitioning. 78/100 criteria met."
         },
         {
-          competency: "Integrity & Proctoring Telemetry",
-          score: 72,
-          notes: "Step 2/2: A single 4.2-second browser window blur was logged. Manual verification recommended prior to final offer."
+          competency: "Technical Trade-Offs & Scalability",
+          score: 74,
+          notes: "Step 2/2: Candidate discussed trade-offs between read replicas and tenant partitioning."
         }
       ],
       generatedAt: s2Date
     });
 
-    await db.insert(integritySignals).values({
-      id: crypto.randomUUID(),
-      sessionId: s2Id,
-      interviewSessionId: iv2Id,
-      signalType: "tab_blur",
-      timestamp: new Date(s2Date.getTime() + 1000 * 60 * 3),
-      metadata: JSON.stringify({
-        durationMs: 4200,
-        cause: "Candidate switched browser window or screen focus during preparation",
-        riskSeverity: "medium",
-        fairnessScore: 94.8
-      })
-    });
-
-    // Candidate 3: David Okafor (Reject)
+    // Candidate 3: David Okafor (Candidate Notes Ready)
     const c3Id = crypto.randomUUID();
     await db.insert(candidates).values({
       id: c3Id,
@@ -326,7 +299,7 @@ export async function seedCompletedCandidatesAndAdmin() {
       id: crypto.randomUUID(),
       sessionId: s3Id,
       overallScore: 52,
-      recommendation: "Reject",
+      recommendation: "Candidate Notes Ready",
       rubricVersion: "v2.4-enterprise-strict",
       breakdown: {
         concurrencyControl: 45,
@@ -338,14 +311,14 @@ export async function seedCompletedCandidatesAndAdmin() {
         "Friendly delivery and clear audio communication throughout the session"
       ],
       weaknesses: [
-        "Critical failure on basic concurrency protection (unaware of SELECT FOR UPDATE, pessimistic/optimistic locking, or atomic balance checks)",
+        "Needs panel follow-up on basic concurrency protection (unaware of SELECT FOR UPDATE, pessimistic/optimistic locking, or atomic balance checks)",
         "Application-level balance checking introduces severe check-then-act race conditions"
       ],
       evidence: [
         {
           competency: "Concurrency & Transactional ACID Safety",
           score: 45,
-          notes: "Step 1/2: Candidate proposed client-side balance validation without database row-level locking or atomic conditions. High risk for financial or stateful race conditions."
+          notes: "Step 1/2: Candidate proposed client-side balance validation without database row-level locking or atomic conditions."
         },
         {
           competency: "Architectural Robustness",
@@ -356,23 +329,7 @@ export async function seedCompletedCandidatesAndAdmin() {
       generatedAt: s3Date
     });
 
-    await db.insert(integritySignals).values({
-      id: crypto.randomUUID(),
-      sessionId: s3Id,
-      interviewSessionId: iv3Id,
-      signalType: "bias_audit_baseline",
-      timestamp: s3Date,
-      metadata: JSON.stringify({
-        status: "verified_neutral",
-        demographicBiasSkew: 0.0,
-        cadenceUniformity: "98.1%",
-        speechLatencyDeviation: "185ms (Normal)",
-        tabSwitches: 0,
-        fairnessScore: 91.5
-      })
-    });
-
-    console.log('Successfully seeded completed candidates: Elena Rostova (Proceed), Marcus Chen (Review), David Okafor (Reject)');
+    console.log('Successfully seeded completed candidates for Recruiter Copilot digest.');
   } catch (err) {
     console.error('Error seeding completed candidates:', err);
   }

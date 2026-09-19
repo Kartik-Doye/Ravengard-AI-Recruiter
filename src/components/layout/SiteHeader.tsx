@@ -58,17 +58,17 @@ export function SiteHeader() {
         </div>
         
         <div className="flex items-center gap-4">
-          <nav className="hidden items-center gap-2 md:flex">
+          <nav className="hidden items-center gap-1.5 md:flex" aria-label="Main Navigation">
             {links.map((link) => {
               const isActive = activePath === link.href;
               return (
                 <Link
                   key={link.href}
                   to={link.href}
-                  className={`px-3 py-2 text-sm transition-colors ${
+                  className={`px-3.5 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
                     isActive
-                      ? "text-white font-semibold underline underline-offset-8 decoration-white/40"
-                      : "text-white/70 hover:text-white"
+                      ? "text-white bg-white/10 font-semibold shadow-inner border border-white/20"
+                      : "text-zinc-200 hover:text-white hover:bg-white/[0.08] hover:border-white/10 border border-transparent"
                   }`}
                 >
                   {link.label}
@@ -78,8 +78,16 @@ export function SiteHeader() {
           </nav>
           
           <Link
+            to="/admin"
+            className="hidden md:inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs font-mono font-medium text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 transition-colors ml-2"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+            Admin Portal
+          </Link>
+
+          <Link
             to="/gateway"
-            className="hidden md:inline-flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black hover:bg-white/90 transition-colors ml-4 shadow-sm"
+            className="hidden md:inline-flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-zinc-100 transition-colors ml-2 shadow-sm"
           >
             Book a Demo
           </Link>
@@ -147,6 +155,24 @@ export function SiteHeader() {
                   </motion.div>
                 );
               })}
+              
+              <div className="pt-2 border-t border-white/10 flex flex-col gap-3">
+                <Link
+                  to="/admin"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4 text-base font-mono font-medium text-amber-300"
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                  Admin Portal
+                </Link>
+                <Link
+                  to="/gateway"
+                  onClick={() => setMobileOpen(false)}
+                  className="block rounded-2xl bg-white px-5 py-4 text-base font-semibold text-center text-zinc-950"
+                >
+                  Book a Demo
+                </Link>
+              </div>
             </motion.nav>
           </motion.div>
         )}

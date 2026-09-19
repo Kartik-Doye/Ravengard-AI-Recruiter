@@ -1,6 +1,4 @@
-import { db } from "../db/index";
-import { adminLogs } from "../db/schema";
-import crypto from "crypto";
+import { logAdminAudit } from "../services/adminLogService";
 
 export async function logAdminAction(params: {
   adminId: string;
@@ -11,20 +9,5 @@ export async function logAdminAction(params: {
   requestId?: string;
   ip?: string;
 }) {
-  try {
-    await db.insert(adminLogs).values({
-      id: crypto.randomUUID(),
-      adminId: params.adminId,
-      action: params.action,
-      target: params.target || null,
-      metadata: {
-        ...params.metadata,
-        role: params.role,
-        requestId: params.requestId,
-        ip: params.ip
-      }
-    });
-  } catch (error) {
-    console.error("Failed to log admin action:", error);
-  }
+  return logAdminAudit(params);
 }

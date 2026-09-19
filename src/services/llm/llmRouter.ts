@@ -194,6 +194,27 @@ class LLMRouter {
   }
 
   /**
+   * Adapts completion parameters (e.g., model name) to match provider capabilities
+   */
+  private adaptParamsForProvider(params: any, providerName: string) {
+    const cloned = { ...params };
+    if (providerName === 'gemini') {
+      if (!cloned.model || !cloned.model.startsWith('gemini-')) {
+        cloned.model = 'gemini-2.5-flash';
+      }
+    } else if (providerName === 'groq') {
+      if (!cloned.model || cloned.model.startsWith('gemini-') || cloned.model.startsWith('mistral-')) {
+        cloned.model = 'llama-3.3-70b-versatile';
+      }
+    } else if (providerName === 'mistral') {
+      if (!cloned.model || cloned.model.startsWith('gemini-') || cloned.model.startsWith('llama-')) {
+        cloned.model = 'mistral-small-latest';
+      }
+    }
+    return cloned;
+  }
+
+  /**
    * Get list of enabled providers
    */
   getEnabledProviders() {
@@ -210,7 +231,8 @@ class LLMRouter {
 
     for (const provider of this.getEnabledProviders()) {
       try {
-        const response = await provider.client.chat.completions.create(params);
+        const adaptedParams = this.adaptParamsForProvider(params, provider.name);
+        const response = await provider.client.chat.completions.create(adaptedParams);
         return response;
       } catch (error: any) {
         // Check if error is retryable (429 rate limit, 5xx server error)
@@ -244,13 +266,14 @@ class LLMRouter {
 
     for (const provider of this.getEnabledProviders()) {
       try {
+        const adaptedParams = this.adaptParamsForProvider(params, provider.name);
         const stream = await provider.client.chat.completions.create({
-          ...params,
+          ...adaptedParams,
           stream: true,
         });
 
         // Yield each chunk from the stream
-        for await (const chunk of stream) {
+        for await (const chunk of stream as any) {
           yield chunk;
         }
         return; // Success, exit
@@ -286,8 +309,9 @@ class LLMRouter {
 
     for (const provider of this.getEnabledProviders()) {
       try {
+        const adaptedParams = this.adaptParamsForProvider(params, provider.name);
         const response = await provider.client.chat.completions.create({
-          ...params,
+          ...adaptedParams,
           response_format: { type: 'json_object' },
         });
 
@@ -296,7 +320,14 @@ class LLMRouter {
           throw new Error('Empty response from LLM');
         }
 
-        const parsed = JSON.parse(content);
+        let cleanedContent = content.trim();
+        if (cleanedContent.startsWith('```json')) {
+          cleanedContent = cleanedContent.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
+        } else if (cleanedContent.startsWith('```')) {
+          cleanedContent = cleanedContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+        }
+
+        const parsed = JSON.parse(cleanedContent);
         // Validate with Zod schema
         const validated = schema.parse(parsed);
         return validated;

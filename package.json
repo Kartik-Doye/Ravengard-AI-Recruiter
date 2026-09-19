@@ -13,6 +13,8 @@
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 0",
+    "test:public-apis": "tsx scripts/test_public_apis.ts",
+    "test:admin:stress": "tsx scripts/stress_test_admin.ts",
     "qa": "node scripts/qa-check-routes.js",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push"
