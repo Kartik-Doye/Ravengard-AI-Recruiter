@@ -1,6 +1,8 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { extractTextFromFile } from "./src/services/resume-processor";
+import { extractTextFromFile, analyzeResume } from "./src/services/resume-processor";
+import { generateQuestionStream } from "./src/services/interviewService";
+import { classifyIntegritySignal } from "./src/services/integrityService";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { requireAuth, AuthRequest, signAdminToken } from "./src/middleware/auth";
