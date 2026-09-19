@@ -91,14 +91,14 @@ export default function Features() {
             <div className="w-12 h-12 rounded-full border border-white/10 bg-white/5 flex items-center justify-center mb-6">
               <Shield className="w-6 h-6 text-white/80" />
             </div>
-            <h2 className="text-3xl font-semibold mb-4">Behavioral Analytics</h2>
+            <h2 className="text-3xl font-semibold mb-4">Collaborative Insights</h2>
             <p className="text-white/60 leading-relaxed mb-6">
-              Real-time risk scoring, gaze tracking, and integrity signals run silently in the background. The system detects tab switching, copy-pasting, and suspicious behavior without interrupting the candidate's flow.
+              Real-time competency assessment, technical reasoning breakdowns, and rubric alignment.
             </p>
             <ul className="space-y-3 text-sm text-white/70">
-              <li className="flex items-center gap-3"><div className="w-1.5 h-1.5 rounded-full bg-white/50" /> Window blur detection</li>
-              <li className="flex items-center gap-3"><div className="w-1.5 h-1.5 rounded-full bg-white/50" /> Gaze & Face tracking integration</li>
-              <li className="flex items-center gap-3"><div className="w-1.5 h-1.5 rounded-full bg-white/50" /> Post-session integrity reporting</li>
+              <li className="flex items-center gap-3"><div className="w-1.5 h-1.5 rounded-full bg-white/50" /> Real-time competency evaluation</li>
+              <li className="flex items-center gap-3"><div className="w-1.5 h-1.5 rounded-full bg-white/50" /> Technical reasoning analysis</li>
+              <li className="flex items-center gap-3"><div className="w-1.5 h-1.5 rounded-full bg-white/50" /> Rubric-based performance alignment</li>
             </ul>
           </motion.div>
         </div>

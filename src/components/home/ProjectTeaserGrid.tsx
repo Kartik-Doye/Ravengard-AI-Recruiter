@@ -10,7 +10,7 @@ const projects = [
   },
   {
     title: "Behavioral Analytics",
-    summary: "Real-time risk scoring, gaze tracking, and integrity signals.",
+    summary: "Real-time competency assessment, technical reasoning breakdowns, and rubric alignment.",
     href: "/features#analytics",
   },
   {

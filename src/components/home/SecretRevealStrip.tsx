@@ -69,9 +69,9 @@ export function SecretRevealStrip() {
           />
           <FeatureCard
             icon={<ShieldAlert className="h-5 w-5 text-white/80" />}
-            title="Integrity & Anti-Cheat"
-            subtitle="Security"
-            description="Silent background telemetry tracking gaze, focus events, and browser state to flag suspicious activity."
+            title="Work Sample Authenticity"
+            subtitle="Verification"
+            description="Verified code execution and transparent work sample validation to ensure authentic candidate performance."
           />
           <FeatureCard
             icon={<BarChart3 className="h-5 w-5 text-white/80" />}

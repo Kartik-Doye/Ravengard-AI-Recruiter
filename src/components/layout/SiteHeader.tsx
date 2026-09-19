@@ -76,7 +76,14 @@ export function SiteHeader() {
               );
             })}
           </nav>
-          
+
+          <Link
+            to="/admin"
+            className="hidden md:inline-flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black hover:bg-white/90 transition-colors ml-6 shadow-sm"
+          >
+            Admin Portal
+          </Link>
+
           <Link
             to="/admin"
             className="hidden md:inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs font-mono font-medium text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 transition-colors ml-2"
