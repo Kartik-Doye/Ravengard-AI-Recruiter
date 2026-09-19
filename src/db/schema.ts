@@ -1,4 +1,5 @@
-import { pgTable, text, integer, boolean, timestamp, jsonb, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, jsonb, pgEnum, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const stageEnum = pgEnum('session_stage', [
   'resume_upload',
@@ -110,16 +111,19 @@ export const integritySignals = pgTable('integrity_signals', {
 
 export const interviewReports = pgTable('interview_reports', {
   id: text('id').primaryKey(),
-  sessionId: text('session_id').references(() => sessions.id),
+  sessionId: text('session_id').references(() => sessions.id).notNull(),
   overallScore: integer('overall_score'),
   breakdown: jsonb('breakdown'),
   strengths: jsonb('strengths'),
   weaknesses: jsonb('weaknesses'),
   recommendation: text('recommendation'),
-  rubricVersion: text('rubric_version').default('v1.0'),
+  rubricVersion: text('rubric_version').default('v1.0').notNull(),
+  scoringStatus: text('scoring_status').default('completed').notNull(), // 'completed' | 'pending_retry' | 'failed'
   evidence: jsonb('evidence'),
   generatedAt: timestamp('generated_at').defaultNow(),
-});
+}, (table) => [
+  uniqueIndex('interview_reports_session_rubric_idx').on(table.sessionId, table.rubricVersion),
+]);
 
 
 export const rubrics = pgTable('rubrics', {
@@ -139,13 +143,22 @@ export const rubricCriteria = pgTable('rubric_criteria', {
 
 export const questionScores = pgTable('question_scores', {
   id: text('id').primaryKey(),
-  sessionId: text('session_id').references(() => sessions.id),
-  questionId: text('question_id').references(() => interviewQuestions.id),
-  criterionId: text('criterion_id').references(() => rubricCriteria.id),
-  score: integer('score'),
+  sessionId: text('session_id').references(() => sessions.id).notNull(),
+  questionId: text('question_id').references(() => interviewQuestions.id).notNull(),
+  criterionId: text('criterion_id').references(() => rubricCriteria.id).notNull(),
+  score: integer('score').notNull(),
+  rubricVersion: text('rubric_version').default('v1.0').notNull(),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow()
-});
+}, (table) => [
+  uniqueIndex('question_scores_identity_idx').on(
+    table.sessionId,
+    table.questionId,
+    table.criterionId,
+    table.rubricVersion
+  ),
+  check('question_score_range_check', sql`${table.score} >= 0 AND ${table.score} <= 100`)
+]);
 
 
 export const adminUsers = pgTable('admin_users', {
