@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { registrationSchema } from '../lib/validation';
+import { useToast } from '../contexts/ToastContext';
 import { 
   Check, 
   ChevronDown, 
@@ -80,6 +81,7 @@ export function validatePhoneFormat(phone: string): { valid: boolean; warning?: 
 }
 
 export default function Registration({ user, onComplete }: { user: string, onComplete: (user: string) => void }) {
+  const { addToast } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     email: '',

@@ -32,6 +32,7 @@ import { evaluateAndScoreSession } from "./src/services/scoringService";
 import { validateCandidateEmail } from "./src/services/candidateService";
 import { getNetworkReadiness } from "./src/services/deviceCheckService";
 import { checkIpReputation } from "./src/services/adminLogService";
+import { sanitizeCandidateRegistrationInput } from "./src/services/sanitizer";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -509,13 +510,25 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
 
   const handleCandidateRegistration = async (req: AuthRequest, res: express.Response) => {
     try {
-      const parsedData = registrationSchema.safeParse(req.body);
-      if (!parsedData.success) {
-        const errors = parsedData.error.issues.map(e => e.message);
-        return res.status(400).json({ success: false, errors });
+      // Comprehensive Server-Side Sanitization & Validation
+      // Enforces strict types, bounds, strips null bytes & control chars, and blocks XSS / script injection
+      const sanitizeResult = sanitizeCandidateRegistrationInput(req.body);
+      if (!sanitizeResult.success) {
+        return res.status(400).json({ success: false, errors: sanitizeResult.errors });
       }
 
-      const { email: reqEmail, name, mobile, college, degree, gradYear, preferredLanguage } = parsedData.data;
+      const {
+        email: reqEmail,
+        name,
+        mobile,
+        college,
+        degree,
+        gradYear,
+        preferredLanguage,
+        resumeText: sanitizedResumeText,
+        requisitionId: sanitizedReqId,
+        jobId: sanitizedJobId
+      } = sanitizeResult.data!;
 
       // Phase 1 — Email Verification via free public APIs (Debounce / Disify / Local Blocklist)
       const emailValidation = await validateCandidateEmail(reqEmail);
@@ -560,7 +573,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
       // When candidates access /interview directly without a magic link token,
       // ensure the backend POST endpoint automatically creates a fallback candidate session
       // rather than failing on a missing requisition ID.
-      const rawRequisitionId = (req.body as any).requisitionId || (req.body as any).jobId;
+      const rawRequisitionId = sanitizedReqId || sanitizedJobId;
       let targetJobId = rawRequisitionId;
       let targetOrgId = 'org-ravengard';
 
@@ -627,7 +640,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
       }
 
       // If raw resume text was attached during registration (from the drop zone)
-      const resumeText = (req.body as any).resumeText || (req.body as any).rawResumeText;
+      const resumeText = sanitizedResumeText;
       if (resumeText && typeof resumeText === 'string' && resumeText.trim().length > 20) {
         try {
           const existingAnalysis = await db.select().from(resumeAnalyses).where(eq(resumeAnalyses.sessionId, activeSession.id));
