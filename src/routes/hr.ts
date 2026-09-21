@@ -10,8 +10,11 @@ import {
   integritySignals,
   adminLogs,
   screeningQueue,
+  apiKeys,
+  integrationConfigs,
+  outboxEvents,
 } from "../db/schema";
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, isNull } from "drizzle-orm";
 import { requireHrAuth, HrAuthRequest } from "../middleware/tenant";
 import { generateMagicToken } from "../services/magicTokenService";
 import { emailService } from "../services/emailService";
@@ -597,3 +600,213 @@ hrRouter.post("/applications/:id/reset-magic-link", async (req: HrAuthRequest, r
     return res.status(500).json({ error: "Failed to reset magic link." });
   }
 });
+
+/**
+ * GET /api/hr/settings/api-keys
+ * Lists active tenant API keys (with prefix masking).
+ */
+hrRouter.get("/settings/api-keys", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+
+  try {
+    const keys = await db
+      .select({
+        id: apiKeys.id,
+        name: apiKeys.name,
+        keyPrefix: apiKeys.keyPrefix,
+        scopes: apiKeys.scopes,
+        lastUsedAt: apiKeys.lastUsedAt,
+        createdAt: apiKeys.createdAt,
+      })
+      .from(apiKeys)
+      .where(and(eq(apiKeys.organizationId, orgId), isNull(apiKeys.revokedAt)))
+      .orderBy(desc(apiKeys.createdAt));
+
+    return res.json({ success: true, keys });
+  } catch (err: any) {
+    console.error("Failed to fetch API keys:", err);
+    return res.status(500).json({ error: "Failed to fetch API keys." });
+  }
+});
+
+/**
+ * POST /api/hr/settings/api-keys
+ * Generates a new tenant-scoped API key ('rg_live_...').
+ * Returns raw key EXACTLY ONCE to the user.
+ */
+hrRouter.post("/settings/api-keys", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+  const { name, scopes } = req.body;
+
+  if (!name || typeof name !== "string") {
+    return res.status(400).json({ error: "API key name is required." });
+  }
+
+  try {
+    // Generate 32 bytes of cryptographic entropy
+    const randomHex = crypto.randomBytes(32).toString("hex");
+    const rawKey = `rg_live_${randomHex}`;
+    const keyPrefix = `rg_live_${randomHex.substring(0, 8)}`;
+    const keyHash = crypto.createHash("sha256").update(rawKey).digest("hex");
+
+    const keyId = `key-${crypto.randomUUID()}`;
+    const allowedScopes = Array.isArray(scopes) && scopes.length > 0 ? scopes : ["candidates:read", "candidates:write"];
+
+    await db.insert(apiKeys).values({
+      id: keyId,
+      organizationId: orgId,
+      name: name.trim(),
+      keyPrefix,
+      keyHash,
+      scopes: allowedScopes,
+    });
+
+    await db.insert(adminLogs).values({
+      id: `log-${crypto.randomUUID()}`,
+      adminId: req.hr!.id,
+      organizationId: orgId,
+      action: "API_KEY_CREATED",
+      target: keyId,
+      metadata: { keyName: name.trim(), keyPrefix },
+    });
+
+    return res.status(201).json({
+      success: true,
+      id: keyId,
+      name: name.trim(),
+      keyPrefix,
+      key: rawKey,
+      scopes: allowedScopes,
+      message: "API key generated successfully. Copy and store this secret key now; you will not be able to view it again.",
+    });
+  } catch (err: any) {
+    console.error("Failed to create API key:", err);
+    return res.status(500).json({ error: "Failed to create API key." });
+  }
+});
+
+/**
+ * DELETE /api/hr/settings/api-keys/:id
+ * Soft-deletes / revokes an API key.
+ */
+hrRouter.delete("/settings/api-keys/:id", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+  const keyId = req.params.id;
+
+  try {
+    const [existing] = await db
+      .select()
+      .from(apiKeys)
+      .where(and(eq(apiKeys.id, keyId), eq(apiKeys.organizationId, orgId)))
+      .limit(1);
+
+    if (!existing) {
+      return res.status(404).json({ error: "API key not found." });
+    }
+
+    await db
+      .update(apiKeys)
+      .set({ revokedAt: new Date() })
+      .where(eq(apiKeys.id, keyId));
+
+    await db.insert(adminLogs).values({
+      id: `log-${crypto.randomUUID()}`,
+      adminId: req.hr!.id,
+      organizationId: orgId,
+      action: "API_KEY_REVOKED",
+      target: keyId,
+      metadata: { keyPrefix: existing.keyPrefix },
+    });
+
+    return res.json({ success: true, message: "API key successfully revoked." });
+  } catch (err: any) {
+    console.error("Failed to revoke API key:", err);
+    return res.status(500).json({ error: "Failed to revoke API key." });
+  }
+});
+
+/**
+ * GET /api/hr/settings/integrations
+ * Retrieves tenant integration status for Greenhouse, Lever, and Workday.
+ */
+hrRouter.get("/settings/integrations", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+
+  try {
+    const configs = await db
+      .select({
+        id: integrationConfigs.id,
+        provider: integrationConfigs.provider,
+        apiEndpoint: integrationConfigs.apiEndpoint,
+        isEnabled: integrationConfigs.isEnabled,
+        updatedAt: integrationConfigs.updatedAt,
+      })
+      .from(integrationConfigs)
+      .where(eq(integrationConfigs.organizationId, orgId));
+
+    const providers = ["greenhouse", "lever", "workday"].map((p) => {
+      const found = configs.find((c) => c.provider === p);
+      return {
+        provider: p,
+        isEnabled: found?.isEnabled || false,
+        apiEndpoint: found?.apiEndpoint || "",
+        webhookUrl: `/api/v1/integrations/webhooks/${p}`,
+        isConfigured: !!found,
+      };
+    });
+
+    return res.json({ success: true, providers });
+  } catch (err: any) {
+    console.error("Failed to get integration configs:", err);
+    return res.status(500).json({ error: "Failed to get integration configs." });
+  }
+});
+
+/**
+ * POST /api/hr/settings/integrations
+ * Configures or updates an ATS provider.
+ */
+hrRouter.post("/settings/integrations", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+  const { provider, webhookSecret, apiEndpoint, isEnabled } = req.body;
+
+  if (!provider || !["greenhouse", "lever", "workday"].includes(provider)) {
+    return res.status(400).json({ error: "Invalid provider. Must be greenhouse, lever, or workday." });
+  }
+
+  try {
+    const [existing] = await db
+      .select()
+      .from(integrationConfigs)
+      .where(and(eq(integrationConfigs.organizationId, orgId), eq(integrationConfigs.provider, provider)))
+      .limit(1);
+
+    if (existing) {
+      await db
+        .update(integrationConfigs)
+        .set({
+          webhookSecret: webhookSecret || existing.webhookSecret,
+          apiEndpoint: apiEndpoint !== undefined ? apiEndpoint : existing.apiEndpoint,
+          isEnabled: isEnabled !== undefined ? isEnabled : existing.isEnabled,
+          updatedAt: new Date(),
+        })
+        .where(eq(integrationConfigs.id, existing.id));
+    } else {
+      await db.insert(integrationConfigs).values({
+        id: `ic-${crypto.randomUUID()}`,
+        organizationId: orgId,
+        provider,
+        webhookSecret: webhookSecret || null,
+        apiEndpoint: apiEndpoint || null,
+        encryptedCredentials: {},
+        isEnabled: isEnabled !== undefined ? isEnabled : true,
+      });
+    }
+
+    return res.json({ success: true, message: `${provider} integration updated successfully.` });
+  } catch (err: any) {
+    console.error("Failed to save integration config:", err);
+    return res.status(500).json({ error: "Failed to update integration config." });
+  }
+});
+

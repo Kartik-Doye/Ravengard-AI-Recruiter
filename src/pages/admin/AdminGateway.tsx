@@ -8,6 +8,7 @@ import { CandidateDetail } from './CandidateDetail';
 import { ReportsPage } from './ReportsPage';
 import { FlagQueue } from './FlagQueue';
 import { AtsPipeline } from './AtsPipeline';
+import { ApiSettings } from '../../components/admin/ApiSettings';
 import { ShieldCheck, LogOut, ArrowLeft } from 'lucide-react';
 
 export default function AdminGateway() {
@@ -79,6 +80,7 @@ export default function AdminGateway() {
     { label: 'All Candidates', path: '/admin/candidates' },
     { label: 'Scorecards & Reports', path: '/admin/reports' },
     { label: 'Flagged Review Queue', path: '/admin/flags' },
+    { label: 'API & Integrations', path: '/admin/api-settings' },
   ];
 
   return (
@@ -156,6 +158,7 @@ export default function AdminGateway() {
           <Route path="/candidates/:id" element={<CandidateDetail />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/flags" element={<FlagQueue />} />
+          <Route path="/api-settings" element={<ApiSettings />} />
           <Route path="/sessions/:id" element={<SessionDetail />} />
           <Route path="/session/:id" element={<SessionDetail />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />

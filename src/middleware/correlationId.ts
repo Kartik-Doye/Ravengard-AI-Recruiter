@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
+import { runWithLogContext } from "../lib/logger";
 
 export function extractClientIp(req: Request): string {
   const forwarded = req.headers["x-forwarded-for"];
@@ -17,6 +18,11 @@ export function correlationIdMiddleware(req: Request, res: Response, next: NextF
   const id = (req.headers["x-request-id"] as string | undefined) || crypto.randomUUID();
   res.setHeader("X-Request-Id", id);
   (req as any).requestId = id;
-  (req as any).clientIp = extractClientIp(req);
-  next();
+  const clientIp = extractClientIp(req);
+  (req as any).clientIp = clientIp;
+
+  runWithLogContext({ correlationId: id, clientIp }, () => {
+    next();
+  });
 }
+

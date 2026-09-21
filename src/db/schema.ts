@@ -266,3 +266,48 @@ export const emailOutbox = pgTable('email_outbox', {
 }, (table) => [
   index('email_outbox_status_idx').on(table.status)
 ]);
+
+export const apiKeys = pgTable('api_keys', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull(),
+  name: text('name').notNull(),
+  keyPrefix: text('key_prefix').notNull(),
+  keyHash: text('key_hash').notNull().unique(),
+  scopes: jsonb('scopes').default(['candidates:read', 'candidates:write']).notNull(),
+  lastUsedAt: timestamp('last_used_at'),
+  revokedAt: timestamp('revoked_at'),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => [
+  index('idx_api_keys_org_hash').on(table.organizationId, table.keyHash)
+]);
+
+export const integrationConfigs = pgTable('integration_configs', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull(),
+  provider: text('provider').notNull(), // 'greenhouse' | 'lever' | 'workday'
+  apiEndpoint: text('api_endpoint'),
+  encryptedCredentials: jsonb('encrypted_credentials').notNull(),
+  webhookSecret: text('webhook_secret'),
+  isEnabled: boolean('is_enabled').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  uniqueIndex('integration_configs_org_provider_idx').on(table.organizationId, table.provider)
+]);
+
+export const outboxEvents = pgTable('outbox_events', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull(),
+  eventType: text('event_type').notNull(), // 'ATS_EXPORT_CANDIDATE_SCORECARD'
+  payload: jsonb('payload').notNull(),
+  status: text('status').default('pending').notNull(), // 'pending' | 'processing' | 'completed' | 'failed'
+  retryCount: integer('retry_count').default(0).notNull(),
+  maxRetries: integer('max_retries').default(5).notNull(),
+  nextRetryAt: timestamp('next_retry_at').defaultNow().notNull(),
+  lastError: text('last_error'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('idx_outbox_events_processing').on(table.status, table.nextRetryAt)
+]);
+
