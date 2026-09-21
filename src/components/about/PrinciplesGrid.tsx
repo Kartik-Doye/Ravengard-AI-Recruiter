@@ -11,8 +11,8 @@ export function PrinciplesGrid() {
       highlight: "from-blue-500/20 to-blue-500/0"
     },
     {
-      title: "Absolute Integrity",
-      body: "O(1) telemetry tracking monitors hardware and tab context, guaranteeing the authenticity of every submission.",
+      title: "Work Sample Authenticity",
+      body: "Verified code execution and authentic work sample validation, guaranteeing the credibility of every submission without invasive surveillance.",
       icon: Shield,
       highlight: "from-green-500/20 to-green-500/0"
     },

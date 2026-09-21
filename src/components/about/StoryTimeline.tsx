@@ -6,7 +6,7 @@ export function StoryTimeline() {
     {
       year: "The Problem",
       label: "Interviews are broken",
-      description: "Traditional interviews are plagued by bias, subjective grading, and a lack of standardized telemetry, leading to poor hiring signals."
+      description: "Traditional interviews are plagued by bias, subjective grading, and a lack of standardized rubrics, leading to poor hiring signals."
     },
     {
       year: "The Vision",

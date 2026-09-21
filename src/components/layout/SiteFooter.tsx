@@ -12,6 +12,9 @@ export function SiteFooter() {
           <Link to="/features" className="hover:text-white transition-colors">
             Features
           </Link>
+          <Link to="/#faqs" className="hover:text-white transition-colors">
+            FAQs
+          </Link>
           <Link to="/contact" className="hover:text-white transition-colors">
             Contact
           </Link>

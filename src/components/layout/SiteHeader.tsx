@@ -12,7 +12,8 @@ type NavLink = {
 const links: NavLink[] = [
   { label: "Product", href: "/features" },
   { label: "Security", href: "/#security" },
-  { label: "Pricing", href: "/#pricing" },
+  { label: "FAQs", href: "/#faqs" },
+  { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
 ];
 
@@ -33,6 +34,36 @@ export function SiteHeader() {
   }, [mobileOpen]);
 
   const activePath = useMemo(() => location.pathname || "/", [location.pathname]);
+
+  // Handle smooth scroll when navigating to hash anchors
+  useEffect(() => {
+    if (location.hash) {
+      const targetId = location.hash.replace('#', '');
+      const element = document.getElementById(targetId);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
+    }
+  }, [location.pathname, location.hash]);
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (href.startsWith('/#')) {
+      const targetId = href.replace('/#', '');
+      if (location.pathname === '/') {
+        e.preventDefault();
+        const element = document.getElementById(targetId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+          window.history.pushState(null, '', `/#${targetId}`);
+        }
+      } else {
+        navigate(`/#${targetId}`);
+      }
+      setMobileOpen(false);
+    }
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[var(--color-bg-0)]/80 backdrop-blur-xl">
@@ -64,6 +95,7 @@ export function SiteHeader() {
                 <Link
                   key={link.href}
                   to={link.href}
+                  onClick={(e) => handleNavClick(e, link.href)}
                   className={`px-3.5 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
                     isActive
                       ? "text-white bg-white/10 font-semibold shadow-inner border border-white/20"
@@ -77,15 +109,15 @@ export function SiteHeader() {
           </nav>
 
           <Link
-            to="/admin/ats"
+            to="/admin"
             className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1.5 text-xs font-mono font-medium text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 transition-colors ml-3"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-            HR & ATS Portal
+            Admin Portal
           </Link>
 
           <Link
-            to="/gateway"
+            to="/contact"
             className="hidden md:inline-flex items-center justify-center rounded-full bg-white px-5 py-2 text-sm font-semibold text-zinc-950 hover:bg-zinc-100 transition-colors ml-2 shadow-sm"
           >
             Book a Demo
@@ -143,6 +175,7 @@ export function SiteHeader() {
                   >
                     <Link
                       to={link.href}
+                      onClick={(e) => handleNavClick(e, link.href)}
                       className={`block rounded-2xl border px-5 py-4 text-xl font-medium transition ${
                         isActive
                           ? "border-white bg-white text-black"
@@ -157,15 +190,15 @@ export function SiteHeader() {
               
               <div className="pt-2 border-t border-white/10 flex flex-col gap-3">
                 <Link
-                  to="/admin/ats"
+                  to="/admin"
                   onClick={() => setMobileOpen(false)}
                   className="flex items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-4 text-base font-mono font-medium text-amber-300"
                 >
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                  HR & ATS Portal
+                  Admin Portal
                 </Link>
                 <Link
-                  to="/gateway"
+                  to="/contact"
                   onClick={() => setMobileOpen(false)}
                   className="block rounded-2xl bg-white px-5 py-4 text-base font-semibold text-center text-zinc-950"
                 >

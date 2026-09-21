@@ -1,6 +1,6 @@
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { extractTextFromFile, analyzeResume } from "./src/services/resume-processor";
+import { extractTextFromFile, analyzeResume, extractCandidateFieldsFromResume } from "./src/services/resume-processor";
 import { generateQuestionStream } from "./src/services/interviewService";
 import path from "path";
 import { createServer as createViteServer } from "vite";
@@ -9,7 +9,7 @@ import bcrypt from "bcryptjs";
 import { correlationIdMiddleware } from "./src/middleware/correlationId";
 import { adminLimiter } from "./src/middleware/adminRateLimit";
 import { db } from "./src/db/index";
-import { candidates, sessions, resumeAnalyses, organizationAdmins, contacts, interviewSessions, interviewQuestions, interviewResponses, interviewReports, questionScores, adminUsers, integritySignals } from "./src/db/schema";
+import { candidates, sessions, resumeAnalyses, organizationAdmins, contacts, interviewSessions, interviewQuestions, interviewResponses, interviewReports, questionScores, adminUsers, integritySignals, jobs, applications } from "./src/db/schema";
 import { eq, and, or, desc, lt } from "drizzle-orm";
 import multer from "multer";
 
@@ -211,6 +211,52 @@ app.use("/api/candidate/portal", candidatePortalRouter);
 app.get("/api/candidate/verify", (req, res, next) => (candidatePortalRouter as any).handle(req, res, next));
 app.use("/api/jobs", publicJobsRouter);
 
+  // Lead capture endpoint for enterprise consultations & demo requests
+  app.post("/api/leads", async (req, res) => {
+    try {
+      const { fullName, email, company, teamSize, selectedTier } = req.body || {};
+
+      if (!fullName || typeof fullName !== "string" || !fullName.trim()) {
+        return res.status(400).json({ error: "Full Name is required." });
+      }
+
+      if (!email || typeof email !== "string" || !email.trim()) {
+        return res.status(400).json({ error: "Work Email is required." });
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({ error: "Please enter a valid work email address." });
+      }
+
+      if (!company || typeof company !== "string" || !company.trim()) {
+        return res.status(400).json({ error: "Company / Organization Name is required." });
+      }
+
+      const leadRecord = {
+        id: crypto.randomUUID(),
+        fullName: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        company: company.trim(),
+        teamSize: teamSize || "10–50 hires/mo",
+        selectedTier: selectedTier || "Enterprise Copilot",
+        submittedAt: new Date().toISOString()
+      };
+
+      console.log(`[Lead Captured] Received lead from ${leadRecord.email} for ${leadRecord.company} (${leadRecord.selectedTier})`);
+
+      return res.status(200).json({
+        success: true,
+        leadId: leadRecord.id,
+        message: "Request Received! Our talent strategy team will reach out within 2 hours.",
+        lead: leadRecord
+      });
+    } catch (err: any) {
+      console.error("Error processing /api/leads:", err);
+      return res.status(500).json({ error: "Internal server error processing lead capture." });
+    }
+  });
+
   const PORT = 3000;
 
   app.use(express.json());
@@ -280,6 +326,100 @@ app.use("/api/jobs", publicJobsRouter);
     }
   });
 
+  // ─── POST /api/chat ──────────────────────────────────────────────────────────
+  // Multi-turn Gemini chatbot with role instructions & conversation history
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const { messages, role = "candidate_advisor", taskComplexity = "general" } = req.body || {};
+      if (!Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ error: "messages array is required." });
+      }
+
+      let systemInstruction = `You are RavenGard AI, an intelligent, empathetic, and technically rigorous recruitment assistant for candidate assessments and engineering evaluation.
+Your responsibilities:
+1. Explain the 7-phase assessment journey (Registration -> Policy Consent -> Device Check -> Waiting Room -> Dynamic Technical Interview -> Work Sample Verification -> Final Report).
+2. Detail how deterministic rubric scoring works (evaluating architecture, code execution, and system trade-offs without demographic subjectivity).
+3. Clarify Blind Evaluation Mode: how applicant names, emails, and universities are masked from human review panels to eliminate bias.
+4. Explain hardware verification (camera/mic/browser) and resilient session state recovery.
+
+Guidelines:
+- Keep answers professional, concise, technically sound, and supportive.
+- Do not fabricate hypothetical candidates or violate candidate privacy.`;
+
+      if (role === "admin_copilot") {
+        systemInstruction = `You are RavenGard Recruiter Copilot, an enterprise hiring analytics assistant.
+Help recruiters interpret technical rubric scores, evaluate work samples, configure job requisition thresholds, and generate ATS export packages.`;
+      }
+
+      // Model Selection: gemini-3.1-pro-preview for complex, gemini-3.1-flash-lite for fast, gemini-3.5-flash / models/gemini-flash-latest for general
+      let selectedModel = "models/gemini-flash-latest";
+      if (taskComplexity === "complex") {
+        selectedModel = "gemini-3.1-pro-preview";
+      } else if (taskComplexity === "fast") {
+        selectedModel = "gemini-3.1-flash-lite";
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        // Deterministic fallback if API key is not configured in preview environment
+        const lastMsg = String(messages[messages.length - 1]?.content || "").toLowerCase();
+        let fallback = "Welcome to RavenGard. Our platform evaluates technical architecture, verified code execution, and system trade-offs deterministically. Blind Evaluation Mode ensures pure merit-based hiring.";
+        if (lastMsg.includes("score") || lastMsg.includes("rubric") || lastMsg.includes("evaluat")) {
+          fallback = "Scoring is performed against pre-configured rubrics (such as Architectural Soundness, Code Execution, and System Trade-offs). Scores are backed by verbatim code evidence rather than subjective impressions.";
+        } else if (lastMsg.includes("blind") || lastMsg.includes("bias")) {
+          fallback = "Blind Evaluation Mode hides applicant names, universities, and demographic identifiers from review panels. Reviewers see only competencies, problem-solving reasoning, and work samples.";
+        } else if (lastMsg.includes("device") || lastMsg.includes("camera") || lastMsg.includes("mic")) {
+          fallback = "Phase 2 validates your camera, microphone, and browser compatibility. Once validated, your session is securely locked so you can focus entirely on the technical challenge.";
+        } else if (lastMsg.includes("disconnect") || lastMsg.includes("crash") || lastMsg.includes("refresh")) {
+          fallback = "RavenGard saves session progress persistently. If your browser disconnects or refreshes, you automatically resume from your last verified question checkpoint.";
+        }
+        return res.json({ reply: fallback, model: "fallback-deterministic" });
+      }
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey });
+
+      // Format conversation history for Gemini API
+      const formattedContents = messages.map((m: any) => ({
+        role: m.role === "user" ? "user" : "model",
+        parts: [{ text: String(m.content || m.text || "") }]
+      }));
+
+      try {
+        const response = await ai.models.generateContent({
+          model: selectedModel,
+          contents: formattedContents,
+          config: {
+            systemInstruction,
+            temperature: 0.3,
+            maxOutputTokens: 1000
+          }
+        });
+
+        const reply = response.text || "I am ready to assist with your assessment questions.";
+        return res.json({ reply, model: selectedModel });
+      } catch (geminiError: any) {
+        console.warn(`Primary model ${selectedModel} call failed, trying fallback:`, geminiError.message);
+        // Fallback to gemini-2.5-flash or standard
+        const fallbackResponse = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: formattedContents,
+          config: {
+            systemInstruction,
+            temperature: 0.3,
+            maxOutputTokens: 800
+          }
+        });
+        return res.json({ reply: fallbackResponse.text || "How can I assist with your assessment?", model: "gemini-2.5-flash" });
+      }
+    } catch (err: any) {
+      console.error("Chat route error:", err);
+      res.json({
+        reply: "RavenGard's AI assessment engine utilizes deterministic rubrics to evaluate engineering competencies. Feel free to ask about any phase of the process."
+      });
+    }
+  });
+
   app.post("/api/contact", async (req, res) => {
     try {
       const { name, email, message } = req.body || {};
@@ -300,7 +440,74 @@ app.use("/api/jobs", publicJobsRouter);
     }
   });
 
-  app.post("/api/register", requireAuth, async (req: AuthRequest, res) => {
+  // Endpoint to parse resume directly from the Candidate Registration drop zone
+  app.post("/api/candidate/parse-resume", upload.single("resume"), async (req: express.Request, res: express.Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: "No resume file uploaded. Please provide a PDF or DOCX file." });
+      }
+
+      const originalName = req.file.originalname.toLowerCase();
+      let fileType: 'pdf' | 'docx' = 'pdf';
+      if (originalName.endsWith('.docx') || originalName.endsWith('.doc')) {
+        fileType = 'docx';
+      } else if (originalName.endsWith('.pdf')) {
+        fileType = 'pdf';
+      } else {
+        return res.status(400).json({ success: false, error: "Unsupported file type. Please upload a PDF or DOCX resume." });
+      }
+
+      const extractedText = await extractTextFromFile(req.file.buffer, fileType);
+      if (!extractedText || extractedText.trim().length === 0) {
+        return res.status(400).json({ success: false, error: "Unable to extract readable text from the uploaded resume file." });
+      }
+
+      const parsedProfile = await extractCandidateFieldsFromResume(extractedText);
+
+      return res.json({
+        success: true,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        parsed: {
+          name: parsedProfile.name || '',
+          email: parsedProfile.email || '',
+          mobile: parsedProfile.mobile || '',
+          college: parsedProfile.college || '',
+          degree: parsedProfile.degree || '',
+          gradYear: parsedProfile.gradYear || 2024,
+        },
+        rawResumeText: extractedText
+      });
+    } catch (err: any) {
+      console.error("Failed to parse candidate resume:", err);
+      return res.status(500).json({
+        success: false,
+        error: err.message || "An unexpected error occurred while parsing the resume."
+      });
+    }
+  });
+
+  // Also support /api/resume/parse-fields alias
+  app.post("/api/resume/parse-fields", upload.single("resume"), async (req: express.Request, res: express.Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: "No file uploaded." });
+      }
+      const fileType = req.file.originalname.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf';
+      const extractedText = await extractTextFromFile(req.file.buffer, fileType);
+      const parsedProfile = await extractCandidateFieldsFromResume(extractedText);
+      return res.json({
+        success: true,
+        fileName: req.file.originalname,
+        parsed: parsedProfile,
+        rawResumeText: extractedText
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  const handleCandidateRegistration = async (req: AuthRequest, res: express.Response) => {
     try {
       const parsedData = registrationSchema.safeParse(req.body);
       if (!parsedData.success) {
@@ -323,27 +530,142 @@ app.use("/api/jobs", publicJobsRouter);
         eq(candidates.id, req.user!.id)
       ).limit(1);
 
+      let candidateRecord;
       if (existingCandidate.length > 0) {
-        return res.status(400).json({ success: false, errors: ['Candidate is already registered.'] });
+        const [updated] = await db.update(candidates).set({
+          email: reqEmail,
+          name,
+          mobile,
+          college,
+          degree,
+          gradYear,
+          preferredLanguage
+        }).where(eq(candidates.id, req.user!.id)).returning();
+        candidateRecord = updated;
+      } else {
+        const [user] = await db.insert(candidates).values({
+          id: req.user!.id,
+          email: reqEmail,
+          name,
+          mobile,
+          college,
+          degree,
+          gradYear,
+          preferredLanguage
+        }).returning();
+        candidateRecord = user;
       }
 
-      const [user] = await db.insert(candidates).values({
-        id: req.user!.id,
-        email: reqEmail,
-        name,
-        mobile,
-        college,
-        degree,
-        gradYear,
-        preferredLanguage
-      }).returning();
+      // Direct Registration Session Fallback:
+      // When candidates access /interview directly without a magic link token,
+      // ensure the backend POST endpoint automatically creates a fallback candidate session
+      // rather than failing on a missing requisition ID.
+      const rawRequisitionId = (req.body as any).requisitionId || (req.body as any).jobId;
+      let targetJobId = rawRequisitionId;
+      let targetOrgId = 'org-ravengard';
 
-      res.json({ candidateId: user.id, registrationStatus: 'validated', welcomeMessage: 'Welcome!' });
+      if (!targetJobId) {
+        const [activeJob] = await db.select().from(jobs).where(eq(jobs.status, 'active')).limit(1);
+        if (activeJob) {
+          targetJobId = activeJob.id;
+          targetOrgId = activeJob.organizationId;
+        } else {
+          const [anyJob] = await db.select().from(jobs).limit(1);
+          if (anyJob) {
+            targetJobId = anyJob.id;
+            targetOrgId = anyJob.organizationId;
+          } else {
+            targetJobId = 'job-backend-eng-01';
+            targetOrgId = 'org-ravengard';
+          }
+        }
+      }
+
+      // Find or automatically create a fallback candidate session
+      let [activeSession] = await db.select().from(sessions)
+        .where(eq(sessions.candidateId, candidateRecord.id))
+        .orderBy(desc(sessions.createdAt))
+        .limit(1);
+
+      if (!activeSession) {
+        const sessionId = crypto.randomUUID();
+        const [createdSession] = await db.insert(sessions).values({
+          id: sessionId,
+          candidateId: candidateRecord.id,
+          currentStage: 'resume_upload' as any,
+          status: 'active',
+          locked: false,
+          policyVersion: 'v1.0'
+        }).returning();
+        activeSession = createdSession;
+      }
+
+      // Ensure application link exists
+      if (targetJobId) {
+        try {
+          const [existingApp] = await db.select().from(applications).where(
+            and(eq(applications.candidateId, candidateRecord.id), eq(applications.jobId, targetJobId))
+          ).limit(1);
+
+          if (!existingApp) {
+            await db.insert(applications).values({
+              id: crypto.randomUUID(),
+              jobId: targetJobId,
+              candidateId: candidateRecord.id,
+              organizationId: targetOrgId,
+              status: 'assessment_pending',
+              sessionId: activeSession.id
+            }).onConflictDoNothing();
+          } else if (!existingApp.sessionId) {
+            await db.update(applications).set({
+              sessionId: activeSession.id
+            }).where(eq(applications.id, existingApp.id));
+          }
+        } catch (appErr) {
+          console.warn("Application link notice:", appErr);
+        }
+      }
+
+      // If raw resume text was attached during registration (from the drop zone)
+      const resumeText = (req.body as any).resumeText || (req.body as any).rawResumeText;
+      if (resumeText && typeof resumeText === 'string' && resumeText.trim().length > 20) {
+        try {
+          const existingAnalysis = await db.select().from(resumeAnalyses).where(eq(resumeAnalyses.sessionId, activeSession.id));
+          if (existingAnalysis.length > 0) {
+            await db.update(resumeAnalyses)
+              .set({ rawResumeText: resumeText })
+              .where(eq(resumeAnalyses.sessionId, activeSession.id));
+          } else {
+            await db.insert(resumeAnalyses).values({
+              id: crypto.randomUUID(),
+              sessionId: activeSession.id,
+              rawResumeText: resumeText
+            });
+          }
+        } catch (rErr) {
+          console.warn("Resume text save notice:", rErr);
+        }
+      }
+
+      return res.json({
+        success: true,
+        candidateId: candidateRecord.id,
+        sessionId: activeSession.id,
+        session: activeSession,
+        registrationStatus: 'validated',
+        welcomeMessage: 'Welcome to RavenGard Assessment Portal!'
+      });
     } catch (error: any) {
-      console.error(error);
-      res.status(500).json({ success: false, errors: [error.message || "Registration failed due to a server error."] });
+      console.error("Registration error:", error);
+      return res.status(500).json({
+        success: false,
+        errors: [error.message || "Registration failed due to a server error."]
+      });
     }
-  });
+  };
+
+  app.post("/api/register", requireAuth, handleCandidateRegistration);
+  app.post("/api/candidate/register", requireAuth, handleCandidateRegistration);
 
   app.get("/api/welcome-message", requireAuth, async (req: AuthRequest, res) => {
     try {

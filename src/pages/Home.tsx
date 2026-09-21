@@ -3,7 +3,8 @@ import { HeroSection } from '../components/home/HeroSection';
 import { SecretRevealStrip } from '../components/home/SecretRevealStrip';
 import { ParallaxStorySection } from '../components/home/ParallaxStorySection';
 import { ProjectTeaserGrid } from '../components/home/ProjectTeaserGrid';
-import { PricingSection } from '../components/home/PricingSection';
+import { TestimonialsSlider } from '../components/home/TestimonialsSlider';
+import { FAQs } from '../components/common/FAQs';
 import { FinalCtaSection } from '../components/home/FinalCtaSection';
 
 export default function Home() {
@@ -13,7 +14,8 @@ export default function Home() {
       <SecretRevealStrip />
       <ParallaxStorySection />
       <ProjectTeaserGrid />
-      <PricingSection />
+      <TestimonialsSlider />
+      <FAQs />
       <FinalCtaSection />
     </div>
   );

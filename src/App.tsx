@@ -7,6 +7,7 @@ import RootLayout from './components/layout/RootLayout.tsx';
 import { LenisProvider } from './components/layout/LenisProvider.tsx';
 import { SmoothLoader } from './components/layout/SmoothLoader.tsx';
 import { HelmetProvider } from 'react-helmet-async';
+import { AppMeta } from './components/layout/AppMeta.tsx';
 
 const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
@@ -43,6 +44,7 @@ export default function App() {
           <ThemeProvider>
             <LenisProvider>
               <BrowserRouter>
+                <AppMeta />
                 <Suspense fallback={<SmoothLoader />}>
                   <Routes>
                     <Route element={<RootLayout />}>

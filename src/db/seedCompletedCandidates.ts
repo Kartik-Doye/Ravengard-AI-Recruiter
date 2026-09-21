@@ -6,7 +6,10 @@ import {
   interviewSessions,
   interviewQuestions,
   interviewResponses,
-  adminUsers
+  adminUsers,
+  organizations,
+  jobs,
+  applications
 } from "./schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -33,9 +36,75 @@ export async function seedCompletedCandidatesAndAdmin() {
       console.log('Seeded root admin: admin@ravengard.com / admin123');
     }
 
-    // 2. Check if completed candidates exist
+    // 2. Ensure Default Organization exists
+    const [existingOrg] = await db.select().from(organizations).where(eq(organizations.id, 'org-ravengard-default')).limit(1);
+    if (!existingOrg) {
+      await db.insert(organizations).values({
+        id: 'org-ravengard-default',
+        name: 'Ravengard Systems Inc.'
+      });
+    }
+
+    // 3. Ensure Default Jobs exist
+    const defaultJobsList = [
+      {
+        id: 'job-dist-sys-01',
+        organizationId: 'org-ravengard-default',
+        title: 'Senior Distributed Systems Engineer',
+        department: 'Infrastructure & Platform',
+        description: 'Design and implement fault-tolerant consensus mechanisms, low-latency replication engines, and highly available microservices.',
+        requirementsJson: ['Distributed consensus (Raft/Paxos)', 'High-throughput stream processing', 'Fault-tolerant state machines'],
+        screeningThreshold: 75,
+        status: 'active'
+      },
+      {
+        id: 'job-staff-backend-02',
+        organizationId: 'org-ravengard-default',
+        title: 'Staff Backend Architect',
+        department: 'Core Services',
+        description: 'Own technical architecture for enterprise APIs, resilient database sharding, and real-time candidate processing pipelines.',
+        requirementsJson: ['PostgreSQL & distributed data stores', 'Enterprise security & IAM', 'High concurrency async processing'],
+        screeningThreshold: 70,
+        status: 'active'
+      },
+      {
+        id: 'job-fullstack-sys-03',
+        organizationId: 'org-ravengard-default',
+        title: 'Full Stack Systems Engineer',
+        department: 'Product Engineering',
+        description: 'Develop performant client-side state engines and streaming evaluation interfaces for real-time candidate experiences.',
+        requirementsJson: ['React & Vite architecture', 'Server-Sent Events / streaming pipelines', 'Accessible UI systems'],
+        screeningThreshold: 65,
+        status: 'active'
+      }
+    ];
+
+    for (const j of defaultJobsList) {
+      const [existingJob] = await db.select().from(jobs).where(eq(jobs.id, j.id)).limit(1);
+      if (!existingJob) {
+        await db.insert(jobs).values(j);
+      }
+    }
+
+    // 4. Check if completed candidates exist
     const existingCandidates = await db.select().from(candidates).limit(3);
     if (existingCandidates.length >= 3) {
+      // Ensure application links exist for existing candidates
+      const allExisting = await db.select().from(candidates);
+      for (let i = 0; i < allExisting.length; i++) {
+        const cand = allExisting[i];
+        const assignedJobId = defaultJobsList[i % defaultJobsList.length].id;
+        const [existingApp] = await db.select().from(applications).where(eq(applications.candidateId, cand.id)).limit(1);
+        if (!existingApp) {
+          await db.insert(applications).values({
+            id: crypto.randomUUID(),
+            jobId: assignedJobId,
+            candidateId: cand.id,
+            organizationId: 'org-ravengard-default',
+            status: 'assessment_completed'
+          });
+        }
+      }
       return;
     }
 

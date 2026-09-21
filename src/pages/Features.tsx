@@ -15,7 +15,7 @@ export default function Features() {
         <p className="text-xs uppercase tracking-[0.3em] text-white/50 mb-4">The Platform</p>
         <h1 className="text-5xl md:text-7xl font-semibold tracking-tight mb-8">System Architecture.</h1>
         <p className="text-lg text-white/70">
-          Ravengard is built on a foundation of uncompromised integrity, real-time behavioral analysis, and dynamic conversational AI.
+          Ravengard is built on a foundation of uncompromised integrity, collaborative insights, and dynamic conversational AI.
         </p>
       </motion.div>
       
@@ -73,11 +73,11 @@ export default function Features() {
             <Activity className="w-24 h-24 text-white/20 mb-8" />
             <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
               <div className="p-4 border border-white/5 rounded-xl bg-white/5 text-center">
-                <div className="text-2xl font-display text-white">0</div>
-                <div className="text-xs text-white/40 uppercase mt-1">Blur Events</div>
+                <div className="text-2xl font-display text-white">100%</div>
+                <div className="text-xs text-white/40 uppercase mt-1">Rubric Alignment</div>
               </div>
               <div className="p-4 border border-white/5 rounded-xl bg-white/5 text-center">
-                <div className="text-2xl font-display text-green-400">Secure</div>
+                <div className="text-2xl font-display text-green-400">Verified</div>
                 <div className="text-xs text-white/40 uppercase mt-1">Status</div>
               </div>
             </div>
