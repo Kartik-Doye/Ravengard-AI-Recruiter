@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { DownloadSummaryButton } from '../../components/admin/DownloadSummaryButton';
 
 export const ReportsPage = () => {
   const [reports, setReports] = useState<any[]>([]);
@@ -88,9 +89,14 @@ export const ReportsPage = () => {
                   <td className="p-4 text-[var(--color-text-secondary)]">
                     {new Date(report.generatedAt || Date.now()).toLocaleDateString()}
                   </td>
-                  <td className="p-4">
-                    <a href={`/admin/sessions/${report.sessionId}`} className="text-blue-500 hover:underline">
-                      View Full Report
+                  <td className="p-4 flex items-center gap-3">
+                    <DownloadSummaryButton
+                      sessionId={report.sessionId}
+                      candidateName={report.candidateName}
+                      variant="compact"
+                    />
+                    <a href={`/admin/sessions/${report.sessionId}`} className="text-xs font-mono uppercase text-blue-400 hover:text-blue-300 hover:underline">
+                      View Audit
                     </a>
                   </td>
                 </motion.tr>

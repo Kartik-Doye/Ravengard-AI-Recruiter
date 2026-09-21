@@ -48,7 +48,7 @@ export function AboutIntroSection() {
           </h1>
           
           <p className="text-xl text-white/60 leading-relaxed max-w-2xl mx-auto backdrop-blur-sm p-4 rounded-2xl">
-            Ravengard was built to remove the noise from technical interviews. By combining rigorous, state-machine driven evaluation with non-intrusive anti-cheat telemetry, we ensure fairness, speed, and depth in every assessment.
+            Ravengard was built to remove the noise from technical interviews. By combining rigorous, state-machine driven evaluation with ethical AI governance, we ensure fairness, speed, and depth in every assessment.
           </p>
         </motion.div>
       </div>

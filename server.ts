@@ -20,6 +20,11 @@ import fs from "fs/promises";
 import { registrationSchema, reportSchema } from "./src/lib/validation";
 import adminRoutes from "./src/routes/admin";
 import candidateRoutes from "./src/routes/candidate";
+import { hrRouter } from "./src/routes/hr";
+import { candidatePortalRouter } from "./src/routes/candidatePortal";
+import { publicJobsRouter } from "./src/routes/publicJobs";
+import { preScreeningService } from "./src/services/preScreeningService";
+import { emailService } from "./src/services/emailService";
 import { seedCompletedCandidatesAndAdmin } from "./src/db/seedCompletedCandidates";
 import { evaluateAndScoreSession } from "./src/services/scoringService";
 import { validateCandidateEmail } from "./src/services/candidateService";
@@ -198,6 +203,10 @@ app.post("/api/admin/login", async (req, res) => {
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/candidate", candidateRoutes);
+app.use("/api/hr", hrRouter);
+app.use("/api/candidate/portal", candidatePortalRouter);
+app.get("/api/candidate/verify", (req, res, next) => (candidatePortalRouter as any).handle(req, res, next));
+app.use("/api/jobs", publicJobsRouter);
 
   const PORT = 3000;
 
@@ -878,6 +887,34 @@ B.S. in Computer Science — University of California, Berkeley (2019)`;
   setInterval(() => {
      console.log(`Cron: Checking cumulative LLM API spend against threshold...`);
   }, 24 * 60 * 60 * 1000); 
+
+  // --- Asynchronous Background Workers for Screening Queue & Transactional Email Outbox ---
+  let isScreeningRunning = false;
+  setInterval(async () => {
+    if (isScreeningRunning) return;
+    isScreeningRunning = true;
+    try {
+      const appUrl = (process.env.APP_URL || `http://localhost:${PORT}`).trim();
+      await preScreeningService.processQueueBatch(appUrl, 3);
+    } catch (e: any) {
+      console.error("Screening queue background worker error:", e.message);
+    } finally {
+      isScreeningRunning = false;
+    }
+  }, 4000);
+
+  let isOutboxRunning = false;
+  setInterval(async () => {
+    if (isOutboxRunning) return;
+    isOutboxRunning = true;
+    try {
+      await emailService.processOutboxBatch(5);
+    } catch (e: any) {
+      console.error("Email outbox background worker error:", e.message);
+    } finally {
+      isOutboxRunning = false;
+    }
+  }, 4000); 
 
   
   // Global error handler

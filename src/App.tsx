@@ -17,6 +17,8 @@ const Gateway = lazy(() => import('./pages/Gateway'));
 const AssessmentGuide = lazy(() => import('./pages/AssessmentGuide'));
 const InterviewGateway = lazy(() => import('./pages/InterviewGateway'));
 const AdminGateway = lazy(() => import('./pages/admin/AdminGateway'));
+const Careers = lazy(() => import('./pages/Careers'));
+const CandidatePortal = lazy(() => import('./pages/CandidatePortal'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 
@@ -51,6 +53,10 @@ export default function App() {
                       <Route path="/contact" element={<Contact />} />
                       <Route path="/gateway" element={<Gateway />} />
                       <Route path="/demo" element={<Gateway />} />
+                      <Route path="/careers" element={<Careers />} />
+                      <Route path="/jobs" element={<Careers />} />
+                      <Route path="/portal" element={<CandidatePortal />} />
+                      <Route path="/candidate/portal" element={<CandidatePortal />} />
                       <Route path="/assessment-guide" element={<AssessmentGuide />} />
                       {/* Interview Gateway renders without standard layout wrappers based on location in RootLayout */}
                       

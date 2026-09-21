@@ -14,6 +14,8 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
+import { CandidatePerformanceCharts } from '../../components/admin/CandidatePerformanceCharts';
+import { DownloadSummaryButton } from '../../components/admin/DownloadSummaryButton';
 
 interface CompletedSession {
   id: string;
@@ -35,6 +37,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [recommendationFilter, setRecommendationFilter] = useState<'ALL' | 'Proceed' | 'Review' | 'Reject'>('ALL');
+  const [showCharts, setShowCharts] = useState(true);
   const navigate = useNavigate();
 
   const fetchCompletedSessions = async () => {
@@ -123,6 +126,18 @@ export default function Dashboard() {
 
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setShowCharts(!showCharts)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs border transition-colors cursor-pointer ${
+              showCharts
+                ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                : 'bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border-white/10'
+            }`}
+            title="Toggle candidate performance charts"
+          >
+            <span>{showCharts ? 'Hide Analytics' : 'Show Performance Analytics'}</span>
+          </button>
+
+          <button
             onClick={fetchCompletedSessions}
             disabled={loading}
             className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-xs border border-white/10 transition-colors cursor-pointer"
@@ -133,6 +148,11 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {/* Candidate Performance Metrics Visualizations (Recharts) */}
+      {showCharts && (
+        <CandidatePerformanceCharts sessions={sessions} />
+      )}
 
       {/* Metric Tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -327,10 +347,20 @@ export default function Dashboard() {
 
                       {/* Column 5: Action Link */}
                       <td className="py-4 px-4 text-right whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 text-xs text-[var(--color-secondary)] hover:text-white font-mono uppercase tracking-wider group-hover:underline">
-                          <span>View Scorecard</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </span>
+                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                          <DownloadSummaryButton
+                            sessionId={s.id}
+                            candidateName={s.candidateName || 'Candidate'}
+                            variant="compact"
+                          />
+                          <span
+                            onClick={() => navigate(`/admin/sessions/${s.id}`)}
+                            className="inline-flex items-center gap-1.5 text-xs text-[var(--color-secondary)] hover:text-white font-mono uppercase tracking-wider hover:underline cursor-pointer"
+                          >
+                            <span>Scorecard</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </span>
+                        </div>
                       </td>
                     </tr>
                   );

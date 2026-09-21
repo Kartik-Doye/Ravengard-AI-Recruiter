@@ -7,6 +7,7 @@ import { CandidatesPage } from './CandidatesPage';
 import { CandidateDetail } from './CandidateDetail';
 import { ReportsPage } from './ReportsPage';
 import { FlagQueue } from './FlagQueue';
+import { AtsPipeline } from './AtsPipeline';
 import { ShieldCheck, LogOut, ArrowLeft } from 'lucide-react';
 
 export default function AdminGateway() {
@@ -74,6 +75,7 @@ export default function AdminGateway() {
 
   const navLinks = [
     { label: 'Candidate Ledger', path: '/admin' },
+    { label: 'ATS & HR Funnel', path: '/admin/ats' },
     { label: 'All Candidates', path: '/admin/candidates' },
     { label: 'Scorecards & Reports', path: '/admin/reports' },
     { label: 'Flagged Review Queue', path: '/admin/flags' },
@@ -149,6 +151,7 @@ export default function AdminGateway() {
       <main className="p-6 max-w-7xl mx-auto">
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/ats" element={<AtsPipeline />} />
           <Route path="/candidates" element={<CandidatesPage />} />
           <Route path="/candidates/:id" element={<CandidateDetail />} />
           <Route path="/reports" element={<ReportsPage />} />

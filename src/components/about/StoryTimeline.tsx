@@ -16,7 +16,7 @@ export function StoryTimeline() {
     {
       year: "The Execution",
       label: "Ravengard AI",
-      description: "A platform with zero-tolerance anti-cheat, dynamic LLM drill-downs, and structured output formatting for transparent scoring."
+      description: "A platform with zero biometric surveillance, dynamic LLM drill-downs, and structured rubric scoring for transparent evaluation."
     }
   ];
 

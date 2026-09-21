@@ -14,8 +14,8 @@ const categories = [
 
 const projects: ProjectItem[] = [
   {
-    title: "AI Interview Engine",
-    summary: "State-driven interview flow with locked session integrity and zero-tolerance tracking.",
+    title: "Collaborative Work Samples",
+    summary: "Interactive, real-world engineering scenarios that evaluate candidate architectural reasoning in real time.",
     slug: "ravengard",
     year: "2026",
     category: "Product",
@@ -24,18 +24,18 @@ const projects: ProjectItem[] = [
     accent: "linear-gradient(180deg, rgba(116,129,255,0.18), rgba(6,8,20,0.78))",
   },
   {
-    title: "Behavioral Analytics",
-    summary: "Real-time risk scoring, gaze tracking, and integrity signals running silently.",
+    title: "Enterprise AI Governance",
+    summary: "Zero-biometric candidate privacy, EEOC compliance auditing, and auditable rubrics.",
     slug: "analytics",
     year: "2026",
     category: "UI",
-    tags: ["ui", "analytics"],
+    tags: ["ui", "compliance"],
     image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2564&auto=format&fit=crop",
     accent: "linear-gradient(180deg, rgba(255,100,100,0.16), rgba(6,8,20,0.78))",
   },
   {
-    title: "Automated Reporting",
-    summary: "Zero-shot JSON extractions processing multi-axis scorecards and insights.",
+    title: "1-Minute Executive Summaries",
+    summary: "Deterministic rubric extraction processing multi-axis scorecards and hiring evidence.",
     slug: "reporting",
     year: "2026",
     category: "Experience",

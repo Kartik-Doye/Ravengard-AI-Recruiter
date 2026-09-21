@@ -17,6 +17,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
+import { DownloadSummaryButton } from '../../components/admin/DownloadSummaryButton';
 
 export default function SessionDetail() {
   const { id } = useParams<{ id: string }>();
@@ -133,8 +134,20 @@ export default function SessionDetail() {
           </div>
         </div>
 
-        {/* Overall Recommendation Pill */}
-        <div className="flex items-center gap-3">
+        {/* Overall Recommendation Pill & Actions */}
+        <div className="flex flex-wrap items-center gap-3">
+          <DownloadSummaryButton
+            sessionId={session.id}
+            candidateName={candidate?.name}
+            variant="primary"
+            preloadedData={{
+              candidate: candidate || { id: session.candidateId, name: 'Candidate', email: '' },
+              session: session,
+              report: report,
+              transcript: transcript,
+            }}
+          />
+
           {recommendation === 'Proceed' ? (
             <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/5">
               <CheckCircle2 className="w-5 h-5" />
@@ -236,7 +249,7 @@ export default function SessionDetail() {
             </span>
           </div>
           <p className="text-[11px] text-white/50 pt-1 border-t border-white/5">
-            Monitored window focus, gaze alignment, and network latency events.
+            Monitored window focus, session continuity, and network latency events.
           </p>
         </Card>
       </div>

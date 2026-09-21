@@ -43,9 +43,9 @@ export default function RootLayout() {
     <>
       <Helmet>
         <title>{getPageTitle(location.pathname)}</title>
-        <meta name="description" content="Premium AI Interview Engine with state-machine flow and anti-cheat logic." />
+        <meta name="description" content="Enterprise AI Interview Platform with deterministic rubric scoring and ethical AI governance." />
         <meta property="og:title" content={getPageTitle(location.pathname)} />
-        <meta property="og:description" content="Premium AI Interview Engine with state-machine flow and anti-cheat logic." />
+        <meta property="og:description" content="Enterprise AI Interview Platform with deterministic rubric scoring and ethical AI governance." />
         <meta property="og:type" content="website" />
       </Helmet>
       <NetworkStatusBanner />

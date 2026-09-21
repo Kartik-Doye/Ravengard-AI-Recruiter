@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, jsonb, pgEnum, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, jsonb, pgEnum, uniqueIndex, index, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const stageEnum = pgEnum('session_stage', [
@@ -104,7 +104,7 @@ export const integritySignals = pgTable('integrity_signals', {
   id: text('id').primaryKey(),
   sessionId: text('session_id').references(() => sessions.id),
   interviewSessionId: text('interview_session_id').references(() => interviewSessions.id),
-  signalType: text('signal_type'), // 'tab_blur', 'gaze_off', 'copy_paste', etc.
+  signalType: text('signal_type'), // 'tab_blur', 'window_switch', 'copy_paste', etc.
   timestamp: timestamp('timestamp').defaultNow(),
   metadata: text('metadata'),
 });
@@ -165,7 +165,8 @@ export const adminUsers = pgTable('admin_users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
   name: text('name').notNull(),
-  role: text('role').notNull().default('viewer'),
+  role: text('role').notNull().default('viewer'), // 'super_admin' | 'admin' | 'hr_admin' | 'hr_user' | 'recruiter' | 'reviewer' | 'viewer'
+  organizationId: text('organization_id').references(() => organizations.id),
   passwordHash: text('password_hash'),
   createdAt: timestamp('created_at').defaultNow()
 });
@@ -173,8 +174,95 @@ export const adminUsers = pgTable('admin_users', {
 export const adminLogs = pgTable('admin_logs', {
   id: text('id').primaryKey(),
   adminId: text('admin_id').references(() => adminUsers.id),
+  organizationId: text('organization_id').references(() => organizations.id),
   action: text('action').notNull(),
   target: text('target'),
   timestamp: timestamp('timestamp').defaultNow(),
   metadata: jsonb('metadata')
 });
+
+export const jobs = pgTable('jobs', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organizations.id),
+  title: text('title').notNull(),
+  department: text('department'),
+  description: text('description').notNull(),
+  requirementsJson: jsonb('requirements_json'), // target competencies, target skills, rubric criteria
+  screeningThreshold: integer('screening_threshold').notNull().default(70),
+  requireHumanRejectionApproval: boolean('require_human_rejection_approval').notNull().default(true),
+  status: text('status').notNull().default('active'), // 'active' | 'closed' | 'draft'
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  uniqueIndex('jobs_id_org_unique_idx').on(table.id, table.organizationId),
+  index('jobs_org_created_idx').on(table.organizationId, table.createdAt)
+]);
+
+export const applications = pgTable('applications', {
+  id: text('id').primaryKey(),
+  jobId: text('job_id').notNull().references(() => jobs.id),
+  candidateId: text('candidate_id').notNull().references(() => candidates.id),
+  organizationId: text('organization_id').notNull().references(() => organizations.id),
+  status: text('status').notNull().default('applied'),
+  // Possible values:
+  // 'applied' | 'shortlisted' | 'rejected_at_screening' | 'pending_rejection_review' |
+  // 'assessment_pending' | 'assessment_in_progress' | 'assessment_completed' |
+  // 'recommended' | 'not_recommended' | 'screening_failed_manual_review'
+  sessionId: text('session_id').references(() => sessions.id),
+  magicTokenHash: text('magic_token_hash'),
+  magicTokenExpiresAt: timestamp('magic_token_expires_at'),
+  magicTokenUsedAt: timestamp('magic_token_used_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  uniqueIndex('applications_candidate_job_unique_idx').on(table.candidateId, table.jobId),
+  index('applications_org_status_idx').on(table.organizationId, table.status),
+  index('applications_magic_token_hash_idx').on(table.magicTokenHash)
+]);
+
+export const aiScreeningResults = pgTable('ai_screening_results', {
+  id: text('id').primaryKey(),
+  applicationId: text('application_id').notNull().references(() => applications.id),
+  matchScore: integer('match_score').notNull(),
+  strengthsSummary: jsonb('strengths_summary'), // string[]
+  gapsSummary: jsonb('gaps_summary'), // string[]
+  fullRationaleJson: jsonb('full_rationale_json'),
+  screeningVersion: text('screening_version').default('v1.0').notNull(),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => [
+  uniqueIndex('ai_screening_app_version_idx').on(table.applicationId, table.screeningVersion)
+]);
+
+export const screeningQueue = pgTable('screening_queue', {
+  id: text('id').primaryKey(),
+  applicationId: text('application_id').notNull().references(() => applications.id),
+  organizationId: text('organization_id').notNull(),
+  status: text('status').notNull().default('pending'), // 'pending' | 'processing' | 'completed' | 'failed' | 'screening_failed_manual_review'
+  attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error'),
+  lockedAt: timestamp('locked_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+}, (table) => [
+  index('screening_queue_status_idx').on(table.status)
+]);
+
+export const emailOutbox = pgTable('email_outbox', {
+  id: text('id').primaryKey(),
+  recipientEmail: text('recipient_email').notNull(),
+  recipientName: text('recipient_name'),
+  templateType: text('template_type').notNull(), // 'shortlist_invitation' | 'assessment_completed' | 'non_selection_rejection'
+  subject: text('subject').notNull(),
+  bodyText: text('body_text').notNull(),
+  bodyHtml: text('body_html'),
+  applicationId: text('application_id').references(() => applications.id),
+  organizationId: text('organization_id'),
+  idempotencyKey: text('idempotency_key').unique(),
+  status: text('status').notNull().default('pending'), // 'pending' | 'processing' | 'sent' | 'failed' | 'logged_dev'
+  attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error'),
+  sentAt: timestamp('sent_at'),
+  createdAt: timestamp('created_at').defaultNow()
+}, (table) => [
+  index('email_outbox_status_idx').on(table.status)
+]);

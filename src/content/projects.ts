@@ -2,7 +2,7 @@ export const projects = [
   {
     title: "Ravengard Engine",
     slug: "ravengard",
-    summary: "Premium interview engine with state-machine flow and anti-cheat logic.",
+    summary: "Enterprise interview engine with deterministic rubrics and ethical AI governance.",
     category: "Product",
     year: "2026",
     role: "Frontend + Systems",

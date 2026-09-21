@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { DownloadSummaryButton } from '../../components/admin/DownloadSummaryButton';
 
 export const CandidateDetail = () => {
   const [data, setData] = useState<any>(null);
@@ -104,7 +105,12 @@ export const CandidateDetail = () => {
                   )}
                 </div>
               </div>
-              <div>
+              <div className="flex items-center gap-2">
+                <DownloadSummaryButton
+                  sessionId={session.id}
+                  candidateName={data?.candidate?.name}
+                  variant="secondary"
+                />
                 <a href={`/admin/sessions/${session.id}`} className="px-4 py-2 bg-[var(--color-bg-2)] hover:bg-[var(--color-bg-3)] rounded-lg text-sm text-[var(--color-text-primary)] transition-colors border border-[var(--color-border)]">
                   View Session
                 </a>

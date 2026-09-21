@@ -75,6 +75,7 @@ export const signAdminToken = (payload: {
   id: string;
   email: string;
   role: string;
+  organizationId?: string | null;
 }): string => {
   return jwt.sign({ ...payload, isAdmin: true }, JWT_SECRET, { expiresIn: "8h" });
 };
