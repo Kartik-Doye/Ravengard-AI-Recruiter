@@ -43,6 +43,7 @@ export const candidates = pgTable('candidates', {
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
   candidateId: text('candidate_id').references(() => candidates.id),
+  organizationId: text('organization_id').references(() => organizations.id), // Added for strict isolation
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
   currentStage: stageEnum('current_stage').default('resume_upload'),

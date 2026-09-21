@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import { extractTextFromFile, analyzeResume, extractCandidateFieldsFromResume } from "./src/services/resume-processor";
@@ -33,6 +34,10 @@ import { validateCandidateEmail } from "./src/services/candidateService";
 import { getNetworkReadiness } from "./src/services/deviceCheckService";
 import { checkIpReputation } from "./src/services/adminLogService";
 import { sanitizeCandidateRegistrationInput } from "./src/services/sanitizer";
+import { healthCheckRouter } from "./src/healthCheck";
+import { requestLogger } from "./src/middleware/requestLogger";
+import { errorHandler } from "./src/middleware/errorHandler";
+import { logger } from "./src/utils/logger";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -106,11 +111,14 @@ async function transitionSessionStage(sessionId: string, currentStage: string, t
 // --- Main Server ---
 
 async function startServer() {
+  const PORT = parseInt(process.env.PORT || "3000", 10);
   const app = express();
   app.set("trust proxy", 1);
   app.use(correlationIdMiddleware);
+  app.use(requestLogger);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use(healthCheckRouter);
 
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -136,42 +144,6 @@ app.post("/api/admin/login", async (req, res) => {
 
   if (!identifier || !password) {
     return res.status(400).json({ success: false, error: "Username/email and password are required." });
-  }
-
-  // Hardcoded master credential check as required by Phase 7 specification
-  const isMasterUser = identifier === "admin" || identifier === "admin@ravengard.com" || identifier === "admin@ravengard.ai";
-  const isMasterPass = password === "admin123" || password === "admin" || password === "Admin2026!" || password === "password";
-
-  if (isMasterUser && isMasterPass) {
-    let [adminRecord] = await db.select().from(adminUsers).where(eq(adminUsers.email, "admin@ravengard.com")).limit(1);
-    if (!adminRecord) {
-      const hashed = await bcrypt.hash("admin123", 10);
-      const [newAdmin] = await db.insert(adminUsers).values({
-        id: "admin-root",
-        email: "admin@ravengard.com",
-        name: "Ravengard Lead Auditor",
-        role: "admin",
-        passwordHash: hashed
-      }).returning();
-      adminRecord = newAdmin;
-    }
-
-    const token = signAdminToken({
-      id: adminRecord.id,
-      email: adminRecord.email,
-      role: adminRecord.role,
-    });
-
-    return res.json({
-      success: true,
-      token,
-      admin: {
-        id: adminRecord.id,
-        email: adminRecord.email,
-        name: adminRecord.name,
-        role: adminRecord.role
-      }
-    });
   }
 
   // Look up admin by email in database
@@ -258,45 +230,7 @@ app.use("/api/jobs", publicJobsRouter);
     }
   });
 
-  const PORT = 3000;
 
-  app.use(express.json());
-
-  app.post("/api/auth/candidate-mock-login", async (req, res) => {
-    try {
-      // In a real app, this would be a Google/Firebase OAuth callback.
-      // For now, we simulate a candidate logging in.
-      const { email = "candidate@example.com", name = "Test Candidate" } = req.body || {};
-      
-      let [user] = await db.select().from(candidates).where(eq(candidates.email, email)).limit(1);
-      
-      let candidateId;
-      if (!user) {
-        candidateId = crypto.randomUUID();
-        // Just reserve the email. Registration form fills the rest.
-        await db.insert(candidates).values({
-          id: candidateId,
-          email: email,
-          name: name,
-        });
-      } else {
-        candidateId = user.id;
-      }
-      
-      const { signCandidateToken } = await import("./src/middleware/auth");
-      const token = signCandidateToken({
-        id: candidateId,
-        email: email,
-        name: name,
-        email_verified: true
-      });
-      
-      res.json({ success: true, token, candidateId });
-    } catch (e: any) {
-      console.error(e);
-      res.status(500).json({ success: false, error: "Mock login failed" });
-    }
-  });
 
   // API Routes
   app.get("/api/me", requireAuth, async (req: AuthRequest, res) => {
@@ -709,67 +643,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
     }
   });
 
-  const SAMPLE_ENGINEERING_RESUME = `ALEX RIVERA
-Senior Full-Stack Software Engineer | San Francisco, CA | alex.rivera@example.com
 
-PROFESSIONAL SUMMARY
-Senior Full-Stack Engineer with 6+ years of experience architecting resilient distributed systems, event-driven microservices, and reactive web applications. Specialized in TypeScript, React, Node.js, PostgreSQL, and Google Cloud Run. Proven track record of reducing p99 latency by 45% and scaling systems to 10M+ daily transactions.
-
-CORE COMPETENCIES & TECH STACK
-- Languages: TypeScript, JavaScript, Go, SQL, Python
-- Frontend: React 18, Vite, Next.js, Tailwind CSS, WebSockets, Server-Sent Events (SSE)
-- Backend & Systems: Node.js, Express, PostgreSQL, Drizzle ORM, Redis, Distributed Locking
-- Cloud & DevOps: Google Cloud Platform (Cloud Run, Cloud SQL), Docker, CI/CD GitHub Actions
-- Architecture: Microservices, Event-Driven Architecture, High-Availability Fault Tolerance
-
-PROFESSIONAL EXPERIENCE
-Senior Backend Engineer | CloudScale Systems (2022 - Present)
-- Designed and deployed multi-tenant ingestion pipeline processing 10M+ daily transactions with Node.js and PostgreSQL.
-- Architected zero-downtime database migration strategy and optimized multi-table join indexes, slashing p99 latency from 850ms to 92ms.
-- Built automated health monitoring and rate-limiting middleware mitigating DDoS anomalies.
-
-Full Stack Engineer | DataForge (2019 - 2022)
-- Built real-time operational analytics dashboard utilizing React, Tailwind CSS, and Server-Sent Events for streaming metrics.
-- Enforced strict role-based access control (RBAC) and OAuth 2.0 token security across enterprise clients.
-- Led the migration from monolithic REST backend to modular microservices with 99.98% uptime.
-
-EDUCATION
-B.S. in Computer Science — University of California, Berkeley (2019)`;
-
-  app.post("/api/session/:id/demo-resume", requireAuth, async (req: AuthRequest, res) => {
-    try {
-      const ownership = await verifySessionOwnership(req, req.params.id, res);
-      if (!ownership) return;
-      const { session } = ownership;
-
-      const existingAnalysis = await db.select().from(resumeAnalyses).where(eq(resumeAnalyses.sessionId, session.id));
-      if (existingAnalysis.length > 0) {
-        await db.update(resumeAnalyses)
-          .set({ rawResumeText: SAMPLE_ENGINEERING_RESUME })
-          .where(eq(resumeAnalyses.sessionId, session.id));
-      } else {
-        await db.insert(resumeAnalyses).values({
-          id: crypto.randomUUID(),
-          sessionId: session.id,
-          rawResumeText: SAMPLE_ENGINEERING_RESUME
-        });
-      }
-
-      let updatedSession = session;
-      if (session.currentStage === 'resume_upload' || (session.currentStage as any) === 'resume') {
-        updatedSession = await transitionSessionStage(session.id, 'resume_upload', 'resume_analysis');
-      }
-
-      res.json({
-        success: true,
-        session: updatedSession,
-        resumeReference: SAMPLE_ENGINEERING_RESUME
-      });
-    } catch (e: any) {
-      console.error("Demo resume seed error:", e);
-      res.status(500).json({ error: e.message || "Failed to seed demo resume" });
-    }
-  });
 
   app.post("/api/session/:id/upload-resume", requireAuth, upload.single('resume'), async (req: AuthRequest, res) => {
     try {
@@ -777,7 +651,7 @@ B.S. in Computer Science — University of California, Berkeley (2019)`;
       if (!ownership) return;
       const { session } = ownership;
 
-      let extractedText = SAMPLE_ENGINEERING_RESUME;
+      let extractedText = "";
       if (req.file) {
         try {
           const ext = req.file.originalname.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf';
@@ -832,7 +706,7 @@ B.S. in Computer Science — University of California, Berkeley (2019)`;
           "Mobile native development experience is not explicitly detailed"
         ],
         missingKeywords: ["Kubernetes", "gRPC", "Terraform", "Kafka", "Grafana"],
-        rawResumeText: record?.rawResumeText || SAMPLE_ENGINEERING_RESUME
+        rawResumeText: record?.rawResumeText || "No resume text found"
       };
 
       res.json({
@@ -1297,8 +1171,15 @@ B.S. in Computer Science — University of California, Berkeley (2019)`;
     console.warn("Seeding completed candidates warning:", seedErr);
   }
 
-  const server = app.listen(PORT, "0.0.0.0", () => {
+  try {
+    const { validateStartupConfiguration } = await import("./src/startupValidator");
+    validateStartupConfiguration();
+  } catch (error) {
+    console.error("Startup validation failed:", error);
+    process.exit(1);
+  }
 
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

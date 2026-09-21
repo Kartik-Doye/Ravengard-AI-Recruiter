@@ -10,7 +10,13 @@ export interface AuthRequest extends Request {
   };
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || "ravengard_dev_jwt_secret_change_in_production";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET === "REPLACE_ME_run_node_console.log(require('crypto').randomBytes(32).toString('hex'))") {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error("FATAL: JWT_SECRET must be set in production environment");
+  }
+}
+const ACTUAL_SECRET = JWT_SECRET || "ravengard_dev_jwt_secret_change_in_production";
 
 export const requireAuth = async (
   req: AuthRequest,
@@ -26,7 +32,7 @@ export const requireAuth = async (
   const token = authHeader.substring(7);
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as {
+    const decoded = jwt.verify(token, ACTUAL_SECRET) as {
       id: string;
       email: string;
       name?: string;
@@ -63,7 +69,7 @@ export const signCandidateToken = (payload: {
   name?: string;
   email_verified?: boolean;
 }): string => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" });
+  return jwt.sign(payload, ACTUAL_SECRET, { expiresIn: "24h" });
 };
 
 /**
@@ -77,5 +83,5 @@ export const signAdminToken = (payload: {
   role: string;
   organizationId?: string | null;
 }): string => {
-  return jwt.sign({ ...payload, isAdmin: true }, JWT_SECRET, { expiresIn: "8h" });
+  return jwt.sign({ ...payload, isAdmin: true }, ACTUAL_SECRET, { expiresIn: "8h" });
 };

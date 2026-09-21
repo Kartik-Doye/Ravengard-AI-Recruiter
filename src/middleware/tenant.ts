@@ -5,7 +5,13 @@ import { adminUsers, organizations, applications } from "../db/schema";
 import { eq, and } from "drizzle-orm";
 import { verifyCandidateMagicJwt, CandidateTokenPayload } from "../services/magicTokenService";
 
-const JWT_SECRET = process.env.JWT_SECRET || "ravengard_dev_jwt_secret_change_in_production";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET === "REPLACE_ME_run_node_console.log(require('crypto').randomBytes(32).toString('hex'))") {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error("FATAL: JWT_SECRET must be set in production environment");
+  }
+}
+const ACTUAL_SECRET = JWT_SECRET || "ravengard_dev_jwt_secret_change_in_production";
 
 export interface HrAuthRequest extends Request {
   user?: {
@@ -40,7 +46,7 @@ export const requireHrAuth = async (
   const token = authHeader.substring(7);
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, ACTUAL_SECRET) as any;
 
     // Check if token belongs to an admin or HR user
     if (!decoded || !decoded.email) {
@@ -53,19 +59,6 @@ export const requireHrAuth = async (
       .from(adminUsers)
       .where(eq(adminUsers.email, decoded.email))
       .limit(1);
-
-    if (!userRecord && decoded.email === "admin@ravengard.com") {
-      // Fallback super admin
-      const overrideOrg = (req.headers["x-organization-id"] as string) || "org-ravengard";
-      req.hr = {
-        id: "admin-root",
-        email: "admin@ravengard.com",
-        name: "Ravengard Lead Auditor",
-        role: "super_admin",
-        organizationId: overrideOrg,
-      };
-      return next();
-    }
 
     if (!userRecord) {
       return res.status(403).json({ error: "Forbidden: Account not registered for HR or Admin access." });
