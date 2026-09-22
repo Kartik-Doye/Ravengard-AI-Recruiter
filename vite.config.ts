@@ -21,11 +21,26 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
     build: {
+      outDir: 'dist',
+      emptyOutDir: false,
+      chunkSizeWarningLimit: 1200,
       rollupOptions: {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              return 'vendor';
+              if (id.includes('recharts') || id.includes('d3-') || id.includes('d3/')) {
+                return 'vendor-charts';
+              }
+              if (id.includes('jspdf') || id.includes('canvg') || id.includes('html2canvas') || id.includes('dompurify')) {
+                return 'vendor-pdf';
+              }
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons';
+              }
+              if (id.includes('unpdf') || id.includes('mammoth') || id.includes('pdfjs')) {
+                return 'vendor-docs';
+              }
+              return 'vendor-core';
             }
           },
         },
