@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { GlobalErrorBoundary } from "./components/layout/GlobalErrorBoundary";
 import { ReducedMotionProvider } from "./components/layout/ReducedMotionProvider";
@@ -8,19 +8,18 @@ import { LenisProvider } from './components/layout/LenisProvider';
 import { SmoothLoader } from './components/layout/SmoothLoader';
 import { HelmetProvider } from 'react-helmet-async';
 import { AppMeta } from './components/layout/AppMeta';
-
-const Home = lazy(() => import('./pages/Home'));
-const About = lazy(() => import('./pages/About'));
-const Features = lazy(() => import('./pages/Features'));
-const Projects = lazy(() => import('./pages/Projects'));
-const Contact = lazy(() => import('./pages/Contact'));
-const Gateway = lazy(() => import('./pages/Gateway'));
-const AssessmentGuide = lazy(() => import('./pages/AssessmentGuide'));
-const InterviewGateway = lazy(() => import('./pages/InterviewGateway'));
-const AdminGateway = lazy(() => import('./pages/admin/AdminGateway'));
-const Careers = lazy(() => import('./pages/Careers'));
-const CandidatePortal = lazy(() => import('./pages/CandidatePortal'));
-const NotFound = lazy(() => import('./pages/NotFound'));
+import Home from './pages/Home';
+import About from './pages/About';
+import Features from './pages/Features';
+import Projects from './pages/Projects';
+import Contact from './pages/Contact';
+import Gateway from './pages/Gateway';
+import AssessmentGuide from './pages/AssessmentGuide';
+import InterviewGateway from './pages/InterviewGateway';
+import AdminGateway from './pages/admin/AdminGateway';
+import Careers from './pages/Careers';
+import CandidatePortal from './pages/CandidatePortal';
+import NotFound from './pages/NotFound';
 
 
 export default function App() {

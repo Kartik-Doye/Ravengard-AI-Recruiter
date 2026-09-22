@@ -118,6 +118,7 @@ async function startServer() {
   app.use(requestLogger);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use("/api", healthCheckRouter);
   app.use(healthCheckRouter);
 
 const globalLimiter = rateLimit({
@@ -1087,7 +1088,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
+    app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

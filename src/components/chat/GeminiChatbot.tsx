@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
+import { DemoLink } from '../ui/DemoLink';
 import {
   MessageSquare,
   Sparkles,
@@ -164,20 +165,20 @@ export function GeminiChatbot() {
 
   return (
     <>
-      {/* Floating Chat Launcher Button */}
+      {/* Floating Chat / Advisor Consultation Launcher Button */}
       <div className="fixed bottom-6 right-6 z-40">
-        <button
-          onClick={() => setIsOpen(true)}
-          className="group relative flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-semibold text-xs tracking-wide shadow-2xl shadow-amber-500/30 transition-all hover:scale-105 active:scale-95 cursor-pointer border border-amber-300/40"
-          aria-label="Open RavenGard AI Advisor"
+        <DemoLink
+          to="/contact"
+          className="group relative inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-zinc-100 shadow-xl transition-all hover:scale-105 active:scale-95 cursor-pointer border border-zinc-200 no-underline"
+          aria-label="Ask the Advisor - Book Consultation"
         >
-          <Sparkles className="w-4 h-4 text-black animate-pulse" />
-          <span className="font-mono uppercase tracking-wider">Ask AI Advisor</span>
+          <Sparkles className="w-4 h-4 text-amber-500" />
+          <span>Ask the Advisor</span>
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-black opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-black"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
           </span>
-        </button>
+        </DemoLink>
       </div>
 
       {/* Main Chat Modal / Drawer */}

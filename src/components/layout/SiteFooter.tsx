@@ -6,14 +6,14 @@ export function SiteFooter() {
     <footer className="border-t border-white/5 bg-[var(--color-bg-0)] px-6 py-8 text-white/50">
       <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-end">
         <div className="flex flex-wrap items-center gap-6 text-sm font-medium">
+          <Link to="/" className="hover:text-white transition-colors">
+            Home
+          </Link>
           <Link to="/about" className="hover:text-white transition-colors">
             About
           </Link>
           <Link to="/features" className="hover:text-white transition-colors">
             Features
-          </Link>
-          <Link to="/#faqs" className="hover:text-white transition-colors">
-            FAQs
           </Link>
           <Link to="/contact" className="hover:text-white transition-colors">
             Contact

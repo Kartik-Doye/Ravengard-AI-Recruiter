@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft } from "lucide-react";
 import { RavengardSymbol } from "../ui/RavengardSymbol";
+import { DemoLink } from "../ui/DemoLink";
 
 type NavLink = {
   label: string;
@@ -10,9 +11,8 @@ type NavLink = {
 };
 
 const links: NavLink[] = [
+  { label: "Home", href: "/" },
   { label: "Product", href: "/features" },
-  { label: "Security", href: "/#security" },
-  { label: "FAQs", href: "/#faqs" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
 ];
@@ -116,12 +116,11 @@ export function SiteHeader() {
             Admin Portal
           </Link>
 
-          <Link
-            to="/contact"
+          <DemoLink
             className="hidden md:inline-flex items-center justify-center rounded-full bg-white px-5 py-2 text-sm font-semibold text-zinc-950 hover:bg-zinc-100 transition-colors ml-2 shadow-sm"
           >
             Book a Demo
-          </Link>
+          </DemoLink>
           
           <button
             type="button"
@@ -197,13 +196,12 @@ export function SiteHeader() {
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
                   Admin Portal
                 </Link>
-                <Link
-                  to="/contact"
+                <DemoLink
                   onClick={() => setMobileOpen(false)}
-                  className="block rounded-2xl bg-white px-5 py-4 text-base font-semibold text-center text-zinc-950"
+                  className="block rounded-2xl bg-white px-5 py-4 text-base font-semibold text-center text-zinc-950 hover:bg-zinc-100 transition-colors"
                 >
                   Book a Demo
-                </Link>
+                </DemoLink>
               </div>
             </motion.nav>
           </motion.div>

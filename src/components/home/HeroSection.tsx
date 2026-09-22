@@ -3,6 +3,7 @@ import { motion, useScroll, useTransform } from 'motion/react';
 import { PaperScrunchOverlay } from '../ui/PaperScrunchOverlay';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, CheckCircle2, Scale, ArrowRight } from 'lucide-react';
+import { DemoLink } from '../ui/DemoLink';
 
 export function HeroSection() {
   const ref = useRef<HTMLElement | null>(null);
@@ -43,12 +44,11 @@ export function HeroSection() {
               Run Candidate Demo
               <ArrowRight className="w-4 h-4 text-[#060814]" />
             </Link>
-            <Link
-              to="/demo"
+            <DemoLink
               className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/5 px-8 py-4 text-base font-medium text-white hover:bg-white/10 hover:border-white/30 transition-all backdrop-blur-sm"
             >
-              Watch 2-min Demo
-            </Link>
+              Book a Demo
+            </DemoLink>
           </div>
           
           {/* Trust Badges - Spaced with generous vertical padding and clean visual separators */}
