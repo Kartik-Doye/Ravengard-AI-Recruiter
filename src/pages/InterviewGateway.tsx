@@ -123,7 +123,7 @@ export default function InterviewGateway() {
 
   const handleSignIn = async () => {
     setLoading(true);
-    let token = localStorage.getItem('ravengard_uid');
+    let token: string | null = localStorage.getItem('ravengard_uid');
     
     if (!token) {
       try {
@@ -134,7 +134,7 @@ export default function InterviewGateway() {
         });
         const data = await res.json();
         if (data.success && data.token) {
-          token = data.token;
+          token = data.token as string;
           localStorage.setItem('ravengard_uid', token);
           addToast('success', 'Account created successfully.');
         } else {
@@ -151,6 +151,12 @@ export default function InterviewGateway() {
       addToast('success', 'Signed in successfully.');
     }
     
+    if (!token) {
+      addToast('error', 'Authentication token missing');
+      setLoading(false);
+      return;
+    }
+
     setUser(token);
     await fetchCandidateData(token);
   };

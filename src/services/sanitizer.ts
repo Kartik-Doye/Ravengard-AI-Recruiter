@@ -418,6 +418,7 @@ export function sanitizeCandidateRegistrationInput(body: any): SanitizationResul
 
   return {
     success: true,
+    errors: [],
     data: {
       name: nameRes.value!,
       email: emailRes.value!,

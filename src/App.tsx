@@ -1,13 +1,13 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { GlobalErrorBoundary } from "./components/layout/GlobalErrorBoundary.tsx";
-import { ReducedMotionProvider } from "./components/layout/ReducedMotionProvider.tsx";
-import { ThemeProvider } from "./contexts/ThemeContext.tsx";
-import RootLayout from './components/layout/RootLayout.tsx';
-import { LenisProvider } from './components/layout/LenisProvider.tsx';
-import { SmoothLoader } from './components/layout/SmoothLoader.tsx';
+import { GlobalErrorBoundary } from "./components/layout/GlobalErrorBoundary";
+import { ReducedMotionProvider } from "./components/layout/ReducedMotionProvider";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import RootLayout from './components/layout/RootLayout';
+import { LenisProvider } from './components/layout/LenisProvider';
+import { SmoothLoader } from './components/layout/SmoothLoader';
 import { HelmetProvider } from 'react-helmet-async';
-import { AppMeta } from './components/layout/AppMeta.tsx';
+import { AppMeta } from './components/layout/AppMeta';
 
 const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));

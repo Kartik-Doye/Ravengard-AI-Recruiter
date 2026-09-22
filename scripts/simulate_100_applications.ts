@@ -303,7 +303,7 @@ async function runLoadTest() {
     console.log(`  Current Stage: ${candidateSession.current_stage} | Locked: ${candidateSession.locked}`);
 
     // Verify stage transition to device_check
-    const [user] = await pool.query(`SELECT id, email FROM candidates WHERE id = $1;`, [candidateSession.candidate_id]).then(r => r.rows);
+    const [user] = await pool.query(`SELECT id, email FROM candidates WHERE id = $1;`, [candidateSession.candidate_id]).then((r: any) => r.rows);
     console.log(`  Candidate email: ${user?.email}`);
 
     // Test transition endpoint

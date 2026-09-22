@@ -624,7 +624,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
 
   app.post("/api/session/confirm-consent", requireAuth, async (req: AuthRequest, res) => {
     try {
-      const [candidate] = await db.select().from(candidates).where(eq(candidates.id, req.user.id));
+      const [candidate] = await db.select().from(candidates).where(eq(candidates.id, req.user?.id!));
       let [session] = await db.select().from(sessions).where(eq(sessions.candidateId, candidate.id)).orderBy(desc(sessions.createdAt)).limit(1);
       
       if (!session) {
@@ -638,8 +638,8 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
       }
       
       res.json({ success: true, session });
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || String(error) });
     }
   });
 
@@ -727,7 +727,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
       const ownership = await verifySessionOwnership(req, req.params.id, res);
       if (!ownership) return;
       const { session } = ownership;
-      const updatedSession = await transitionSessionStage(session.id, session.currentStage, targetStage);
+      const updatedSession = await transitionSessionStage(session.id, session.currentStage || 'resume_upload', targetStage);
       res.json({ success: true, session: updatedSession });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -804,24 +804,24 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
   app.post("/api/interview/readiness/confirm", requireAuth, async (req: AuthRequest, res) => {
     try {
       res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || String(e) });
     }
   });
 
   app.post("/api/session/:id/request-retake", requireAuth, async (req: AuthRequest, res) => {
     try {
       res.json({ success: true });
-    } catch(e) {
-      res.status(500).json({ error: e.message });
+    } catch(e: any) {
+      res.status(500).json({ error: e?.message || String(e) });
     }
   });
 
   app.post("/api/session/:id/think-again", requireAuth, async (req: AuthRequest, res) => {
     try {
       res.json({ success: true });
-    } catch(e) {
-      res.status(500).json({ error: e.message });
+    } catch(e: any) {
+      res.status(500).json({ error: e?.message || String(e) });
     }
   });
 
@@ -833,7 +833,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
       if (!ownership) return;
       const { session } = ownership;
 
-      if (!session.currentStage.startsWith('interview_')) {
+      if (!(session.currentStage || '').startsWith('interview_')) {
         return res.status(403).json({ error: "Session is not in an interview stage" });
       }
 

@@ -260,6 +260,7 @@ router.get("/candidates/:id/executive-digest", async (req, res) => {
     if (!candidate) {
       return res.status(404).json({ error: "Candidate not found." });
     }
+    const candidateName = candidate.name || "Candidate";
 
     const candSessions = await db.select().from(sessions).where(eq(sessions.candidateId, candidateId));
     const latestSession = candSessions.sort(
@@ -296,19 +297,22 @@ router.get("/candidates/:id/executive-digest", async (req, res) => {
     const overallScore = report?.overallScore ?? 92;
     const recommendation = report?.recommendation ?? "Proceed";
 
+    const reportBreakdown = (report?.breakdown || {}) as Record<string, any>;
+    const reportStrengths = (report?.strengths || []) as string[];
+
     // 3-bullet technical competency breakdown (Architecture, Code Execution, System Trade-offs)
     const breakdown = {
       architecture: {
-        score: report?.breakdown?.technicalArchitecturalProwess || 94,
-        bullet: report?.strengths?.[0] || "Decomposed high-throughput event bus into decoupled partitions; enforced Raft quorum consensus (N/2 + 1) with hybrid logical clocks to eliminate split-brain."
+        score: reportBreakdown.technicalArchitecturalProwess || 94,
+        bullet: reportStrengths[0] || "Decomposed high-throughput event bus into decoupled partitions; enforced Raft quorum consensus (N/2 + 1) with hybrid logical clocks to eliminate split-brain."
       },
       codeExecution: {
-        score: report?.breakdown?.distributedSystemsIntegrity || 91,
-        bullet: report?.strengths?.[1] || "Deterministic code execution verified across all boundary test suites; bounded memory allocation with zero unhandled rejection or ring buffer overflows."
+        score: reportBreakdown.distributedSystemsIntegrity || 91,
+        bullet: reportStrengths[1] || "Deterministic code execution verified across all boundary test suites; bounded memory allocation with zero unhandled rejection or ring buffer overflows."
       },
       systemTradeOffs: {
-        score: report?.breakdown?.systemicFaultTolerance || 88,
-        bullet: report?.strengths?.[2] || "Articulated consistency vs latency trade-offs cleanly; opted for eventual consistency with read-repair caches for non-transactional reads."
+        score: reportBreakdown.systemicFaultTolerance || 88,
+        bullet: reportStrengths[2] || "Articulated consistency vs latency trade-offs cleanly; opted for eventual consistency with read-repair caches for non-transactional reads."
       }
     };
 
@@ -384,8 +388,8 @@ export class MemoryRingBuffer<T> {
       harvest_api_version: "v1",
       candidate: {
         id: candidate.id,
-        first_name: candidate.name.split(" ")[0],
-        last_name: candidate.name.split(" ").slice(1).join(" ") || "Candidate",
+        first_name: candidateName.split(" ")[0],
+        last_name: candidateName.split(" ").slice(1).join(" ") || "Candidate",
         email: candidate.email,
         phone_number: candidate.mobile || "N/A",
         applications: [
@@ -416,7 +420,7 @@ export class MemoryRingBuffer<T> {
       ats: "lever",
       posting_id: "post_distributed_sys_eng",
       opportunity: {
-        name: candidate.name,
+        name: candidateName,
         contact: candidate.email,
         headline: appliedRole,
         origin: "RavenGard Autonomous Assessment",
@@ -438,7 +442,7 @@ export class MemoryRingBuffer<T> {
       success: true,
       candidate: {
         id: candidate.id,
-        name: candidate.name,
+        name: candidateName,
         email: candidate.email,
         college: candidate.college,
         degree: candidate.degree,
@@ -472,6 +476,7 @@ router.get("/candidates/:id/export/:format", async (req, res) => {
     if (!candidate) {
       return res.status(404).json({ error: "Candidate not found." });
     }
+    const candidateName = candidate.name || "Candidate";
 
     const candSessions = await db.select().from(sessions).where(eq(sessions.candidateId, candidateId));
     const latestSession = candSessions[0];
@@ -479,7 +484,7 @@ router.get("/candidates/:id/export/:format", async (req, res) => {
       ? await db.select().from(interviewReports).where(eq(interviewReports.sessionId, latestSession.id)).limit(1)
       : [null];
 
-    const filename = `ravengard-scorecard-${candidate.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${format}`;
+    const filename = `ravengard-scorecard-${candidateName.toLowerCase().replace(/[^a-z0-9]/g, "-")}-${format}`;
 
     if (format === "greenhouse") {
       const greenhouseData = {
@@ -487,8 +492,8 @@ router.get("/candidates/:id/export/:format", async (req, res) => {
         version: "v1",
         exportDate: new Date().toISOString(),
         candidate: {
-          first_name: candidate.name.split(" ")[0],
-          last_name: candidate.name.split(" ").slice(1).join(" ") || "Candidate",
+          first_name: candidateName.split(" ")[0],
+          last_name: candidateName.split(" ").slice(1).join(" ") || "Candidate",
           email: candidate.email,
         },
         scorecard: {
@@ -659,7 +664,7 @@ router.get("/sessions/:id", async (req, res) => {
       .from(interviewSessions)
       .where(eq(interviewSessions.sessionId, sessionId));
 
-    let transcript: { question: string | null; response: string | null; questionIndex?: number }[] = [];
+    let transcript: { question: string | null; response: string | null; questionIndex?: number | null }[] = [];
     for (const ivSession of interviewSessionRows) {
       const qs = await db
         .select({
@@ -671,7 +676,7 @@ router.get("/sessions/:id", async (req, res) => {
         .leftJoin(interviewResponses, eq(interviewQuestions.id, interviewResponses.questionId))
         .where(eq(interviewQuestions.interviewSessionId, ivSession.id))
         .orderBy(interviewQuestions.questionIndex);
-      transcript = transcript.concat(qs);
+      transcript = transcript.concat(qs as any);
     }
 
     const activeReport = reports[0] || null;
@@ -744,7 +749,7 @@ router.get("/sessions/:id/summary", async (req, res) => {
       .from(interviewSessions)
       .where(eq(interviewSessions.sessionId, sessionId));
 
-    let transcript: { question: string | null; response: string | null; questionIndex?: number; score?: number | null; feedback?: string | null }[] = [];
+    let transcript: { question: string | null; response: string | null; questionIndex?: number | null; score?: number | null; feedback?: string | null }[] = [];
     for (const ivSession of interviewSessionRows) {
       const qs = await db
         .select({
@@ -756,7 +761,7 @@ router.get("/sessions/:id/summary", async (req, res) => {
         .leftJoin(interviewResponses, eq(interviewQuestions.id, interviewResponses.questionId))
         .where(eq(interviewQuestions.interviewSessionId, ivSession.id))
         .orderBy(interviewQuestions.questionIndex);
-      transcript = transcript.concat(qs);
+      transcript = transcript.concat(qs as any);
     }
 
     const sessionScores = await db
