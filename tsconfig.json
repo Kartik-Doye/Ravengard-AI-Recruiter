@@ -24,5 +24,16 @@
     "noEmit": true,
     "strict": true,
     "noImplicitAny": true
-  }
+  },
+  "include": [
+    "src/**/*",
+    "server.ts",
+    "scripts/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "Ravengard-AI-Recruiter"
+  ]
 }

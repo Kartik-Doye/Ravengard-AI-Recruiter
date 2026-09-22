@@ -105,7 +105,7 @@ You MUST output ONLY a valid JSON object matching this schema:
 `;
 
       const response = await this.aiClient.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: {
           temperature: 0.1,
@@ -262,6 +262,8 @@ You MUST output ONLY a valid JSON object matching this schema:
       const threshold = appData.screening_threshold || 70;
       const isShortlisted = evalResult.matchScore >= threshold;
 
+      let emailToQueue: any = null;
+
       if (isShortlisted) {
         // Generate single-use magic token
         const magicToken = generateMagicToken(appUrl);
@@ -276,7 +278,7 @@ You MUST output ONLY a valid JSON object matching this schema:
           [magicToken.tokenHash, magicToken.expiresAt, applicationId]
         );
 
-        // Queue Email #1 (Invitation)
+        // Prepare Email #1 (Invitation)
         const emailContent = renderShortlistInvitationEmail({
           candidateName: appData.candidate_name || "Candidate",
           jobTitle: appData.job_title,
@@ -284,7 +286,7 @@ You MUST output ONLY a valid JSON object matching this schema:
           magicAssessmentLink: magicToken.magicLinkUrl,
         });
 
-        await emailService.queueEmail({
+        emailToQueue = {
           recipientEmail: appData.candidate_email,
           recipientName: appData.candidate_name,
           templateType: "shortlist_invitation",
@@ -293,7 +295,7 @@ You MUST output ONLY a valid JSON object matching this schema:
           bodyHtml: emailContent.bodyHtml,
           applicationId,
           organizationId: appData.organization_id,
-        });
+        };
       } else {
         // Below threshold: Human-in-the-Loop decision
         if (appData.require_human_rejection_approval) {
@@ -315,14 +317,14 @@ You MUST output ONLY a valid JSON object matching this schema:
             [applicationId]
           );
 
-          // Queue Email #3 (Rejection)
+          // Prepare Email #3 (Rejection)
           const rejectionContent = renderNonSelectionRejectionEmail({
             candidateName: appData.candidate_name || "Candidate",
             jobTitle: appData.job_title,
             constructiveFeedback: evalResult.constructiveFeedbackForCandidate,
           });
 
-          await emailService.queueEmail({
+          emailToQueue = {
             recipientEmail: appData.candidate_email,
             recipientName: appData.candidate_name,
             templateType: "non_selection_rejection",
@@ -331,18 +333,24 @@ You MUST output ONLY a valid JSON object matching this schema:
             bodyHtml: rejectionContent.bodyHtml,
             applicationId,
             organizationId: appData.organization_id,
-          });
+          };
         }
       }
 
       await client.query("COMMIT");
+      client.release();
+
+      // Queue email outside of transaction boundary to prevent connection pool starvation
+      if (emailToQueue) {
+        await emailService.queueEmail(emailToQueue);
+      }
+
       return true;
     } catch (err: any) {
       await client.query("ROLLBACK");
+      client.release();
       console.error(`[PreScreeningService] Failed to process app ${applicationId}:`, err);
       throw err;
-    } finally {
-      client.release();
     }
   }
 
@@ -354,6 +362,7 @@ You MUST output ONLY a valid JSON object matching this schema:
     if (!pool) return 0;
 
     let count = 0;
+    let claimedJobs: any[] = [];
 
     try {
       const client = await pool.connect();
@@ -361,7 +370,7 @@ You MUST output ONLY a valid JSON object matching this schema:
         await client.query("BEGIN");
 
         const selectQuery = `
-          SELECT * FROM screening_queue
+          SELECT id, application_id, attempts FROM screening_queue
           WHERE status = 'pending' AND attempts < 3
           ORDER BY created_at ASC
           LIMIT $1
@@ -369,31 +378,14 @@ You MUST output ONLY a valid JSON object matching this schema:
         `;
 
         const { rows } = await client.query(selectQuery, [batchSize]);
+        claimedJobs = rows;
 
-        for (const row of rows) {
-          // Mark processing
+        if (claimedJobs.length > 0) {
+          const ids = claimedJobs.map((j: any) => j.id);
           await client.query(
-            `UPDATE screening_queue SET status = 'processing', locked_at = now() WHERE id = $1;`,
-            [row.id]
+            `UPDATE screening_queue SET status = 'processing', locked_at = now() WHERE id = ANY($1::text[]);`,
+            [ids]
           );
-
-          try {
-            await this.processScreeningJob(row.application_id, appUrl);
-            await client.query(
-              `UPDATE screening_queue SET status = 'completed', updated_at = now() WHERE id = $1;`,
-              [row.id]
-            );
-            count++;
-          } catch (jobErr: any) {
-            const nextAttempts = row.attempts + 1;
-            const newStatus = nextAttempts >= 3 ? "screening_failed_manual_review" : "pending";
-            await client.query(
-              `UPDATE screening_queue 
-               SET status = $1, attempts = $2, last_error = $3, updated_at = now() 
-               WHERE id = $4;`,
-              [newStatus, nextAttempts, jobErr.message, row.id]
-            );
-          }
         }
 
         await client.query("COMMIT");
@@ -402,6 +394,27 @@ You MUST output ONLY a valid JSON object matching this schema:
         throw e;
       } finally {
         client.release();
+      }
+
+      // Process each claimed job independently with dedicated connection
+      for (const row of claimedJobs) {
+        try {
+          await this.processScreeningJob(row.application_id, appUrl);
+          await pool.query(
+            `UPDATE screening_queue SET status = 'completed', updated_at = now() WHERE id = $1;`,
+            [row.id]
+          );
+          count++;
+        } catch (jobErr: any) {
+          const nextAttempts = (row.attempts || 0) + 1;
+          const newStatus = nextAttempts >= 3 ? "screening_failed_manual_review" : "pending";
+          await pool.query(
+            `UPDATE screening_queue 
+             SET status = $1, attempts = $2, last_error = $3, updated_at = now() 
+             WHERE id = $4;`,
+            [newStatus, nextAttempts, jobErr.message, row.id]
+          );
+        }
       }
     } catch (e: any) {
       console.error("[PreScreeningService] Error in processQueueBatch:", e.message);

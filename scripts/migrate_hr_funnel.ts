@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { db, createPool } from "../src/db/index";
 import { sql } from "drizzle-orm";
 

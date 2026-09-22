@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { db } from "../src/db/index";
 import {
   jobs,

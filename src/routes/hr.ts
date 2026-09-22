@@ -13,6 +13,7 @@ import {
   apiKeys,
   integrationConfigs,
   outboxEvents,
+  adminUsers,
 } from "../db/schema";
 import { eq, and, desc, sql, inArray, isNull } from "drizzle-orm";
 import { requireHrAuth, HrAuthRequest } from "../middleware/tenant";
@@ -22,11 +23,73 @@ import {
   renderShortlistInvitationEmail,
   renderNonSelectionRejectionEmail,
 } from "../templates/emailTemplates";
+import { signAdminToken } from "../middleware/auth";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 
 export const hrRouter = Router();
 
-// Apply tenant-isolated auth to all /api/hr routes
+/**
+ * POST /api/hr/login
+ * Public authentication endpoint for HR team members.
+ * Validates role and scopes to organization.
+ */
+hrRouter.post("/login", async (req, res) => {
+  const body = req.body || {};
+  const identifier = String(body.email || "").trim().toLowerCase();
+  const password = typeof body.password === "string" ? body.password : "";
+
+  if (!identifier || !password) {
+    return res.status(400).json({ error: "Email and password are required." });
+  }
+
+  try {
+    const [user] = await db
+      .select()
+      .from(adminUsers)
+      .where(eq(adminUsers.email, identifier))
+      .limit(1);
+
+    if (!user || !user.passwordHash) {
+      return res.status(401).json({ error: "Invalid credentials." });
+    }
+
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid credentials." });
+    }
+
+    const allowedRoles = ["hr_admin", "hr_user", "recruiter", "hiring_manager", "super_admin", "admin"];
+    if (!allowedRoles.includes(user.role)) {
+      return res.status(403).json({ error: "Account not authorized for HR portal access." });
+    }
+
+    const orgId = user.organizationId || "org-ravengard";
+    const token = signAdminToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      organizationId: orgId,
+    });
+
+    return res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        organizationId: orgId,
+      },
+    });
+  } catch (err: any) {
+    console.error("HR login error:", err);
+    return res.status(500).json({ error: "Failed to process login." });
+  }
+});
+
+// Apply tenant-isolated auth to all remaining /api/hr routes
 hrRouter.use(requireHrAuth);
 
 /**
@@ -598,6 +661,72 @@ hrRouter.post("/applications/:id/reset-magic-link", async (req: HrAuthRequest, r
   } catch (err: any) {
     console.error("Failed to reset magic link:", err);
     return res.status(500).json({ error: "Failed to reset magic link." });
+  }
+});
+
+/**
+ * POST /api/hr/applications/:id/telemetry/clear
+ * False-Positive Telemetry Clear Button: Allows HR to dismiss anti-cheat flags (e.g., candidate using scratchpad) with audit note.
+ */
+hrRouter.post("/applications/:id/telemetry/clear", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+  const appId = req.params.id;
+  const { reason, signalId } = req.body;
+
+  const pool = (db as any).session?.client || (global as any)._postgresPool;
+  if (!pool) return res.status(500).json({ error: "Database client unavailable." });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT a.id, a.session_id FROM applications a WHERE a.id = $1 AND a.organization_id = $2;`,
+      [appId, orgId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Application not found." });
+    }
+
+    const sessionId = rows[0].session_id;
+    if (!sessionId) {
+      return res.status(400).json({ error: "No active interview session associated with this application." });
+    }
+
+    if (signalId) {
+      await pool.query(
+        `DELETE FROM integrity_signals WHERE id = $1 AND session_id = $2;`,
+        [signalId, sessionId]
+      );
+    } else {
+      // Clear all signals for this session
+      await pool.query(
+        `DELETE FROM integrity_signals WHERE session_id = $1;`,
+        [sessionId]
+      );
+    }
+
+    // Unflag session if flagged
+    await pool.query(
+      `UPDATE sessions SET flagged = false, flag_reason = NULL WHERE id = $1;`,
+      [sessionId]
+    );
+
+    await db.insert(adminLogs).values({
+      id: `log-${crypto.randomUUID()}`,
+      adminId: req.hr!.id,
+      organizationId: orgId,
+      action: "TELEMETRY_FLAG_CLEARED",
+      target: appId,
+      metadata: {
+        reason: reason || "Recruiter verified valid candidate explanation",
+        signalId: signalId || "ALL_SIGNALS",
+        clearedBy: req.hr!.email,
+      },
+    });
+
+    return res.json({ success: true, message: "Telemetry signal cleared successfully." });
+  } catch (err: any) {
+    console.error("Failed to clear telemetry:", err);
+    return res.status(500).json({ error: "Failed to clear telemetry flag." });
   }
 });
 
