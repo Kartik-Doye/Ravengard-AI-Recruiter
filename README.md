@@ -68,3 +68,9 @@ export const sessions = pgTable('sessions', {
   thinkAgainUsesLeft: integer('think_again_uses_left')
 });
 ```
+
+## Project Documentation & Architecture
+- **[Requirements Specification](REQUIREMENTS.md)**: System prerequisites, environment variables, database requirements, and client device specs.
+- **[Operational Runbook & How to Run](HOW_TO_RUN.md)**: Step-by-step setup, database migrations, dev runner, credentials, and test instructions.
+- **[End-to-End Hiring Process Capability Matrix](docs/HIRING_PROCESS_CAPABILITY.md)**: 10-stage evaluation matrix comparing traditional hiring vs. Ravengard capabilities, automation tiers, and legal compliance (GDPR Art 22 & NYC Law 144).
+
