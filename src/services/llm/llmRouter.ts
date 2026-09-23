@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { createPool } from "../../db/index";
 import crypto from "crypto";
+import OpenAI from "openai";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "model";
@@ -38,6 +39,8 @@ export interface ChatCompletionResponse {
 
 export class LLMRouter {
   private static geminiClient: GoogleGenAI | null = null;
+  private static groqClient: OpenAI | null = null;
+  private static openRouterClient: OpenAI | null = null;
 
   private static getGeminiClient(): GoogleGenAI {
     if (!this.geminiClient) {
@@ -47,10 +50,37 @@ export class LLMRouter {
     return this.geminiClient;
   }
 
+  private static getGroqClient(): OpenAI | null {
+    if (!process.env.GROQ_API_KEY) return null;
+    if (!this.groqClient) {
+      this.groqClient = new OpenAI({
+        apiKey: process.env.GROQ_API_KEY,
+        baseURL: "https://api.groq.com/openai/v1",
+      });
+    }
+    return this.groqClient;
+  }
+
+  private static getOpenRouterClient(): OpenAI | null {
+    if (!process.env.OPENROUTER_API_KEY) return null;
+    if (!this.openRouterClient) {
+      this.openRouterClient = new OpenAI({
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: "https://openrouter.ai/api/v1",
+        defaultHeaders: {
+          "HTTP-Referer": "https://ravengard.ai",
+          "X-Title": "Ravengard AI Recruiter",
+        },
+      });
+    }
+    return this.openRouterClient;
+  }
+
   public static async recordTelemetry(
     context: LLMTelemetryContext,
     tokensUsed: number,
-    latencyMs: number
+    latencyMs: number,
+    provider: string = "unknown"
   ): Promise<void> {
     try {
       const pool = createPool();
@@ -61,6 +91,9 @@ export class LLMRouter {
          VALUES ($1, $2, $3, $4, $5, NOW())`,
         [`tel-${crypto.randomUUID()}`, orgId, context.module, Math.max(tokensUsed, 1), Math.max(latencyMs, 10)]
       );
+      
+      // Optionally log provider in metadata if the table supports it, or just console log for now
+      console.log(`[LLM TELEMETRY] Provider: ${provider}, Module: ${context.module}, Latency: ${latencyMs}ms, Tokens: ${tokensUsed}`);
     } catch {
       // Non-blocking telemetry
     }
@@ -68,16 +101,68 @@ export class LLMRouter {
 
   /**
    * Streaming completion with async generator
+   * Multi-Provider Failover: Groq (Primary) -> OpenRouter (Secondary) -> Gemini (Safety Fallback)
    */
   public static async *chatCompletionStream(
     request: ChatCompletionRequest
   ): AsyncGenerator<{ choices: { delta: { content?: string } }[] }> {
     const startTime = Date.now();
     const systemPrompt = request.messages.find((m) => m.role === "system")?.content || "";
-    const userPrompt = request.messages.filter((m) => m.role !== "system").map((m) => m.content).join("\n\n");
+    const userMessages = request.messages.filter((m) => m.role !== "system").map((m) => ({
+      role: m.role as any,
+      content: m.content
+    }));
 
+    // --- STEP 1: GROQ (Ultra-low latency primary for voice loop) ---
+    const groq = this.getGroqClient();
+    if (groq) {
+      try {
+        const stream = await groq.chat.completions.create({
+          model: request.model || "llama-3.3-70b-versatile",
+          messages: [{ role: "system", content: systemPrompt }, ...userMessages],
+          temperature: request.temperature ?? 0.7,
+          max_tokens: request.max_tokens ?? 300,
+          stream: true,
+        });
+
+        for await (const chunk of stream) {
+          const text = chunk.choices[0]?.delta?.content || "";
+          if (text) yield { choices: [{ delta: { content: text } }] };
+        }
+        await this.recordTelemetry({ module: "voice_interview" }, 80, Date.now() - startTime, "groq");
+        return;
+      } catch (err) {
+        console.warn("Groq stream failed, failing over to OpenRouter:", err);
+      }
+    }
+
+    // --- STEP 2: OPENROUTER (High availability secondary) ---
+    const openRouter = this.getOpenRouterClient();
+    if (openRouter) {
+      try {
+        const stream = await openRouter.chat.completions.create({
+          model: "meta-llama/llama-3.3-70b-instruct",
+          messages: [{ role: "system", content: systemPrompt }, ...userMessages],
+          temperature: request.temperature ?? 0.7,
+          max_tokens: request.max_tokens ?? 300,
+          stream: true,
+        });
+
+        for await (const chunk of stream) {
+          const text = chunk.choices[0]?.delta?.content || "";
+          if (text) yield { choices: [{ delta: { content: text } }] };
+        }
+        await this.recordTelemetry({ module: "voice_interview" }, 85, Date.now() - startTime, "openrouter");
+        return;
+      } catch (err) {
+        console.warn("OpenRouter stream failed, failing over to Gemini:", err);
+      }
+    }
+
+    // --- STEP 3: GEMINI (Deterministic safety fallback) ---
     try {
       const gemini = this.getGeminiClient();
+      const userPrompt = userMessages.map(m => m.content).join("\n\n");
       const responseStream = await gemini.models.generateContentStream({
         model: "gemini-2.5-flash",
         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
@@ -90,16 +175,12 @@ export class LLMRouter {
 
       for await (const chunk of responseStream) {
         const text = chunk.text || "";
-        if (text) {
-          yield { choices: [{ delta: { content: text } }] };
-        }
+        if (text) yield { choices: [{ delta: { content: text } }] };
       }
-
-      const latencyMs = Date.now() - startTime;
-      await this.recordTelemetry({ module: "voice_interview" }, 80, latencyMs);
-    } catch {
-      // Deterministic fallback tokens
-      const fallbackTokens = ["Can ", "you ", "describe ", "a ", "distributed ", "system ", "trade-off ", "you ", "faced ", "in ", "production?"];
+      await this.recordTelemetry({ module: "voice_interview" }, 90, Date.now() - startTime, "gemini");
+    } catch (err) {
+      console.error("All LLM providers failed for stream:", err);
+      const fallbackTokens = ["I ", "apologize, ", "I'm ", "having ", "trouble ", "connecting. ", "Can ", "you ", "repeat ", "your ", "last ", "thought?"];
       for (const token of fallbackTokens) {
         yield { choices: [{ delta: { content: token } }] };
       }
@@ -108,16 +189,39 @@ export class LLMRouter {
 
   /**
    * Standard Chat Completion
+   * Multi-Provider Failover: Groq -> OpenRouter -> Gemini
    */
   public static async chatCompletion(
     request: ChatCompletionRequest
   ): Promise<ChatCompletionResponse> {
     const startTime = Date.now();
     const systemPrompt = request.messages.find((m) => m.role === "system")?.content || "";
-    const userPrompt = request.messages.filter((m) => m.role !== "system").map((m) => m.content).join("\n\n");
+    const userMessages = request.messages.filter((m) => m.role !== "system").map((m) => ({
+      role: m.role as any,
+      content: m.content
+    }));
 
+    // Try Groq
+    const groq = this.getGroqClient();
+    if (groq) {
+      try {
+        const completion = await groq.chat.completions.create({
+          model: request.model || "llama-3.3-70b-versatile",
+          messages: [{ role: "system", content: systemPrompt }, ...userMessages],
+          temperature: request.temperature ?? 0.7,
+          max_tokens: request.max_tokens ?? 300,
+        });
+        await this.recordTelemetry({ module: "voice_interview" }, 90, Date.now() - startTime, "groq");
+        return {
+          choices: [{ message: { role: "assistant", content: completion.choices[0].message.content || "" } }]
+        };
+      } catch {}
+    }
+
+    // Try Gemini (Dossier primary / Global fallback)
     try {
       const gemini = this.getGeminiClient();
+      const userPrompt = userMessages.map(m => m.content).join("\n\n");
       const response = await gemini.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
@@ -127,37 +231,19 @@ export class LLMRouter {
           maxOutputTokens: request.max_tokens ?? 300,
         },
       });
-
-      const text = response.text || "";
-      const latencyMs = Date.now() - startTime;
-      await this.recordTelemetry({ module: "voice_interview" }, 90, latencyMs);
-
+      await this.recordTelemetry({ module: "voice_interview" }, 90, Date.now() - startTime, "gemini");
       return {
-        choices: [
-          {
-            message: {
-              role: "assistant",
-              content: text,
-            },
-          },
-        ],
+        choices: [{ message: { role: "assistant", content: response.text || "" } }]
       };
     } catch {
       return {
-        choices: [
-          {
-            message: {
-              role: "assistant",
-              content: "Describe how you ensure consistency and high availability in your service architecture.",
-            },
-          },
-        ],
+        choices: [{ message: { role: "assistant", content: "Describe how you ensure consistency and high availability in your service architecture." } }]
       };
     }
   }
 
   /**
-   * Schema validated JSON extraction
+   * Schema validated JSON extraction (Primary: Gemini)
    */
   public static async structuredOutput<T = any>(
     request: ChatCompletionRequest,
@@ -183,15 +269,10 @@ export class LLMRouter {
       const text = response.text || "{}";
       const parsed = JSON.parse(text);
       const validated = schema ? schema.parse(parsed) : parsed;
-      const latencyMs = Date.now() - startTime;
-      await this.recordTelemetry({ module: "resume_screening" }, 150, latencyMs);
-
+      await this.recordTelemetry({ module: "resume_screening" }, 150, Date.now() - startTime, "gemini");
       return validated as T;
     } catch (err) {
-      const latencyMs = Date.now() - startTime;
-      await this.recordTelemetry({ module: "resume_screening" }, 50, latencyMs);
-
-      // Return default minimal structure
+      await this.recordTelemetry({ module: "resume_screening" }, 50, Date.now() - startTime, "fallback");
       return {
         name: "Candidate",
         email: "candidate@example.com",
@@ -203,84 +284,6 @@ export class LLMRouter {
         strengths: ["Clean architectural thinking", "Distributed system principles"],
         weaknesses: ["Deep-dive observability nuances"],
       } as unknown as T;
-    }
-  }
-
-  public static async voiceInterviewTurn(
-    messages: ChatMessage[],
-    systemPrompt: string,
-    telemetryContext: LLMTelemetryContext
-  ): Promise<VoiceTurnResult> {
-    const startTime = Date.now();
-    try {
-      const gemini = this.getGeminiClient();
-      const formattedHistory = messages.map((m) => ({
-        role: m.role === "assistant" ? "model" : m.role === "system" ? "user" : m.role,
-        parts: [{ text: m.content }],
-      }));
-
-      const response = await gemini.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: formattedHistory,
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.2,
-          maxOutputTokens: 300,
-        },
-      });
-
-      const reply = response.text || "";
-      const latencyMs = Date.now() - startTime;
-      const tokensUsed = Math.round(reply.length / 4) + 60;
-
-      await this.recordTelemetry(telemetryContext, tokensUsed, latencyMs);
-      return { reply, tokensUsed, latencyMs, provider: "gemini" };
-    } catch {
-      const latencyMs = Date.now() - startTime;
-      await this.recordTelemetry(telemetryContext, 45, latencyMs);
-      return {
-        reply: "Thank you for explaining your architectural approach. Let us proceed to examine partition tolerance.",
-        tokensUsed: 45,
-        latencyMs,
-        provider: "fallback",
-      };
-    }
-  }
-
-  public static async generateJson<T = any>(
-    prompt: string,
-    systemInstruction: string,
-    telemetryContext: LLMTelemetryContext
-  ): Promise<{ data: T; tokensUsed: number; latencyMs: number; provider: string }> {
-    const startTime = Date.now();
-    try {
-      const gemini = this.getGeminiClient();
-      const response = await gemini.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: {
-          systemInstruction,
-          responseMimeType: "application/json",
-          temperature: 0.1,
-        },
-      });
-
-      const text = response.text || "{}";
-      const parsed = JSON.parse(text) as T;
-      const latencyMs = Date.now() - startTime;
-      const tokensUsed = Math.round((prompt.length + text.length) / 4);
-
-      await this.recordTelemetry(telemetryContext, tokensUsed, latencyMs);
-      return { data: parsed, tokensUsed, latencyMs, provider: "gemini" };
-    } catch {
-      const latencyMs = Date.now() - startTime;
-      await this.recordTelemetry(telemetryContext, 50, latencyMs);
-      return {
-        data: {} as T,
-        tokensUsed: 50,
-        latencyMs,
-        provider: "fallback",
-      };
     }
   }
 }

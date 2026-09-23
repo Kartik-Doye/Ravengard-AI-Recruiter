@@ -37,12 +37,19 @@ export const requireAuth = async (
   next: NextFunction
 ) => {
   const authHeader = req.headers.authorization;
+  const cookieToken = req.cookies?.auth_token;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Unauthorized: Missing or invalid token" });
+  let token: string | undefined;
+
+  if (cookieToken) {
+    token = cookieToken;
+  } else if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.substring(7);
   }
 
-  const token = authHeader.substring(7);
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized: Missing or invalid token" });
+  }
 
   try {
     const decoded = jwt.verify(token, ACTUAL_SECRET) as {

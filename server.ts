@@ -40,6 +40,7 @@ import { healthCheckRouter } from "./src/healthCheck";
 import { requestLogger } from "./src/middleware/requestLogger";
 import { errorHandler } from "./src/middleware/errorHandler";
 import { logger } from "./src/utils/logger";
+import cookieParser from "cookie-parser";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -118,6 +119,7 @@ async function startServer() {
   app.set("trust proxy", 1);
   app.use(correlationIdMiddleware);
   app.use(requestLogger);
+  app.use(cookieParser());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use("/api", healthCheckRouter);
@@ -196,9 +198,16 @@ app.post("/api/admin/login", async (req, res) => {
     organizationId: orgId,
   });
 
+  res.cookie("auth_token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 8 * 60 * 60 * 1000, // 8 hours
+  });
+
   res.json({
     success: true,
-    token,
+    token, // Keep for backward compatibility if needed, but primary is cookie
     role: standardizedRole,
     specificRole: adminRecord.role,
     admin: {
@@ -1250,12 +1259,12 @@ Sitemap: ${SITE_URL}/sitemap.xml
 `);
   });
 
-  app.get("/sitemap.xml", (req, res) => {
+  app.get("/sitemap.xml", async (req, res) => {
     const rawUrl = (process.env.APP_URL || process.env.VITE_APP_URL || `https://${req.get('host')}`).trim();
     const SITE_URL = rawUrl.replace(/\/+$/, '');
     const currentDate = new Date().toISOString();
 
-    const routes = [
+    const staticRoutes = [
       { path: '/', priority: '1.0', changefreq: 'daily' },
       { path: '/about', priority: '0.8', changefreq: 'weekly' },
       { path: '/features', priority: '0.9', changefreq: 'weekly' },
@@ -1271,11 +1280,31 @@ Sitemap: ${SITE_URL}/sitemap.xml
       { path: '/assessment-guide', priority: '0.8', changefreq: 'weekly' }
     ];
 
+    let jobRoutes: any[] = [];
+    try {
+      // Fetch active/published jobs to include in the sitemap
+      const activeJobs = await db
+        .select({ id: jobs.id, updatedAt: jobs.updatedAt })
+        .from(jobs)
+        .where(or(eq(jobs.status, "active"), eq(jobs.status, "published")));
+      
+      jobRoutes = activeJobs.map(job => ({
+        path: `/jobs/${job.id}`,
+        priority: '0.7',
+        changefreq: 'daily',
+        lastmod: (job.updatedAt || new Date()).toISOString()
+      }));
+    } catch (err) {
+      console.warn("Sitemap: Failed to fetch jobs for dynamic list", err);
+    }
+
+    const allRoutes = [...staticRoutes, ...jobRoutes];
+
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${routes.map(r => `  <url>
+${allRoutes.map(r => `  <url>
     <loc>${SITE_URL}${r.path}</loc>
-    <lastmod>${currentDate}</lastmod>
+    <lastmod>${r.lastmod || currentDate}</lastmod>
     <changefreq>${r.changefreq}</changefreq>
     <priority>${r.priority}</priority>
   </url>`).join('\n')}

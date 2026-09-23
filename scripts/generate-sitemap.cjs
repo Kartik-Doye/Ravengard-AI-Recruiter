@@ -8,7 +8,7 @@ if (!rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) {
 }
 const SITE_URL = rawUrl.replace(/\/+$/, '');
 
-// Include all canonical public routes, explicitly excluding /interview/* and /admin/* private paths
+// Include all canonical public routes, explicitly excluding /interview/*, /admin/*, and /hr/* private paths
 const routes = [
   { path: '/', priority: '1.0', changefreq: 'daily' },
   { path: '/about', priority: '0.8', changefreq: 'weekly' },
