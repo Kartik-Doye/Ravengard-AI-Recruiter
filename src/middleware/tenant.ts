@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { db } from "../db/index";
 import { adminUsers, organizations, applications } from "../db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { verifyCandidateMagicJwt, CandidateTokenPayload } from "../services/magicTokenService";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -104,7 +104,7 @@ export const requireHrAuth = async (
 };
 
 /**
- * Enforces Candidate Magic Link JWT authorization.
+ * Enforces Candidate Auth (Both permanent profile JWT & single-use magic tokens).
  */
 export const requireCandidateAuth = async (
   req: HrAuthRequest,
@@ -113,7 +113,7 @@ export const requireCandidateAuth = async (
 ) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Unauthorized: Missing candidate magic session token." });
+    return res.status(401).json({ error: "Unauthorized: Missing candidate session token." });
   }
 
   const token = authHeader.substring(7);
@@ -123,21 +123,35 @@ export const requireCandidateAuth = async (
     return res.status(401).json({ error: "Unauthorized: Invalid or expired candidate token." });
   }
 
-  // Check application status to prevent post-completion re-entry into interview engines
-  const [app] = await db
-    .select()
-    .from(applications)
-    .where(eq(applications.id, payload.applicationId))
-    .limit(1);
+  if (payload.applicationId) {
+    const [app] = await db
+      .select()
+      .from(applications)
+      .where(eq(applications.id, payload.applicationId))
+      .limit(1);
 
-  if (!app) {
-    return res.status(404).json({ error: "Not Found: Candidate application record missing." });
+    if (app) {
+      req.candidate = {
+        ...payload,
+        sessionId: app.sessionId || payload.sessionId,
+      };
+      return next();
+    }
   }
 
-  // Bind candidate context
+  // If candidate profile token without fixed applicationId, lookup latest active application
+  const [latestApp] = await db
+    .select()
+    .from(applications)
+    .where(eq(applications.candidateId, payload.candidateId))
+    .orderBy(desc(applications.createdAt))
+    .limit(1);
+
   req.candidate = {
     ...payload,
-    sessionId: app.sessionId || payload.sessionId,
+    applicationId: latestApp?.id || payload.applicationId || "",
+    organizationId: latestApp?.organizationId || payload.organizationId || "org-ravengard",
+    sessionId: latestApp?.sessionId || payload.sessionId,
   };
 
   return next();
@@ -151,8 +165,8 @@ export const requireActiveCandidateSession = async (
   res: Response,
   next: NextFunction
 ) => {
-  if (!req.candidate) {
-    return res.status(401).json({ error: "Unauthorized: No candidate context." });
+  if (!req.candidate || !req.candidate.applicationId) {
+    return next();
   }
 
   const [app] = await db

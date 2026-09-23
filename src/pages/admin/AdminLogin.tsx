@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ShieldCheck, Lock, ArrowRight, AlertCircle, KeyRound } from 'lucide-react';
+import { ShieldCheck, Lock, ArrowRight, AlertCircle, KeyRound, HelpCircle, Eye, EyeOff } from 'lucide-react';
+import { ForgotPasswordModal } from '../../components/auth/ForgotPasswordModal';
 
 interface AdminLoginProps {
   onSuccess: (token: string) => void;
@@ -9,8 +10,10 @@ interface AdminLoginProps {
 export default function AdminLogin({ onSuccess }: AdminLoginProps) {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('admin123');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showForgotModal, setShowForgotModal] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -103,19 +106,38 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
                 <label className="block text-[11px] font-mono text-white/70 uppercase tracking-widest">
                   Master Password
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(true)}
+                  className="text-[10px] font-mono text-[var(--color-secondary)] hover:underline transition-all cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
               </div>
               <div className="relative">
                 <input
                   id="admin-password-input"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
                   autoComplete="current-password"
-                  className="w-full bg-white/5 border border-white/10 text-white px-4 py-2.5 rounded-lg text-sm font-sans focus:outline-none focus:border-[var(--color-secondary)] focus:ring-1 focus:ring-[var(--color-secondary)] transition-all placeholder:text-white/20"
+                  className="w-full bg-white/5 border border-white/10 text-white pl-4 pr-11 py-2.5 rounded-lg text-sm font-sans focus:outline-none focus:border-[var(--color-secondary)] focus:ring-1 focus:ring-[var(--color-secondary)] transition-all placeholder:text-white/20"
                 />
-                <Lock className="w-4 h-4 text-white/30 absolute right-3.5 top-3 pointer-events-none" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded text-white/40 hover:text-white/90 hover:bg-white/5 transition-colors cursor-pointer"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -166,6 +188,14 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
           Ravengard Assessment Platform • Isolated Audit Plane
         </div>
       </div>
+
+      {/* Forgot Password / Account Recovery Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotModal}
+        onClose={() => setShowForgotModal(false)}
+        defaultEmail={username.includes('@') ? username : ''}
+        portalType="admin"
+      />
     </div>
   );
 }

@@ -19,6 +19,7 @@ import InterviewGateway from './pages/InterviewGateway';
 import AdminGateway from './pages/admin/AdminGateway';
 import Careers from './pages/Careers';
 import CandidatePortal from './pages/CandidatePortal';
+import HrGateway from './pages/hr/HrGateway';
 import NotFound from './pages/NotFound';
 
 
@@ -57,12 +58,14 @@ export default function App() {
                       <Route path="/careers" element={<Careers />} />
                       <Route path="/jobs" element={<Careers />} />
                       <Route path="/portal" element={<CandidatePortal />} />
+                      <Route path="/candidate" element={<CandidatePortal />} />
                       <Route path="/candidate/portal" element={<CandidatePortal />} />
                       <Route path="/assessment-guide" element={<AssessmentGuide />} />
                       {/* Interview Gateway renders without standard layout wrappers based on location in RootLayout */}
                       
                       <Route path="/interview/*" element={<InterviewGateway />} />
                       <Route path="/admin/*" element={<AdminGateway />} />
+                      <Route path="/hr/*" element={<HrGateway />} />
                       <Route path="*" element={<NotFound />} />
                     </Route>
                   </Routes>

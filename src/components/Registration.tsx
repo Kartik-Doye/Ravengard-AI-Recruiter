@@ -11,8 +11,13 @@ import {
   Loader2, 
   Sparkles, 
   RefreshCw,
-  CheckCircle2
+  CheckCircle2,
+  Lock,
+  Eye,
+  EyeOff,
+  KeyRound
 } from 'lucide-react';
+import { PasswordStrengthIndicator } from './auth/PasswordStrengthIndicator';
 
 const COMMON_COLLEGES = [
   "Massachusetts Institute of Technology",
@@ -91,6 +96,8 @@ export default function Registration({ user, onComplete }: { user: string, onCom
     gradYear: '2024',
     preferredLanguage: 'English'
   });
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverErrors, setServerErrors] = useState<string[]>([]);
   const [isAdult, setIsAdult] = useState(false);
@@ -788,6 +795,43 @@ export default function Registration({ user, onComplete }: { user: string, onCom
                 </div>
               </div>
               {errors.preferredLanguage && <p id="preferredLanguage-error" className="mt-1.5 text-xs text-[var(--color-error)] flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5 shrink-0" />{errors.preferredLanguage}</p>}
+            </div>
+
+            {/* Assessment Security Password / PIN */}
+            <div className="md:col-span-2">
+              <label htmlFor="reg-password" className="block text-xs font-semibold uppercase tracking-wider text-white/70 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5 text-violet-400" />
+                  Account Security Password <span className="text-white/40 normal-case font-normal">(Optional for candidate session recovery)</span>
+                </span>
+                <span className="text-[10px] text-white/40 normal-case">Real-time strength meter</span>
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-white/30 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input 
+                  type={showPassword ? "text" : "password"}
+                  id="reg-password"
+                  placeholder="Create a strong password (min 8 characters)..."
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-11 py-2.5 border border-white/10 focus:border-violet-400 bg-white/5 rounded-lg focus:ring-2 focus:ring-violet-500/30 outline-none text-sm text-white placeholder-white/25 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded text-white/40 hover:text-white/90 hover:bg-white/5 transition-colors cursor-pointer"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* Real-Time Password Strength Visual Meter */}
+              {password && (
+                <div className="mt-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                  <PasswordStrengthIndicator password={password} showRequirementsList={true} />
+                </div>
+              )}
             </div>
           </div>
           

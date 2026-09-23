@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Building2, Lock, Mail, ArrowRight, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Shield, Building2, Lock, Mail, ArrowRight, Sparkles, CheckCircle2, AlertCircle, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { ForgotPasswordModal } from '../../components/auth/ForgotPasswordModal';
 
 interface HrLoginProps {
   onSuccess?: () => void;
@@ -8,9 +9,11 @@ interface HrLoginProps {
 
 export default function HrLogin({ onSuccess }: HrLoginProps) {
   const [email, setEmail] = useState('hr@ravengard.com');
-  const [password, setPassword] = useState('kartik@doye#26');
+  const [password, setPassword] = useState('admin123');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showForgotModal, setShowForgotModal] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e?: React.FormEvent) => {
@@ -48,7 +51,7 @@ export default function HrLogin({ onSuccess }: HrLoginProps) {
 
   const handleQuickDemo = (demoEmail: string) => {
     setEmail(demoEmail);
-    setPassword('kartik@doye#26');
+    setPassword('admin123');
   };
 
   return (
@@ -101,19 +104,41 @@ export default function HrLogin({ onSuccess }: HrLoginProps) {
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-1.5">
-                Password
-              </label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-xs font-mono text-white/70 uppercase tracking-wider">
+                  Password
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(true)}
+                  className="text-[10px] font-mono text-blue-400 hover:underline transition-all cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
+              </div>
               <div className="relative">
                 <Lock className="w-4 h-4 text-white/30 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-black/40 border border-white/10 rounded-xl text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-sans"
+                  className="w-full pl-10 pr-11 py-2.5 bg-black/40 border border-white/10 rounded-xl text-sm text-white placeholder-white/30 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-sans"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded text-white/40 hover:text-white/90 hover:bg-white/5 transition-colors cursor-pointer"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -147,7 +172,7 @@ export default function HrLogin({ onSuccess }: HrLoginProps) {
             >
               <span>hr@ravengard.com</span>
               <span className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded font-semibold">
-                HR Admin
+                HR Admin (admin123)
               </span>
             </button>
           </div>
@@ -162,6 +187,14 @@ export default function HrLogin({ onSuccess }: HrLoginProps) {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password / Account Recovery Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotModal}
+        onClose={() => setShowForgotModal(false)}
+        defaultEmail={email}
+        portalType="hr"
+      />
     </div>
   );
 }

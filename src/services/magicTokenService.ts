@@ -30,8 +30,8 @@ export function generateMagicToken(appUrl: string = ""): MagicTokenCreationResul
 
 export interface CandidateTokenPayload {
   candidateId: string;
-  applicationId: string;
-  organizationId: string;
+  applicationId?: string;
+  organizationId?: string;
   sessionId?: string;
   role: "candidate";
   email: string;
@@ -39,6 +39,19 @@ export interface CandidateTokenPayload {
 
 export function signCandidateMagicJwt(payload: CandidateTokenPayload): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "48h" });
+}
+
+export function signCandidateProfileJwt(candidate: { id: string; email: string; name?: string | null }): string {
+  return jwt.sign(
+    {
+      candidateId: candidate.id,
+      email: candidate.email,
+      name: candidate.name || "",
+      role: "candidate",
+    },
+    JWT_SECRET,
+    { expiresIn: "7d" }
+  );
 }
 
 export function verifyCandidateMagicJwt(token: string): CandidateTokenPayload | null {

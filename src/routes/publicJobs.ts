@@ -170,14 +170,16 @@ publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
       );
     }
 
-    // 5. Create application record (organization_id denormalized directly!)
+    // 5. Create application record with strict 24-Hour SLA Timer
     const applicationId = `app-${crypto.randomUUID()}`;
+    const slaExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
     await client.query(
       `INSERT INTO applications (
-         id, job_id, candidate_id, organization_id, status, session_id
+         id, job_id, candidate_id, organization_id, status, session_id, assessment_expires_at, sla_expires_at
        )
-       VALUES ($1, $2, $3, $4, 'applied', $5);`,
-      [applicationId, jobId, candidateId, job.organization_id, sessionId]
+       VALUES ($1, $2, $3, $4, 'applied', $5, $6, $6);`,
+      [applicationId, jobId, candidateId, job.organization_id, sessionId, slaExpiresAt]
     );
 
     // 6. Enqueue into screening_queue for asynchronous background matching
@@ -190,11 +192,22 @@ publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
 
     await client.query("COMMIT");
 
+    const { signCandidateProfileJwt } = await import("../services/magicTokenService");
+    const candidateToken = signCandidateProfileJwt({
+      id: candidateId,
+      email: email.toLowerCase().trim(),
+      name: name.trim(),
+    });
+
     return res.status(201).json({
       success: true,
       applicationId,
+      candidateId,
+      token: candidateToken,
       status: "applied",
-      message: "Application submitted successfully. Candidate pre-screening is underway.",
+      slaExpiresAt,
+      portalUrl: `/portal`,
+      message: "Application received! 24-hour assessment window has started. Complete your assessment before the deadline.",
     });
   } catch (err: any) {
     await client.query("ROLLBACK");

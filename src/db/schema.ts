@@ -30,6 +30,7 @@ export const candidates = pgTable('candidates', {
   id: text('id').primaryKey(),
   email: text('email').notNull(),
   name: text('name'),
+  passwordHash: text('password_hash'),
   mobile: text('mobile'),
   college: text('college'),
   degree: text('degree'),
@@ -199,6 +200,14 @@ export const jobs = pgTable('jobs', {
   index('jobs_org_created_idx').on(table.organizationId, table.createdAt)
 ]);
 
+export const rubricDimensions = pgTable('rubric_dimensions', {
+  id: text('id').primaryKey(),
+  rubricId: text('rubric_id').references(() => rubrics.id, { onDelete: 'cascade' }),
+  dimensionName: text('dimension_name').notNull(),
+  weight: integer('weight').notNull().default(20),
+  evalInstruction: text('eval_instruction').notNull(),
+});
+
 export const applications = pgTable('applications', {
   id: text('id').primaryKey(),
   jobId: text('job_id').notNull().references(() => jobs.id),
@@ -206,10 +215,14 @@ export const applications = pgTable('applications', {
   organizationId: text('organization_id').notNull().references(() => organizations.id),
   status: text('status').notNull().default('applied'),
   // Possible values:
-  // 'applied' | 'shortlisted' | 'rejected_at_screening' | 'pending_rejection_review' |
-  // 'assessment_pending' | 'assessment_in_progress' | 'assessment_completed' |
-  // 'recommended' | 'not_recommended' | 'screening_failed_manual_review'
+  // 'applied' | 'shortlisted' | 'assessment_pending' | 'mcq_in_progress' | 'interview_pending' |
+  // 'pending_hr_review' | 'assessment_completed' | 'recommended' | 'offered' | 'rejected' | 'rejected_timeout'
   sessionId: text('session_id').references(() => sessions.id),
+  assessmentExpiresAt: timestamp('assessment_expires_at'), // Strict 24-hour SLA TTL
+  slaExpiresAt: timestamp('sla_expires_at'),
+  mcqScore: integer('mcq_score'),
+  interviewScore: integer('interview_score'),
+  offerDetailsJson: jsonb('offer_details_json'),
   magicTokenHash: text('magic_token_hash'),
   magicTokenExpiresAt: timestamp('magic_token_expires_at'),
   magicTokenUsedAt: timestamp('magic_token_used_at'),
@@ -220,6 +233,63 @@ export const applications = pgTable('applications', {
   index('applications_org_status_idx').on(table.organizationId, table.status),
   index('applications_magic_token_hash_idx').on(table.magicTokenHash)
 ]);
+
+export const mcqQuestions = pgTable('mcq_questions', {
+  id: text('id').primaryKey(),
+  skillTag: text('skill_tag').notNull(), // e.g., 'SQL', 'Data Modeling', 'Algorithms', 'Behavioral', 'Aptitude'
+  category: text('category').notNull(), // 'Behavioral' | 'Aptitude' | 'Technical Aptitude'
+  difficulty: text('difficulty').notNull().default('medium'), // 'easy' | 'medium' | 'hard' | 'brutal'
+  questionText: text('question_text').notNull(),
+  options: jsonb('options').notNull().$type<string[]>(),
+  correctOption: text('correct_option').notNull(),
+  explanation: text('explanation'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+export const assessmentSessions = pgTable('assessment_sessions', {
+  id: text('id').primaryKey(),
+  applicationId: text('application_id').notNull().references(() => applications.id),
+  candidateId: text('candidate_id').references(() => candidates.id),
+  type: text('type').notNull().default('mcq_battery'), // 'mcq_battery' | 'voice_interview'
+  startedAt: timestamp('started_at').defaultNow().notNull(),
+  expiresAt: timestamp('expires_at').notNull(), // Strict server countdown cutoff (startedAt + 60m)
+  completedAt: timestamp('completed_at'),
+  score: integer('score'),
+  questionSnapshot: jsonb('question_snapshot'),
+  answersSnapshot: jsonb('answers_snapshot'),
+  radarData: jsonb('radar_data'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+export const aiEvaluations = pgTable('ai_evaluations', {
+  id: text('id').primaryKey(),
+  applicationId: text('application_id').notNull().references(() => applications.id),
+  candidateId: text('candidate_id').references(() => candidates.id),
+  overallRecommendation: text('overall_recommendation').notNull().default('HIRE'), // 'STRONG_HIRE' | 'HIRE' | 'WEAK_HIRE' | 'NO_HIRE'
+  overallScore: integer('overall_score').notNull().default(85),
+  durationMinutes: integer('duration_minutes').default(12),
+  executiveSummary: text('executive_summary').notNull(),
+  strengths: jsonb('strengths').$type<string[]>(),
+  weaknesses: jsonb('weaknesses').$type<string[]>(),
+  rubricBreakdown: jsonb('rubric_breakdown'),
+  transcript: jsonb('transcript'),
+  mediaUrls: jsonb('media_urls'),
+  createdAt: timestamp('created_at').defaultNow()
+});
+
+export const candidateTasks = pgTable('candidate_tasks', {
+  id: text('id').primaryKey(),
+  candidateId: text('candidate_id').notNull().references(() => candidates.id),
+  applicationId: text('application_id').notNull().references(() => applications.id),
+  title: text('title').notNull(),
+  description: text('description'),
+  type: text('type').notNull(), // 'mcq_assessment' | 'live_interview' | 'offer_signature'
+  status: text('status').notNull().default('pending'), // 'pending' | 'completed' | 'expired'
+  actionUrl: text('action_url'),
+  dueAt: timestamp('due_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  completedAt: timestamp('completed_at')
+});
 
 export const aiScreeningResults = pgTable('ai_screening_results', {
   id: text('id').primaryKey(),
