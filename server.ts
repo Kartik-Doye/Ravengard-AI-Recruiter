@@ -1322,10 +1322,10 @@ ${allRoutes.map(r => `  <url>
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    const buildPath = path.join(process.cwd(), 'build');
+    app.use(express.static(buildPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      res.sendFile(path.join(buildPath, 'index.html'));
     });
   }
 

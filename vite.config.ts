@@ -18,7 +18,7 @@ export default defineConfig(() => {
       watch: null,
     },
     build: {
-      outDir: 'dist',
+      outDir: 'build',
       emptyOutDir: false,
       chunkSizeWarningLimit: 1200,
       rollupOptions: {

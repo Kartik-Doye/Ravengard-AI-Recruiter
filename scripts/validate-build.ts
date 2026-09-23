@@ -2,11 +2,11 @@ import fs from 'fs';
 import path from 'path';
 
 function validateBuild() {
-  const distDir = path.resolve(process.cwd(), 'dist');
+  const distDir = path.resolve(process.cwd(), 'build');
   console.log('Validating build output in:', distDir);
 
   if (!fs.existsSync(distDir)) {
-    console.error('ERROR: Build directory "dist" does not exist!');
+    console.error('ERROR: Build directory "build" does not exist!');
     process.exit(1);
   }
 
@@ -26,7 +26,7 @@ function validateBuild() {
 
   const assetsDir = path.join(distDir, 'assets');
   if (!fs.existsSync(assetsDir)) {
-    console.error('ERROR: Missing "dist/assets" directory!');
+    console.error('ERROR: Missing "build/assets" directory!');
     process.exit(1);
   }
 
@@ -35,12 +35,12 @@ function validateBuild() {
   const hasCss = assetFiles.some((f) => f.endsWith('.css'));
 
   if (!hasJs) {
-    console.error('ERROR: No JavaScript bundles found in dist/assets!');
+    console.error('ERROR: No JavaScript bundles found in build/assets!');
     process.exit(1);
   }
 
   if (!hasCss) {
-    console.error('ERROR: No CSS bundles found in dist/assets!');
+    console.error('ERROR: No CSS bundles found in build/assets!');
     process.exit(1);
   }
 
