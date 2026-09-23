@@ -16,6 +16,8 @@ export const stageEnum = pgEnum('session_stage', [
 export const organizations = pgTable('organizations', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  billingTier: text('billing_tier').notNull().default('enterprise'),
+  isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow()
 });
 
@@ -38,6 +40,12 @@ export const candidates = pgTable('candidates', {
   preferredLanguage: text('preferred_language'),
   emailVerified: boolean('email_verified').default(false),
   organizationId: text('organization_id').references(() => organizations.id),
+  resumeUrl: text('resume_url'),
+  resumeText: text('resume_text'),
+  githubUsername: text('github_username'),
+  githubData: jsonb('github_data'),
+  timezone: text('timezone'),
+  country: text('country'),
   createdAt: timestamp('created_at').defaultNow()
 });
 
@@ -188,16 +196,35 @@ export const jobs = pgTable('jobs', {
   organizationId: text('organization_id').notNull().references(() => organizations.id),
   title: text('title').notNull(),
   department: text('department'),
+  location: text('location').default('Remote'),
+  employmentType: text('employment_type').default('Full-time'),
+  salaryRange: text('salary_range').default('$120k - $160k'),
   description: text('description').notNull(),
   requirementsJson: jsonb('requirements_json'), // target competencies, target skills, rubric criteria
   screeningThreshold: integer('screening_threshold').notNull().default(70),
   requireHumanRejectionApproval: boolean('require_human_rejection_approval').notNull().default(true),
-  status: text('status').notNull().default('active'), // 'active' | 'closed' | 'draft'
+  status: text('status').notNull().default('published'), // 'pending_approval' | 'published' | 'active' | 'closed' | 'draft' | 'archived'
+  approvalFeedback: text('approval_feedback'),
+  approvedBy: text('approved_by'),
+  approvedAt: timestamp('approved_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 }, (table) => [
   uniqueIndex('jobs_id_org_unique_idx').on(table.id, table.organizationId),
-  index('jobs_org_created_idx').on(table.organizationId, table.createdAt)
+  index('jobs_org_created_idx').on(table.organizationId, table.createdAt),
+  index('jobs_org_status_idx').on(table.organizationId, table.status)
+]);
+
+export const systemTelemetry = pgTable('system_telemetry', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organizations.id),
+  module: text('module').notNull(), // 'voice_interview' | 'mcq_battery' | 'resume_screening' | 'dossier_synthesis'
+  llmTokensUsed: integer('llm_tokens_used').notNull().default(0),
+  latencyMs: integer('latency_ms').notNull(),
+  recordedAt: timestamp('recorded_at').defaultNow().notNull()
+}, (table) => [
+  index('system_telemetry_org_rec_idx').on(table.organizationId, table.recordedAt),
+  index('system_telemetry_mod_rec_idx').on(table.module, table.recordedAt)
 ]);
 
 export const rubricDimensions = pgTable('rubric_dimensions', {

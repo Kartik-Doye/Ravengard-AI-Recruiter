@@ -8,14 +8,22 @@ import {
   resumeAnalyses,
   screeningQueue,
 } from "../db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, or, desc } from "drizzle-orm";
 import crypto from "crypto";
+import multer from "multer";
+import { isDisposableEmail, fetchGithubInsights, getCandidateTimezone } from "../services/publicApis";
+import { extractTextFromPdf } from "../services/pdfParser";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 export const publicJobsRouter = Router();
 
 /**
  * GET /api/jobs
- * Lists public active job openings.
+ * Lists public active & published job openings.
  */
 publicJobsRouter.get("/", async (req: Request, res: Response) => {
   try {
@@ -24,12 +32,16 @@ publicJobsRouter.get("/", async (req: Request, res: Response) => {
         id: jobs.id,
         title: jobs.title,
         department: jobs.department,
+        location: jobs.location,
+        employmentType: jobs.employmentType,
+        salaryRange: jobs.salaryRange,
         description: jobs.description,
         requirementsJson: jobs.requirementsJson,
         createdAt: jobs.createdAt,
       })
       .from(jobs)
-      .where(eq(jobs.status, "active"));
+      .where(or(eq(jobs.status, "active"), eq(jobs.status, "published")))
+      .orderBy(desc(jobs.createdAt));
 
     return res.json({ jobs: activeJobs });
   } catch (err: any) {
@@ -49,10 +61,10 @@ publicJobsRouter.get("/:id", async (req: Request, res: Response) => {
     const [job] = await db
       .select()
       .from(jobs)
-      .where(and(eq(jobs.id, jobId), eq(jobs.status, "active")))
+      .where(eq(jobs.id, jobId))
       .limit(1);
 
-    if (!job) {
+    if (!job || (job.status !== "active" && job.status !== "published")) {
       return res.status(404).json({ error: "Job posting not found or no longer active." });
     }
 
@@ -65,10 +77,10 @@ publicJobsRouter.get("/:id", async (req: Request, res: Response) => {
 
 /**
  * POST /api/jobs/:id/apply
- * Public candidate application submission.
- * Enqueues resume matching asynchronously to avoid 504 Gateway Timeouts.
+ * Public candidate application submission with Anti-Fraud Disposable Email Filter,
+ * GitHub Portfolio Enrichment, Timezone SLA Resolution, and PDF Parsing.
  */
-publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
+publicJobsRouter.post("/:id/apply", upload.single("resume"), async (req: Request, res: Response) => {
   const jobId = req.params.id;
   const {
     name,
@@ -78,8 +90,10 @@ publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
     degree,
     gradYear,
     preferredLanguage,
-    resumeText,
+    githubUsername,
   } = req.body;
+
+  let rawResumeText = req.body.resumeText || "";
 
   if (!email || !email.includes("@")) {
     return res.status(400).json({ error: "Valid email address is required." });
@@ -89,6 +103,26 @@ publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Candidate name is required." });
   }
 
+  // 1. Anti-Abuse Guard: Block disposable / temporary fake email domains
+  const isFake = await isDisposableEmail(email.trim());
+  if (isFake) {
+    return res.status(400).json({
+      error: "Disposable and temporary email addresses are not permitted. Please use your verified primary work or personal email.",
+    });
+  }
+
+  // 2. In-memory PDF text extraction if file was uploaded
+  if (req.file && (!rawResumeText || rawResumeText.trim().length === 0)) {
+    rawResumeText = await extractTextFromPdf(req.file.buffer);
+  }
+
+  // 3. Parallel Background Public API Enrichments (GitHub + Timezone)
+  const candidateIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0] || req.ip || "127.0.0.1";
+  const [githubData, locationInfo] = await Promise.all([
+    githubUsername ? fetchGithubInsights(String(githubUsername)) : Promise.resolve(null),
+    getCandidateTimezone(candidateIp),
+  ]);
+
   const pool = (db as any).session?.client || (global as any)._postgresPool;
   if (!pool) return res.status(500).json({ error: "Database client unavailable." });
 
@@ -97,11 +131,11 @@ publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
   try {
     await client.query("BEGIN");
 
-    // 1. Verify job exists and is active
+    // Verify job exists and is live
     const jobResult = await client.query(
       `SELECT id, organization_id, title, status, screening_threshold 
        FROM jobs 
-       WHERE id = $1 AND status = 'active';`,
+       WHERE id = $1 AND (status = 'active' OR status = 'published');`,
       [jobId]
     );
 
@@ -112,19 +146,24 @@ publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
 
     const job = jobResult.rows[0];
 
-    // 2. Upsert candidate
+    // Upsert candidate with enriched metadata
     const candidateId = `cand-${crypto.createHash("md5").update(email.toLowerCase().trim()).digest("hex").slice(0, 16)}`;
     await client.query(
       `INSERT INTO candidates (
-         id, email, name, mobile, college, degree, grad_year, preferred_language, organization_id
+         id, email, name, mobile, college, degree, grad_year, preferred_language, organization_id,
+         resume_text, github_username, github_data, timezone, country
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        ON CONFLICT (id) DO UPDATE SET
          name = EXCLUDED.name,
          mobile = COALESCE(EXCLUDED.mobile, candidates.mobile),
          college = COALESCE(EXCLUDED.college, candidates.college),
          degree = COALESCE(EXCLUDED.degree, candidates.degree),
-         grad_year = COALESCE(EXCLUDED.grad_year, candidates.grad_year);`,
+         grad_year = COALESCE(EXCLUDED.grad_year, candidates.grad_year),
+         resume_text = COALESCE(EXCLUDED.resume_text, candidates.resume_text),
+         github_data = COALESCE(EXCLUDED.github_data, candidates.github_data),
+         timezone = COALESCE(EXCLUDED.timezone, candidates.timezone),
+         country = COALESCE(EXCLUDED.country, candidates.country);`,
       [
         candidateId,
         email.toLowerCase().trim(),
@@ -135,10 +174,15 @@ publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
         gradYear ? Number(gradYear) : null,
         preferredLanguage ? String(preferredLanguage).trim() : "en",
         job.organization_id,
+        rawResumeText ? String(rawResumeText).slice(0, 4000) : null,
+        githubUsername ? String(githubUsername).trim() : null,
+        githubData ? JSON.stringify(githubData) : null,
+        locationInfo.timezone,
+        locationInfo.country,
       ]
     );
 
-    // 3. Check for existing application to this job
+    // Check for existing application
     const existingAppResult = await client.query(
       `SELECT id, status FROM applications WHERE candidate_id = $1 AND job_id = $2;`,
       [candidateId, jobId]
@@ -154,7 +198,7 @@ publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
       });
     }
 
-    // 4. Initialize session and store resume
+    // Initialize session
     const sessionId = `sess-${crypto.randomUUID()}`;
     await client.query(
       `INSERT INTO sessions (id, candidate_id, current_stage, status, locked)
@@ -162,15 +206,15 @@ publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
       [sessionId, candidateId]
     );
 
-    if (resumeText && String(resumeText).trim().length > 0) {
+    if (rawResumeText && String(rawResumeText).trim().length > 0) {
       await client.query(
         `INSERT INTO resume_analyses (id, session_id, raw_resume_text)
          VALUES ($1, $2, $3);`,
-        [`ra-${crypto.randomUUID()}`, sessionId, String(resumeText).trim()]
+        [`ra-${crypto.randomUUID()}`, sessionId, String(rawResumeText).trim()]
       );
     }
 
-    // 5. Create application record with strict 24-Hour SLA Timer
+    // Create application record with strict 24-Hour SLA Timer
     const applicationId = `app-${crypto.randomUUID()}`;
     const slaExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
@@ -182,7 +226,7 @@ publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
       [applicationId, jobId, candidateId, job.organization_id, sessionId, slaExpiresAt]
     );
 
-    // 6. Enqueue into screening_queue for asynchronous background matching
+    // Enqueue into screening_queue for async matching
     const queueId = `q-${crypto.randomUUID()}`;
     await client.query(
       `INSERT INTO screening_queue (id, application_id, organization_id, status)
@@ -208,6 +252,10 @@ publicJobsRouter.post("/:id/apply", async (req: Request, res: Response) => {
       slaExpiresAt,
       portalUrl: `/portal`,
       message: "Application received! 24-hour assessment window has started. Complete your assessment before the deadline.",
+      enrichment: {
+        timezone: locationInfo.timezone,
+        githubInsights: githubData ? { repoCount: githubData.publicRepoCount, languages: githubData.topLanguages } : null,
+      },
     });
   } catch (err: any) {
     await client.query("ROLLBACK");

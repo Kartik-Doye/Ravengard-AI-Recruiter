@@ -5,7 +5,7 @@ import { adminUsers } from "../db/schema";
 import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 
-export type AdminRole = "admin" | "reviewer" | "viewer";
+export type AdminRole = "admin" | "reviewer" | "viewer" | "super_admin";
 
 export interface AdminAuthRequest extends AuthRequest {
   admin?: {

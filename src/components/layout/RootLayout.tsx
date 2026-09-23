@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { NetworkStatusBanner } from "./NetworkStatusBanner.tsx";
 import { SiteHeader } from './SiteHeader';
 import { SiteFooter } from './SiteFooter';
-import { GeminiChatbot } from '../chat/GeminiChatbot';
 
 export default function RootLayout() {
   const location = useLocation();
@@ -59,7 +58,6 @@ export default function RootLayout() {
         </main>
 
         <SiteFooter />
-        <GeminiChatbot />
       </div>
     </>
   );

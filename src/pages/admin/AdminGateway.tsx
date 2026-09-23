@@ -9,6 +9,7 @@ import { ReportsPage } from './ReportsPage';
 import { FlagQueue } from './FlagQueue';
 import { AtsPipeline } from './AtsPipeline';
 import { JobsPage } from './JobsPage';
+import { AdminTelemetryDashboard } from './AdminTelemetryDashboard';
 import { ApiSettings } from '../../components/admin/ApiSettings';
 import { ShieldCheck, LogOut, ArrowLeft } from 'lucide-react';
 
@@ -79,6 +80,7 @@ export default function AdminGateway() {
     { label: 'Job Openings', path: '/admin/jobs' },
     { label: 'Candidate Ledger', path: '/admin' },
     { label: 'ATS & HR Funnel', path: '/admin/ats' },
+    { label: 'Telemetry & Governance', path: '/admin/telemetry' },
     { label: 'All Candidates', path: '/admin/candidates' },
     { label: 'Scorecards & Reports', path: '/admin/reports' },
     { label: 'Flagged Review Queue', path: '/admin/flags' },
@@ -157,6 +159,7 @@ export default function AdminGateway() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/jobs" element={<JobsPage />} />
           <Route path="/ats" element={<AtsPipeline />} />
+          <Route path="/telemetry" element={<AdminTelemetryDashboard />} />
           <Route path="/candidates" element={<CandidatesPage />} />
           <Route path="/candidates/:id" element={<CandidateDetail />} />
           <Route path="/reports" element={<ReportsPage />} />

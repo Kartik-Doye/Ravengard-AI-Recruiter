@@ -8,17 +8,28 @@ export async function syncFunnelTablesAndSeed() {
 
   try {
     // 1. Ensure table columns exist
-    await client.query(`
-      ALTER TABLE candidates ADD COLUMN IF NOT EXISTS password_hash TEXT;
-      ALTER TABLE applications ADD COLUMN IF NOT EXISTS assessment_expires_at TIMESTAMP;
-      ALTER TABLE applications ADD COLUMN IF NOT EXISTS sla_expires_at TIMESTAMP;
-      ALTER TABLE applications ADD COLUMN IF NOT EXISTS mcq_score INTEGER;
-      ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_score INTEGER;
-      ALTER TABLE applications ADD COLUMN IF NOT EXISTS offer_details_json JSONB;
-      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS location TEXT DEFAULT 'Remote';
-      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS employment_type TEXT DEFAULT 'Full-time';
-      ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_range TEXT DEFAULT '$120k - $160k';
-    `);
+    const initialAlters = [
+      `ALTER TABLE candidates ADD COLUMN IF NOT EXISTS password_hash TEXT`,
+      `ALTER TABLE applications ADD COLUMN IF NOT EXISTS assessment_expires_at TIMESTAMP`,
+      `ALTER TABLE applications ADD COLUMN IF NOT EXISTS sla_expires_at TIMESTAMP`,
+      `ALTER TABLE applications ADD COLUMN IF NOT EXISTS mcq_score INTEGER`,
+      `ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_score INTEGER`,
+      `ALTER TABLE applications ADD COLUMN IF NOT EXISTS offer_details_json JSONB`,
+      `ALTER TABLE applications ADD COLUMN IF NOT EXISTS magic_token_hash TEXT`,
+      `ALTER TABLE applications ADD COLUMN IF NOT EXISTS magic_token_expires_at TIMESTAMP`,
+      `ALTER TABLE applications ADD COLUMN IF NOT EXISTS magic_token_used_at TIMESTAMP`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS location TEXT DEFAULT 'Remote'`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS employment_type TEXT DEFAULT 'Full-time'`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_range TEXT DEFAULT '$120k - $160k'`
+    ];
+
+    for (const sql of initialAlters) {
+      try {
+        await client.query(sql);
+      } catch {
+        // Safe fallback
+      }
+    }
 
     // 2. Create Rubric Dimensions table
     await client.query(`

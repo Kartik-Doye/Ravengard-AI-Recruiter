@@ -20,6 +20,7 @@ import crypto from "crypto";
 import fs from "fs/promises";
 import { registrationSchema, reportSchema } from "./src/lib/validation";
 import adminRoutes from "./src/routes/admin";
+import telemetryRouter from "./src/routes/telemetry";
 import candidateRoutes from "./src/routes/candidate";
 import { hrRouter } from "./src/routes/hr";
 import { candidatePortalRouter } from "./src/routes/candidatePortal";
@@ -178,6 +179,47 @@ app.post("/api/admin/login", async (req, res) => {
   });
 });
 
+// Candidate Mock Login / Quick Auth for demo & test flows
+app.post("/api/auth/candidate-mock-login", async (req, res) => {
+  try {
+    const { email, name } = req.body || {};
+    const candidateEmail = (email || `test-${crypto.randomUUID().slice(0, 8)}@example.com`).toLowerCase().trim();
+    const candidateName = name || "Test Candidate";
+    const candidateId = `cand-${crypto.createHash("md5").update(candidateEmail).digest("hex").slice(0, 16)}`;
+
+    // Upsert candidate record
+    const pool = (db as any).session?.client || (global as any)._postgresPool;
+    if (pool) {
+      await pool.query(`
+        INSERT INTO candidates (id, email, name, organization_id)
+        VALUES ($1, $2, $3, 'org-ravengard-default')
+        ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
+      `, [candidateId, candidateEmail, candidateName]);
+    }
+
+    const { signCandidateProfileJwt } = await import("./src/services/magicTokenService");
+    const token = signCandidateProfileJwt({
+      id: candidateId,
+      email: candidateEmail,
+      name: candidateName,
+    });
+
+    res.status(200).json({
+      success: true,
+      token,
+      candidate: {
+        id: candidateId,
+        email: candidateEmail,
+        name: candidateName,
+      },
+    });
+  } catch (err: any) {
+    console.error("Candidate mock login error:", err);
+    res.status(500).json({ success: false, error: "Mock login failed" });
+  }
+});
+
+app.use("/api/admin/telemetry", telemetryRouter);
 app.use("/api/admin", adminRoutes);
 app.use("/api/candidate", candidatePortalRouter);
 app.use("/api/candidate", candidateRoutes);
@@ -1082,7 +1124,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
   // Vite middleware for development (placed strictly AFTER all API routes)
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false, watch: null },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -1114,6 +1156,15 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
   setInterval(() => {
      console.log(`Cron: Checking cumulative LLM API spend against threshold...`);
   }, 24 * 60 * 60 * 1000); 
+
+  // Ensure database schemas, funnel tables, question banks, admin users, and completed candidate audit records are present
+  try {
+    const { syncFunnelTablesAndSeed } = await import("./src/db/syncFunnelTables");
+    await syncFunnelTablesAndSeed();
+    await seedCompletedCandidatesAndAdmin();
+  } catch (seedErr) {
+    console.warn("Seeding completed candidates warning:", seedErr);
+  }
 
   // --- Asynchronous Background Workers for Screening Queue & Transactional Email Outbox ---
   let isScreeningRunning = false;
@@ -1179,15 +1230,6 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
     console.error("Global Error Handler:", err);
     res.status(err.status || 500).json({ error: err.message || "Internal Server Error" });
   });
-
-  // Ensure database schemas, funnel tables, question banks, admin users, and completed candidate audit records are present
-  try {
-    const { syncFunnelTablesAndSeed } = await import("./src/db/syncFunnelTables");
-    await syncFunnelTablesAndSeed();
-    await seedCompletedCandidatesAndAdmin();
-  } catch (seedErr) {
-    console.warn("Seeding completed candidates warning:", seedErr);
-  }
 
   try {
     const { validateStartupConfiguration } = await import("./src/startupValidator");

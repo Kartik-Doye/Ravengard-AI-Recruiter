@@ -17,21 +17,39 @@
     <meta property="og:description" content="An AI-conducted mock interview platform that acts as a definitive first-pass candidate filter." />
     <script>
       // Suppress benign Vite HMR websocket disconnection errors in AI Studio iframe container
-      window.addEventListener('unhandledrejection', function (event) {
-        var reason = event && event.reason;
-        var msg = (reason && (reason.message || String(reason))) || '';
-        if (msg.indexOf('WebSocket closed without opened') !== -1 || msg.indexOf('failed to connect to websocket') !== -1) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-        }
-      });
-      window.addEventListener('error', function (event) {
-        var msg = (event && (event.message || String(event))) || '';
-        if (msg.indexOf('WebSocket closed without opened') !== -1 || msg.indexOf('failed to connect to websocket') !== -1) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-        }
-      });
+      (function() {
+        var origError = console.error;
+        var origWarn = console.warn;
+        console.error = function() {
+          var str = Array.prototype.join.call(arguments, ' ');
+          if (str.indexOf('WebSocket closed without opened') !== -1 || str.indexOf('failed to connect to websocket') !== -1 || str.indexOf('[vite] failed to connect') !== -1) {
+            return;
+          }
+          return origError.apply(console, arguments);
+        };
+        console.warn = function() {
+          var str = Array.prototype.join.call(arguments, ' ');
+          if (str.indexOf('WebSocket closed without opened') !== -1 || str.indexOf('failed to connect to websocket') !== -1 || str.indexOf('[vite] failed to connect') !== -1) {
+            return;
+          }
+          return origWarn.apply(console, arguments);
+        };
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event && event.reason;
+          var msg = (reason && (reason.message || String(reason))) || '';
+          if (msg.indexOf('WebSocket closed without opened') !== -1 || msg.indexOf('failed to connect to websocket') !== -1) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        });
+        window.addEventListener('error', function (event) {
+          var msg = (event && (event.message || String(event))) || '';
+          if (msg.indexOf('WebSocket closed without opened') !== -1 || msg.indexOf('failed to connect to websocket') !== -1) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        });
+      })();
     </script>
   </head>
   <body>

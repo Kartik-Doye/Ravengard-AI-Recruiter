@@ -68,6 +68,115 @@ router.get("/jobs", async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/jobs/pending ──────────────────────────────────────────────
+// Requisitions waiting for Super Admin approval
+router.get("/jobs/pending", async (req, res) => {
+  try {
+    const pendingJobs = await db
+      .select()
+      .from(jobs)
+      .where(eq(jobs.status, "pending_approval"))
+      .orderBy(desc(jobs.createdAt));
+
+    res.json({ success: true, jobs: pendingJobs });
+  } catch (e: any) {
+    console.error("admin/jobs/pending error:", e);
+    res.status(500).json({ error: "Failed to fetch pending jobs." });
+  }
+});
+
+// ─── PATCH /api/admin/jobs/:id/approve ────────────────────────────────────────
+// Super Admin review and 1-click publishing
+router.patch("/jobs/:id/approve", requireRole("admin", "super_admin") as any, async (req, res) => {
+  try {
+    const jobId = req.params.id;
+    const adminReq = req as AdminAuthRequest;
+
+    const [updatedJob] = await db
+      .update(jobs)
+      .set({
+        status: "published",
+        approvedBy: adminReq.admin?.id || "super_admin",
+        approvedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(jobs.id, jobId))
+      .returning();
+
+    if (!updatedJob) {
+      return res.status(404).json({ error: "Job requisition not found or already published." });
+    }
+
+    await logAdminAction({
+      adminId: adminReq.admin!.id,
+      role: adminReq.admin!.role,
+      action: "approve_job",
+      target: `job:${jobId}`,
+      metadata: { status: "published" },
+      requestId: (req as any).requestId,
+      ip: req.ip,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Job approved. It is now live on the Candidate Portal.",
+      data: {
+        jobId: updatedJob.id,
+        status: updatedJob.status,
+      },
+    });
+  } catch (error) {
+    console.error("Admin approval error:", error);
+    res.status(500).json({ error: "Failed to approve job requisition." });
+  }
+});
+
+// ─── PATCH /api/admin/jobs/:id/reject ─────────────────────────────────────────
+// Super Admin rejection with feedback note
+router.patch("/jobs/:id/reject", requireRole("admin", "super_admin") as any, async (req, res) => {
+  try {
+    const jobId = req.params.id;
+    const { feedback } = req.body || {};
+    const adminReq = req as AdminAuthRequest;
+
+    const [updatedJob] = await db
+      .update(jobs)
+      .set({
+        status: "draft",
+        approvalFeedback: feedback || "Requisition requires revisions before publishing.",
+        updatedAt: new Date(),
+      })
+      .where(eq(jobs.id, jobId))
+      .returning();
+
+    if (!updatedJob) {
+      return res.status(404).json({ error: "Job requisition not found." });
+    }
+
+    await logAdminAction({
+      adminId: adminReq.admin!.id,
+      role: adminReq.admin!.role,
+      action: "reject_job",
+      target: `job:${jobId}`,
+      metadata: { feedback },
+      requestId: (req as any).requestId,
+      ip: req.ip,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Job sent back to HR drafts for revision.",
+      data: {
+        jobId: updatedJob.id,
+        status: updatedJob.status,
+      },
+    });
+  } catch (error) {
+    console.error("Admin job rejection error:", error);
+    res.status(500).json({ error: "Failed to reject job requisition." });
+  }
+});
+
 // ─── POST /api/admin/jobs ─────────────────────────────────────────────────────
 // Create new Job Opening (e.g., Senior Distributed Systems Engineer)
 // Minimum role: reviewer or admin
