@@ -10,14 +10,28 @@ import {
   FileText, 
   Loader2, 
   Sparkles, 
-  RefreshCw,
-  CheckCircle2,
-  Lock,
-  Eye,
-  EyeOff,
-  KeyRound
+  RefreshCw, 
+  CheckCircle2, 
+  Lock, 
+  Eye, 
+  EyeOff, 
+  KeyRound,
+  Globe,
+  Phone,
+  Search
 } from 'lucide-react';
-import { PasswordStrengthIndicator } from './auth/PasswordStrengthIndicator';
+import { 
+  PasswordStrengthIndicator, 
+  evaluatePasswordStrength, 
+  getPasswordStrength 
+} from './auth/PasswordStrengthIndicator';
+import { 
+  COUNTRIES, 
+  CountryInfo, 
+  DEFAULT_COUNTRY, 
+  detectDefaultCountry, 
+  validateNationalPhone 
+} from '../lib/countryData';
 
 const COMMON_COLLEGES = [
   "Massachusetts Institute of Technology",
@@ -67,30 +81,44 @@ const DEGREE_OPTIONS = [
 
 const GRAD_YEARS = Array.from({ length: 11 }, (_, i) => (2020 + i).toString());
 
-// Standard Phone Formatter & Validator
-export function validatePhoneFormat(phone: string): { valid: boolean; warning?: string } {
+// Backward-compatible phone validator export
+export function validatePhoneFormat(phone: string, country?: CountryInfo): { valid: boolean; warning?: string } {
   const trimmed = (phone || '').trim();
   if (!trimmed) {
     return { valid: false, warning: "Mobile number is required" };
   }
+  if (country) {
+    return validateNationalPhone(trimmed, country);
+  }
   const digits = trimmed.replace(/\D/g, '');
-  
-  // Accepts standard formats: (123) 456-7890, 123-456-7890, 123.456.7890, 1234567890, +1 123-456-7890, international 10-15 digits
-  const formatValid = /^(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}$/.test(trimmed) ||
-                      /^\+?[0-9\s\-().]{10,20}$/.test(trimmed);
-
-  if (digits.length < 10 || digits.length > 15 || !formatValid) {
-    return { valid: false, warning: "Please enter a valid 10-digit phone number" };
+  if (digits.length < 7 || digits.length > 16) {
+    return { valid: false, warning: "Please enter a valid phone number" };
   }
   return { valid: true };
 }
 
 export default function Registration({ user, onComplete }: { user: string, onComplete: (user: string) => void }) {
   const { addToast } = useToast();
+
+  // Country & Dialing Code state
+  const [selectedCountry, setSelectedCountry] = useState<CountryInfo>(DEFAULT_COUNTRY);
+  const [selectedDialCountry, setSelectedDialCountry] = useState<CountryInfo>(DEFAULT_COUNTRY);
+  const [phoneLocal, setPhoneLocal] = useState('');
+  
+  // Country & Dial picker dropdowns state
+  const [isCountryPickerOpen, setIsCountryPickerOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
+  const [isDialPickerOpen, setIsDialPickerOpen] = useState(false);
+  const [dialSearch, setDialSearch] = useState('');
+  
+  const countryRef = useRef<HTMLDivElement>(null);
+  const dialRef = useRef<HTMLDivElement>(null);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     mobile: '',
+    country: DEFAULT_COUNTRY.name,
     college: '',
     degree: '',
     gradYear: '2024',
@@ -117,26 +145,128 @@ export default function Registration({ user, onComplete }: { user: string, onCom
   const [isCollegeOpen, setIsCollegeOpen] = useState(false);
   const collegeRef = useRef<HTMLDivElement>(null);
 
+  // 1. Auto-detect Country & Calling Code on Mount via Locale & Timezone + IP fallback
+  useEffect(() => {
+    const detected = detectDefaultCountry();
+    setSelectedCountry(detected);
+    setSelectedDialCountry(detected);
+    setFormData(prev => ({
+      ...prev,
+      country: detected.name
+    }));
+
+    // Async IP-based geolocation check to detect exact ISP country if available
+    const controller = new AbortController();
+    fetch('https://ipapi.co/json/', { signal: controller.signal })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.country_code) {
+          const match = COUNTRIES.find(c => c.code === data.country_code);
+          if (match) {
+            setSelectedCountry(match);
+            setSelectedDialCountry(match);
+            setFormData(prev => ({
+              ...prev,
+              country: match.name
+            }));
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback silently to browser locale / timezone detection
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  // Filtered lists for typeahead / search
+  const filteredCountries = countrySearch.trim() === ''
+    ? COUNTRIES
+    : COUNTRIES.filter(c => 
+        c.name.toLowerCase().includes(countrySearch.toLowerCase()) || 
+        c.code.toLowerCase().includes(countrySearch.toLowerCase()) ||
+        c.dialCode.includes(countrySearch)
+      );
+
+  const filteredDialCountries = dialSearch.trim() === ''
+    ? COUNTRIES
+    : COUNTRIES.filter(c => 
+        c.name.toLowerCase().includes(dialSearch.toLowerCase()) || 
+        c.dialCode.includes(dialSearch) ||
+        c.code.toLowerCase().includes(dialSearch.toLowerCase())
+      );
+
   const filteredColleges = collegeSearch.trim() === ''
     ? COMMON_COLLEGES.slice(0, 8)
     : COMMON_COLLEGES.filter(c => c.toLowerCase().includes(collegeSearch.toLowerCase()));
 
+  // Outside click handlers
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (collegeRef.current && !collegeRef.current.contains(e.target as Node)) {
         setIsCollegeOpen(false);
+      }
+      if (countryRef.current && !countryRef.current.contains(e.target as Node)) {
+        setIsCountryPickerOpen(false);
+      }
+      if (dialRef.current && !dialRef.current.contains(e.target as Node)) {
+        setIsDialPickerOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Update E.164 phone whenever local number or dial country changes
+  const handlePhoneChange = (val: string, dialCountry: CountryInfo = selectedDialCountry) => {
+    setPhoneLocal(val);
+    const digits = val.replace(/\D/g, '');
+    let cleanDigits = digits;
+    if (dialCountry.code !== 'US' && dialCountry.code !== 'CA' && cleanDigits.startsWith('0')) {
+      cleanDigits = cleanDigits.substring(1);
+    }
+    const e164 = digits.length > 0 ? `${dialCountry.dialCode}${cleanDigits}` : '';
+    setFormData(prev => ({ ...prev, mobile: e164 }));
+
+    const check = validateNationalPhone(val, dialCountry);
+    if (!check.valid && val.trim().length > 0) {
+      setErrors(prev => ({ ...prev, mobile: check.warning || `Invalid phone format for ${dialCountry.name}` }));
+    } else {
+      setErrors(prev => ({ ...prev, mobile: '' }));
+    }
+  };
+
+  // When candidate selects Country of Residence:
+  const handleCountrySelect = (country: CountryInfo) => {
+    setSelectedCountry(country);
+    // Auto-synchronize calling code dropdown to match residence country
+    setSelectedDialCountry(country);
+    setFormData(prev => ({ ...prev, country: country.name }));
+    setIsCountryPickerOpen(false);
+    setCountrySearch('');
+
+    // Revalidate phone number against new country rules
+    if (phoneLocal) {
+      handlePhoneChange(phoneLocal, country);
+    }
+    setErrors(prev => ({ ...prev, country: '' }));
+  };
+
+  // When candidate selects a different STD calling code prefix:
+  const handleDialCodeSelect = (country: CountryInfo) => {
+    setSelectedDialCountry(country);
+    setIsDialPickerOpen(false);
+    setDialSearch('');
+    if (phoneLocal) {
+      handlePhoneChange(phoneLocal, country);
+    }
+  };
+
   const validateField = (field: string, value: any) => {
-    // Immediate inline check for phone number
     if (field === 'mobile') {
-      const phoneCheck = validatePhoneFormat(value);
-      if (!phoneCheck.valid) {
-        setErrors(prev => ({ ...prev, mobile: phoneCheck.warning || "Please enter a valid 10-digit phone number" }));
+      const check = validateNationalPhone(phoneLocal, selectedDialCountry);
+      if (!check.valid) {
+        setErrors(prev => ({ ...prev, mobile: check.warning || `Please enter a valid phone number for ${selectedDialCountry.name}` }));
         return;
       }
     }
@@ -187,6 +317,7 @@ export default function Registration({ user, onComplete }: { user: string, onCom
         name: p.name || formData.name,
         email: p.email || formData.email,
         mobile: p.mobile || formData.mobile,
+        country: p.country || formData.country,
         college: p.college || formData.college,
         degree: p.degree || formData.degree,
         gradYear: p.gradYear ? String(p.gradYear) : formData.gradYear,
@@ -197,6 +328,24 @@ export default function Registration({ user, onComplete }: { user: string, onCom
         ...prev,
         ...newValues
       }));
+
+      if (p.mobile) {
+        // Detect if mobile has a country code prefix
+        const rawDigits = p.mobile.replace(/\D/g, '');
+        const matchedCountry = COUNTRIES.find(c => p.mobile.startsWith(c.dialCode)) || selectedDialCountry;
+        setSelectedDialCountry(matchedCountry);
+        const stripped = p.mobile.startsWith(matchedCountry.dialCode)
+          ? p.mobile.slice(matchedCountry.dialCode.length).trim()
+          : p.mobile;
+        setPhoneLocal(stripped);
+      }
+
+      if (p.country) {
+        const cMatch = COUNTRIES.find(c => c.name.toLowerCase() === p.country.toLowerCase() || c.code.toLowerCase() === p.country.toLowerCase());
+        if (cMatch) {
+          setSelectedCountry(cMatch);
+        }
+      }
 
       if (p.college) {
         setCollegeSearch(p.college);
@@ -209,8 +358,6 @@ export default function Registration({ user, onComplete }: { user: string, onCom
       setParsedFileName(file.name);
       setParsedFileSize(file.size);
       setParseSuccessMsg(`Resume "${file.name}" parsed cleanly! Details have been pre-filled below.`);
-
-      // Clear any previous field errors since fields were pre-filled
       setErrors({});
     } catch (err: any) {
       console.error("Resume parse error:", err);
@@ -249,12 +396,18 @@ export default function Registration({ user, onComplete }: { user: string, onCom
     } catch (err: any) {
       console.error("Sample resume load error:", err);
       // Fallback pre-fill directly
+      const usCountry = COUNTRIES.find(c => c.code === 'US') || DEFAULT_COUNTRY;
+      setSelectedCountry(usCountry);
+      setSelectedDialCountry(usCountry);
+      setPhoneLocal('(555) 019-2834');
+      
       if (type === 'docx') {
         setFormData(prev => ({
           ...prev,
           name: 'Elena Rostova',
           email: 'elena.rostova@example.com',
-          mobile: '(555) 019-2834',
+          mobile: '+15550192834',
+          country: 'United States',
           college: 'Stanford University',
           degree: 'M.S. Machine Learning & AI',
           gradYear: '2025'
@@ -266,7 +419,8 @@ export default function Registration({ user, onComplete }: { user: string, onCom
           ...prev,
           name: 'Alex Rivera',
           email: 'alex.rivera@example.com',
-          mobile: '(555) 019-2834',
+          mobile: '+15550192834',
+          country: 'United States',
           college: 'University of California, Berkeley',
           degree: 'B.S. Computer Science',
           gradYear: '2024'
@@ -281,7 +435,7 @@ export default function Registration({ user, onComplete }: { user: string, onCom
     }
   };
 
-  const isPhoneValid = validatePhoneFormat(formData.mobile).valid;
+  const isPhoneValid = validateNationalPhone(phoneLocal, selectedDialCountry).valid;
 
   const isFormValid = Boolean(
     isAdult &&
@@ -298,16 +452,36 @@ export default function Registration({ user, onComplete }: { user: string, onCom
     setServerErrors([]);
     
     // Check phone format first to provide inline warning if invalid
-    const phoneCheck = validatePhoneFormat(formData.mobile);
+    const phoneCheck = validateNationalPhone(phoneLocal, selectedDialCountry);
     let newErrors: Record<string, string> = {};
     let hasErrors = false;
 
     if (!phoneCheck.valid) {
       hasErrors = true;
-      newErrors['mobile'] = phoneCheck.warning || "Please enter a valid 10-digit phone number";
+      newErrors['mobile'] = phoneCheck.warning || `Please enter a valid phone number for ${selectedDialCountry.name}`;
     }
 
-    const result = registrationSchema.safeParse(formData);
+    // Password strength gatekeeper
+    if (password) {
+      const emailPrefix = formData.email ? formData.email.split('@')[0] : '';
+      const strength = evaluatePasswordStrength(password, [formData.name, emailPrefix]);
+      if (!strength.isValid) {
+        hasErrors = true;
+        newErrors['password'] = 'Please choose a stronger password (at least 8 characters with Score 3/Strong) before continuing.';
+      }
+    }
+
+    const payloadMobile = phoneCheck.valid && phoneCheck.e164 
+      ? phoneCheck.e164 
+      : `${selectedDialCountry.dialCode}${phoneLocal.replace(/\D/g, '')}`;
+
+    const submissionData = {
+      ...formData,
+      mobile: payloadMobile,
+      country: selectedCountry.name
+    };
+
+    const result = registrationSchema.safeParse(submissionData);
     if (!result.success) {
       hasErrors = true;
       result.error.issues.forEach(err => {
@@ -343,7 +517,7 @@ export default function Registration({ user, onComplete }: { user: string, onCom
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
-            ...formData,
+            ...submissionData,
             resumeText: resumeText || undefined
           }),
           signal: controller.signal
@@ -362,7 +536,6 @@ export default function Registration({ user, onComplete }: { user: string, onCom
       if (res.ok && data?.success !== false) {
         onComplete(user);
       } else {
-        // Extract EXACT error messages returned by API payload — replace generic banners
         const errorList: string[] = [];
         if (data?.errors && Array.isArray(data.errors) && data.errors.length > 0) {
           data.errors.forEach((err: any) => {
@@ -380,15 +553,15 @@ export default function Registration({ user, onComplete }: { user: string, onCom
         } else if (data?.message && typeof data.message === 'string') {
           errorList.push(data.message);
         } else {
-          errorList.push(`Registration request failed (${res.status} ${res.statusText || 'Server Error'})`);
+          errorList.push("Registration failed. Please check your details and try again.");
         }
         setServerErrors(errorList);
       }
-    } catch (error: any) {
-      if (error?.name === 'AbortError') {
-        setServerErrors(['Registration request timed out. Please check your network and retry.']);
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        setServerErrors(["Registration request timed out. Please try again."]);
       } else {
-        setServerErrors([error?.message || 'Network connectivity error. Please check your connection.']);
+        setServerErrors([e.message || "An unexpected network error occurred."]);
       }
     } finally {
       setLoading(false);
@@ -396,7 +569,7 @@ export default function Registration({ user, onComplete }: { user: string, onCom
   };
 
   return (
-    <div className="max-w-[680px] mx-auto py-4">
+    <div className="max-w-[760px] mx-auto py-8 px-4 font-sans">
       <div className="mb-6">
         <h1 className="text-3xl font-semibold mb-2 text-white tracking-tight">Complete your profile</h1>
         <p className="text-white/60 text-sm">
@@ -588,34 +761,180 @@ export default function Registration({ user, onComplete }: { user: string, onCom
               {errors.email && <p id="email-error" className="mt-1.5 text-xs text-[var(--color-error)] flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5 shrink-0" />{errors.email}</p>}
             </div>
 
-            {/* Mobile Number with Format Validation & Inline Warning */}
-            <div>
-              <label htmlFor="mobile" className="block text-xs font-semibold uppercase tracking-wider text-white/70 mb-1.5">
-                Mobile Number <span className="text-violet-400">*</span>
+            {/* 1. Country / Region Selection Field */}
+            <div className="relative" ref={countryRef}>
+              <label htmlFor="country-selector" className="block text-xs font-semibold uppercase tracking-wider text-white/70 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5 text-violet-400" />
+                  Country / Region of Residence <span className="text-violet-400">*</span>
+                </span>
+                <span className="text-[10px] text-white/40 normal-case">ISO Search & Typeahead</span>
               </label>
-              <input 
-                type="tel" 
-                id="mobile" 
-                placeholder="(555) 019-2834 or +1 (555) 019-2834"
-                aria-invalid={!!errors.mobile} 
-                aria-errormessage="mobile-error" 
-                aria-required="true" 
-                value={formData.mobile} 
-                onBlur={() => handleBlur('mobile')} 
-                onChange={e => { 
-                  const val = e.target.value;
-                  setFormData({...formData, mobile: val}); 
-                  validateField('mobile', val); 
-                }} 
-                className={`w-full px-3.5 py-2.5 border ${errors.mobile ? 'border-[var(--color-error)] ring-1 ring-[var(--color-error)]/30' : 'border-white/10 focus:border-violet-400'} bg-white/5 rounded-lg focus:ring-2 focus:ring-violet-500/30 outline-none text-sm text-white placeholder-white/25 transition-all`} 
-              />
+              <div className="relative">
+                <button
+                  type="button"
+                  id="country-selector"
+                  onClick={() => setIsCountryPickerOpen(prev => !prev)}
+                  className={`w-full px-3.5 py-2.5 border ${
+                    errors.country ? 'border-[var(--color-error)]' : 'border-white/10 hover:border-white/20 focus:border-violet-400'
+                  } bg-white/5 rounded-lg focus:ring-2 focus:ring-violet-500/30 outline-none text-sm text-white flex items-center justify-between transition-all text-left`}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <span className="text-lg leading-none">{selectedCountry.flag}</span>
+                    <span className="font-medium text-white truncate">{selectedCountry.name}</span>
+                    <span className="px-1.5 py-0.5 text-[10px] font-mono bg-white/10 text-white/60 rounded">
+                      {selectedCountry.code}
+                    </span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-white/40 shrink-0 transition-transform ${isCountryPickerOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Country Search & Selection Popover */}
+                {isCountryPickerOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-40 max-h-64 overflow-y-auto rounded-xl border border-white/15 bg-[#121826] shadow-2xl backdrop-blur-2xl p-2 text-sm animate-in fade-in duration-150">
+                    <div className="relative mb-2">
+                      <Search className="w-3.5 h-3.5 text-white/40 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search country or code (e.g. India, US, +91)..."
+                        value={countrySearch}
+                        onChange={(e) => setCountrySearch(e.target.value)}
+                        autoFocus
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 outline-none focus:border-violet-400"
+                      />
+                    </div>
+
+                    <div className="space-y-0.5">
+                      {filteredCountries.length > 0 ? (
+                        filteredCountries.map((c) => {
+                          const isSelected = selectedCountry.code === c.code;
+                          return (
+                            <button
+                              key={c.code}
+                              type="button"
+                              onClick={() => handleCountrySelect(c)}
+                              className={`w-full text-left px-3 py-2 rounded-lg flex items-center justify-between hover:bg-white/10 transition-colors ${
+                                isSelected ? 'bg-violet-600/25 text-violet-300 font-medium' : 'text-zinc-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 truncate">
+                                <span className="text-base">{c.flag}</span>
+                                <span className="truncate">{c.name}</span>
+                                <span className="text-[11px] font-mono text-white/40">({c.code})</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-xs font-mono text-violet-400/80">{c.dialCode}</span>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-violet-400 shrink-0" />}
+                              </div>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="px-3 py-2 text-xs text-white/40 italic">
+                          No matching country found.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {errors.country && <p className="mt-1.5 text-xs text-[var(--color-error)] flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5 shrink-0" />{errors.country}</p>}
+            </div>
+
+            {/* 2. Integrated Phone STD Dialing Code Selector & Dynamic Validation */}
+            <div className="relative">
+              <label htmlFor="mobile-input" className="block text-xs font-semibold uppercase tracking-wider text-white/70 mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5 text-violet-400" />
+                  Mobile Number <span className="text-violet-400">*</span>
+                </span>
+                <span className="text-[10px] text-white/40 normal-case">E.164 International Format</span>
+              </label>
+
+              <div className="flex items-center gap-2" ref={dialRef}>
+                {/* STD Dialing Code Dropdown Prefix */}
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsDialPickerOpen(prev => !prev)}
+                    className="h-10 px-3 border border-white/10 bg-white/5 hover:bg-white/10 rounded-lg flex items-center gap-1.5 text-sm text-white focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 outline-none transition-all cursor-pointer font-mono"
+                    title={`Calling Code: ${selectedDialCountry.name} (${selectedDialCountry.dialCode})`}
+                  >
+                    <span className="text-base leading-none">{selectedDialCountry.flag}</span>
+                    <span className="font-semibold text-white/90">{selectedDialCountry.dialCode}</span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-white/40 transition-transform ${isDialPickerOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Dialing Code Selector Popover */}
+                  {isDialPickerOpen && (
+                    <div className="absolute left-0 top-full mt-1.5 z-50 w-64 max-h-60 overflow-y-auto rounded-xl border border-white/15 bg-[#121826] shadow-2xl backdrop-blur-2xl p-2 text-sm animate-in fade-in duration-150">
+                      <div className="relative mb-2">
+                        <Search className="w-3 h-3 text-white/40 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Search code (e.g. +91, UK)..."
+                          value={dialSearch}
+                          onChange={(e) => setDialSearch(e.target.value)}
+                          autoFocus
+                          className="w-full pl-7 pr-2.5 py-1 text-xs bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 outline-none focus:border-violet-400"
+                        />
+                      </div>
+
+                      <div className="space-y-0.5">
+                        {filteredDialCountries.map((c) => {
+                          const isSelected = selectedDialCountry.code === c.code;
+                          return (
+                            <button
+                              key={c.code}
+                              type="button"
+                              onClick={() => handleDialCodeSelect(c)}
+                              className={`w-full text-left px-2.5 py-1.5 rounded-md flex items-center justify-between hover:bg-white/10 transition-colors ${
+                                isSelected ? 'bg-violet-600/25 text-violet-300 font-medium' : 'text-zinc-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <span className="text-sm">{c.flag}</span>
+                                <span className="text-xs truncate">{c.name}</span>
+                              </div>
+                              <span className="text-xs font-mono font-semibold text-violet-400 shrink-0 ml-1.5">
+                                {c.dialCode}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Local Phone Number Input with Dynamic Placeholder */}
+                <div className="flex-1">
+                  <input 
+                    type="tel" 
+                    id="mobile-input" 
+                    placeholder={selectedDialCountry.formatHint}
+                    aria-invalid={!!errors.mobile} 
+                    aria-errormessage="mobile-error" 
+                    aria-required="true" 
+                    value={phoneLocal} 
+                    onBlur={() => handleBlur('mobile')} 
+                    onChange={e => handlePhoneChange(e.target.value)} 
+                    className={`w-full h-10 px-3.5 border ${
+                      errors.mobile ? 'border-[var(--color-error)] ring-1 ring-[var(--color-error)]/30' : 'border-white/10 focus:border-violet-400'
+                    } bg-white/5 rounded-lg focus:ring-2 focus:ring-violet-500/30 outline-none text-sm text-white placeholder-white/25 transition-all font-mono`} 
+                  />
+                </div>
+              </div>
+
               {errors.mobile ? (
                 <p id="mobile-error" className="mt-1.5 text-xs text-[var(--color-error)] flex items-center gap-1.5 font-medium animate-in fade-in duration-150">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>{errors.mobile}</span>
                 </p>
               ) : (
-                <p className="mt-1 text-[11px] text-white/40">Standard 10-digit format (e.g. (555) 019-2834 or 555-019-2834)</p>
+                <p className="mt-1 text-[11px] text-white/40">
+                  Format for {selectedDialCountry.name}: <span className="font-mono text-white/60">{selectedDialCountry.formatHint}</span> (Full E.164: <span className="font-mono text-violet-400">{selectedDialCountry.dialCode}{phoneLocal.replace(/\D/g, '') || '...'}</span>)
+                </p>
               )}
             </div>
 
@@ -766,7 +1085,7 @@ export default function Registration({ user, onComplete }: { user: string, onCom
             </div>
 
             {/* Preferred Language */}
-            <div className="md:col-span-2">
+            <div>
               <label htmlFor="preferredLanguage" className="block text-xs font-semibold uppercase tracking-wider text-white/70 mb-1.5">
                 Preferred Assessment Language <span className="text-violet-400">*</span>
               </label>
@@ -797,7 +1116,7 @@ export default function Registration({ user, onComplete }: { user: string, onCom
               {errors.preferredLanguage && <p id="preferredLanguage-error" className="mt-1.5 text-xs text-[var(--color-error)] flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5 shrink-0" />{errors.preferredLanguage}</p>}
             </div>
 
-            {/* Assessment Security Password / PIN */}
+            {/* Assessment Security Password / PIN with Real-Time Entropy & Pattern Meter */}
             <div className="md:col-span-2">
               <label htmlFor="reg-password" className="block text-xs font-semibold uppercase tracking-wider text-white/70 mb-1.5 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
@@ -809,12 +1128,19 @@ export default function Registration({ user, onComplete }: { user: string, onCom
               <div className="relative">
                 <Lock className="w-4 h-4 text-white/30 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input 
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? "text" : "password"} 
                   id="reg-password"
-                  placeholder="Create a strong password (min 8 characters)..."
+                  placeholder="Create a strong password (min 8 characters, uppercase, number, symbol)..."
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-11 py-2.5 border border-white/10 focus:border-violet-400 bg-white/5 rounded-lg focus:ring-2 focus:ring-violet-500/30 outline-none text-sm text-white placeholder-white/25 transition-all"
+                  onChange={e => {
+                    setPassword(e.target.value);
+                    if (errors.password) {
+                      setErrors(prev => ({ ...prev, password: '' }));
+                    }
+                  }}
+                  className={`w-full pl-10 pr-11 py-2.5 border ${
+                    errors.password ? 'border-[var(--color-error)]' : 'border-white/10 focus:border-violet-400'
+                  } bg-white/5 rounded-lg focus:ring-2 focus:ring-violet-500/30 outline-none text-sm text-white placeholder-white/25 transition-all`}
                 />
                 <button
                   type="button"
@@ -826,10 +1152,21 @@ export default function Registration({ user, onComplete }: { user: string, onCom
                 </button>
               </div>
 
+              {errors.password && (
+                <p className="mt-1.5 text-xs text-[var(--color-error)] flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {errors.password}
+                </p>
+              )}
+
               {/* Real-Time Password Strength Visual Meter */}
               {password && (
                 <div className="mt-2.5 p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                  <PasswordStrengthIndicator password={password} showRequirementsList={true} />
+                  <PasswordStrengthIndicator 
+                    password={password} 
+                    userInputs={[formData.name, formData.email ? formData.email.split('@')[0] : '']} 
+                    showRequirementsList={true} 
+                  />
                 </div>
               )}
             </div>
@@ -860,31 +1197,22 @@ export default function Registration({ user, onComplete }: { user: string, onCom
             {errors.isAdult && <p className="text-[var(--color-error)] text-xs mt-2 ml-7.5">{errors.isAdult}</p>}
           </div>
 
-          {/* Submit Button */}
-          <div className="pt-2 border-t border-white/10">
-            <button 
-              disabled={loading || !isFormValid} 
-              type="submit" 
-              className={`w-full py-3.5 px-6 rounded-xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 ${
-                isFormValid && !loading
-                  ? 'bg-violet-600 text-white hover:bg-violet-500 hover:shadow-[0_0_24px_rgba(139,92,246,0.45)] cursor-pointer active:scale-[0.99]'
-                  : 'bg-white/5 text-white/35 border border-white/10 cursor-not-allowed shadow-none'
-              }`}
+          {/* Form Actions */}
+          <div className="pt-2 flex items-center justify-end gap-3 border-t border-white/10">
+            <button
+              type="submit"
+              disabled={loading || !isFormValid}
+              className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-sm rounded-lg transition-all shadow-lg shadow-violet-600/20 flex items-center gap-2 cursor-pointer"
             >
               {loading ? (
                 <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                  Validating Profile...
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Validating Profile...</span>
                 </>
               ) : (
-                'Complete Profile'
+                <span>Complete Registration & Proceed</span>
               )}
             </button>
-            {!isFormValid && (
-              <p className="text-center text-xs text-white/40 mt-2.5">
-                {!isAdult ? "Please verify age eligibility to proceed." : !isPhoneValid ? "Please enter a valid 10-digit phone number." : "Please fill out all required fields above."}
-              </p>
-            )}
           </div>
         </form>
       </div>

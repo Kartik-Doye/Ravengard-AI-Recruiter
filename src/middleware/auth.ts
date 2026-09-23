@@ -7,6 +7,19 @@ export interface AuthRequest extends Request {
     email: string;
     name?: string;
     email_verified?: boolean;
+    role?: string;
+    organizationId?: string | null;
+  };
+  principal?: {
+    id: string;
+    email: string;
+    role: string;
+    organizationId?: string | null;
+  };
+  admin?: {
+    id: string;
+    role: string;
+    organizationId?: string | null;
   };
 }
 
@@ -36,7 +49,10 @@ export const requireAuth = async (
       id: string;
       email: string;
       name?: string;
+      role?: string;
+      organizationId?: string | null;
       email_verified?: boolean;
+      isAdmin?: boolean;
     };
 
     req.user = {
@@ -44,7 +60,24 @@ export const requireAuth = async (
       email: decoded.email,
       name: decoded.name,
       email_verified: decoded.email_verified ?? false,
+      role: decoded.role,
+      organizationId: decoded.organizationId,
     };
+
+    req.principal = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role || (decoded.isAdmin ? "super_admin" : "candidate"),
+      organizationId: decoded.organizationId,
+    };
+
+    if (decoded.isAdmin) {
+      req.admin = {
+        id: decoded.id,
+        role: decoded.role || "super_admin",
+        organizationId: decoded.organizationId,
+      };
+    }
 
     return next();
   } catch (err) {
@@ -58,6 +91,55 @@ export const requireAuth = async (
     return res.status(500).json({ error: "Internal Server Error during authentication." });
   }
 };
+
+/**
+ * Normalizes user roles for permission matching.
+ * Maps 'admin', 'ADMIN', 'super_admin' to 'super_admin'.
+ * Maps 'hr', 'hr_admin', 'HR', 'hr_manager', 'hiring_manager' to 'hr_manager'.
+ */
+export function normalizeRole(role: string): string {
+  const r = (role || "").toLowerCase().trim();
+  if (r === "admin" || r === "super_admin" || r === "platform_operator") return "super_admin";
+  if (r === "hr_manager" || r === "hr_admin" || r === "hr" || r === "hiring_manager") return "hr_manager";
+  if (r === "recruiter" || r === "hr_user") return "recruiter";
+  return r;
+}
+
+/**
+ * Role-based access control middleware.
+ * Can be called as requireRole(["hr_manager", "recruiter"]) or requireRole("super_admin").
+ */
+export function requireRole(allowedRoles: string[] | string, ...rest: string[]) {
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles, ...rest];
+  const normalizedAllowed = roles.map(r => normalizeRole(r));
+
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    const rawRole = req.principal?.role || req.user?.role || req.admin?.role;
+
+    if (!rawRole) {
+      return res.status(403).json({
+        error: "403 Forbidden: You do not have permission to access this portal section.",
+      });
+    }
+
+    const userNormalized = normalizeRole(rawRole);
+
+    const matches = roles.includes(rawRole) ||
+      normalizedAllowed.includes(userNormalized) ||
+      (normalizedAllowed.includes("hr_manager") && userNormalized === "recruiter") ||
+      (normalizedAllowed.includes("recruiter") && userNormalized === "hr_manager");
+
+    if (!matches) {
+      return res.status(403).json({
+        error: "403 Forbidden: You do not have permission to access this portal section.",
+        required: roles,
+        providedRole: rawRole,
+      });
+    }
+
+    next();
+  };
+}
 
 /**
  * Signs a candidate JWT token.

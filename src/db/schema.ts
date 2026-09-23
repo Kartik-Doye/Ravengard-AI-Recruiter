@@ -138,6 +138,9 @@ export const interviewReports = pgTable('interview_reports', {
 
 export const rubrics = pgTable('rubrics', {
   id: text('id').primaryKey(),
+  organizationId: text('organization_id').references(() => organizations.id),
+  title: text('title'),
+  department: text('department'),
   jobId: text('job_id'),
   version: text('version').default('v1.0'),
   createdAt: timestamp('created_at').defaultNow()
@@ -194,6 +197,7 @@ export const adminLogs = pgTable('admin_logs', {
 export const jobs = pgTable('jobs', {
   id: text('id').primaryKey(),
   organizationId: text('organization_id').notNull().references(() => organizations.id),
+  rubricId: text('rubric_id').references(() => rubrics.id),
   title: text('title').notNull(),
   department: text('department'),
   location: text('location').default('Remote'),
@@ -207,6 +211,7 @@ export const jobs = pgTable('jobs', {
   approvalFeedback: text('approval_feedback'),
   approvedBy: text('approved_by'),
   approvedAt: timestamp('approved_at'),
+  createdBy: text('created_by'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 }, (table) => [

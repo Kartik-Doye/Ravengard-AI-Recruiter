@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /interview/
+Disallow: /admin/
+Disallow: /hr/
+Disallow: /api/
+
+Sitemap: /sitemap.xml

@@ -1,6 +1,19 @@
 # Ravengard AI Recruiter - Foundation Phase
 
-This is the Foundation Phase of the Ravengard AI Recruiter platform. It enforces a strict, locked, one-way state machine for candidate onboarding.
+This is the Foundation Phase of the Ravengard AI Recruiter platform. It enforces a strict, locked, one-way state machine for candidate onboarding and enterprise talent evaluation.
+
+## 🚀 Quick Start
+To install and start the application right away, run:
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Run the application (Starts Express backend + React Vite on http://localhost:3000)
+npm run dev
+```
+
+For complete setup instructions, database migrations, credentials, and architecture details, see **[RUN.md](./RUN.md)**.
 
 ## Tech Stack
 - **Frontend**: React (Vite), Tailwind CSS
@@ -10,13 +23,18 @@ This is the Foundation Phase of the Ravengard AI Recruiter platform. It enforces
 - **Resume Parsing**: `unpdf` (PDF) and `mammoth` (DOCX)
 
 ## Foundation Flow
-1. **Registration**: Candidate signs up.
+1. **Registration**: Candidate signs up with:
+   - Explicit **Country / Region of Residence** selector with ISO search/typeahead and flag icons.
+   - Integrated **International Phone (STD) Dialing Code Selector** with dropdown prefix (`🇮🇳 +91`, `🇺🇸 +1`, `🇬🇧 +44`, etc.) storing numbers in full **E.164** format.
+   - Dynamic phone number validation matching country-specific digit lengths and formatting hints.
+   - Auto-detection of default country on mount via browser locale, timezone, and IP geolocation fallback.
+   - Real-time **Account Security Password Strength Meter** with entropy scoring, sequence/dictionary pattern detection, and contextual checks against candidate credentials.
 2. **Welcome**: Candidate sees the overview. **No session record exists yet.**
-3. **Consent (The Lock)**: Candidate types "I Agree". The backend creates the `sessions` row, sets `locked: true`, and defaults `current_stage` to `resume_upload`. This is the one irreversible entry point.
+3. **Consent (The Lock)**: Candidate types "I Agree". The backend creates the `sessions` row, sets `locked: true`, initializes `assessment_expires_at` SLA timeout, and defaults `current_stage` to `resume_upload`. This is the one irreversible entry point.
 4. **Resume Upload**: Candidate uploads their resume for AI intelligence extraction.
 
 ## Drizzle Schema Structure
-The true architecture includes the multi-tenant organization structure to prevent future rebuilds:
+The true architecture includes the multi-tenant organization structure and SLA tracking to prevent future rebuilds:
 
 ```typescript
 // /src/db/schema.ts
@@ -51,6 +69,12 @@ export const candidates = pgTable('candidates', {
   id: text('id').primaryKey(),
   email: text('email').notNull(),
   name: text('name'),
+  mobile: text('mobile'), // Full international E.164 format (e.g. +917875693285)
+  country: text('country').default('United States'), // Country of residence
+  college: text('college'),
+  degree: text('degree'),
+  gradYear: text('grad_year'),
+  preferredLanguage: text('preferred_language').default('English'),
   emailVerified: boolean('email_verified').default(false),
   organizationId: text('organization_id').references(() => organizations.id)
 });
@@ -65,7 +89,8 @@ export const sessions = pgTable('sessions', {
   locked: boolean('locked').default(true),
   consentAcceptedAt: timestamp('consent_accepted_at'),
   policyVersion: text('policy_version'),
-  thinkAgainUsesLeft: integer('think_again_uses_left')
+  thinkAgainUsesLeft: integer('think_again_uses_left'),
+  assessmentExpiresAt: timestamp('assessment_expires_at') // SLA deadline
 });
 ```
 

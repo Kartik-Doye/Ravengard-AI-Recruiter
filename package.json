@@ -19,7 +19,8 @@
     "test:admin:stress": "tsx scripts/stress_test_admin.ts",
     "qa": "node scripts/qa-check-routes.js",
     "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:migrate": "tsx scripts/migrate_assessment_expires_at.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

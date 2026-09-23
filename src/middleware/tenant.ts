@@ -4,6 +4,7 @@ import { db } from "../db/index";
 import { adminUsers, organizations, applications } from "../db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { verifyCandidateMagicJwt, CandidateTokenPayload } from "../services/magicTokenService";
+import { AuthRequest } from "./auth";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET === "REPLACE_ME_run_node_console.log(require('crypto').randomBytes(32).toString('hex'))") {
@@ -13,12 +14,7 @@ if (!JWT_SECRET || JWT_SECRET === "REPLACE_ME_run_node_console.log(require('cryp
 }
 const ACTUAL_SECRET = JWT_SECRET || "ravengard_dev_jwt_secret_change_in_production";
 
-export interface HrAuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role?: string;
-  };
+export interface HrAuthRequest extends AuthRequest {
   hr?: {
     id: string;
     email: string;

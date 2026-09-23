@@ -105,3 +105,4 @@ Because Phase 2 (Device Check) and Phase 4 (Interview Engine) perform hardware v
 3. **SSE Transport**: The AI Interview Engine uses Server-Sent Events (SSE) for reliable unidirectional question streaming.
 4. **Anti-Cheat Isolation**: Proctoring signals (`tab_blur`, `gaze_off`) are asynchronously posted to `/api/interview/:id/signal` without interrupting the candidate's interview flow.
 5. **RBAC Isolation**: Admin routes (`/admin/*` and `/api/admin/*`) are strictly guarded and completely segregated from candidate assessment routes.
+6. **International Candidate Onboarding**: The registration phase requires an explicit Country of Residence selector, dynamic international STD dialing codes (E.164 phone storage), dynamic digit length validation, and real-time entropy/sequence password evaluation.

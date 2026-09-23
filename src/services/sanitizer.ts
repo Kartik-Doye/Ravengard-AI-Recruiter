@@ -14,6 +14,7 @@ export interface SanitizedCandidateRegistration {
   name: string;
   email: string;
   mobile: string;
+  country?: string;
   college: string;
   degree: string;
   gradYear: number;
@@ -187,23 +188,38 @@ export function sanitizeMobile(raw: unknown): { value?: string; error?: string }
     return { error: "Mobile number is required and must be a string." };
   }
 
-  const cleaned = stripNullAndControlChars(raw, false);
+  const cleaned = stripNullAndControlChars(raw, false).trim();
   const scriptCheck = hasMaliciousScriptPayload(cleaned);
   if (scriptCheck.dangerous) {
     return { error: "Mobile number contains prohibited characters or script tags." };
   }
 
-  // Check for invalid characters (letters, SQL symbols, tags, etc.)
-  const phoneCharRegex = /^[+]?[0-9\s\-().]{10,25}$/;
+  // Check for valid international or local phone characters (digits, +, spaces, hyphens, dots, parens)
+  const phoneCharRegex = /^[+]?[0-9\s\-().]{7,25}$/;
   if (!phoneCharRegex.test(cleaned)) {
-    return { error: "Please enter a valid 10-digit phone number without illegal characters." };
+    return { error: "Please enter a valid phone number without illegal characters." };
   }
 
   const digitsOnly = cleaned.replace(/\D/g, '');
-  if (digitsOnly.length < 10 || digitsOnly.length > 15) {
-    return { error: "Please enter a valid 10-digit phone number (10 to 15 digits required)." };
+  if (digitsOnly.length < 7 || digitsOnly.length > 16) {
+    return { error: "Please enter a valid phone number (7 to 16 digits required)." };
   }
 
+  return { value: cleaned };
+}
+
+/**
+ * Validates and sanitizes Country name.
+ */
+export function sanitizeCountry(raw: unknown): { value?: string; error?: string } {
+  if (!raw) return { value: undefined };
+  if (typeof raw !== 'string') {
+    return { error: "Country must be a string." };
+  }
+  const cleaned = stripNullAndControlChars(raw, false).trim();
+  if (cleaned.length > 100) {
+    return { error: "Country cannot exceed 100 characters." };
+  }
   return { value: cleaned };
 }
 
@@ -388,6 +404,9 @@ export function sanitizeCandidateRegistrationInput(body: any): SanitizationResul
   const mobileRes = sanitizeMobile(body.mobile);
   if (mobileRes.error) errors.push(mobileRes.error);
 
+  const countryRes = sanitizeCountry(body.country);
+  if (countryRes.error) errors.push(countryRes.error);
+
   const collegeRes = sanitizeCollege(body.college);
   if (collegeRes.error) errors.push(collegeRes.error);
 
@@ -423,6 +442,7 @@ export function sanitizeCandidateRegistrationInput(body: any): SanitizationResul
       name: nameRes.value!,
       email: emailRes.value!,
       mobile: mobileRes.value!,
+      country: countryRes.value,
       college: collegeRes.value!,
       degree: degreeRes.value!,
       gradYear: gradYearRes.value!,

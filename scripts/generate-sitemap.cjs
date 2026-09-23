@@ -16,9 +16,12 @@ const routes = [
   { path: '/projects', priority: '0.8', changefreq: 'weekly' },
   { path: '/contact', priority: '0.7', changefreq: 'monthly' },
   { path: '/gateway', priority: '0.8', changefreq: 'weekly' },
+  { path: '/demo', priority: '0.6', changefreq: 'weekly' },
   { path: '/careers', priority: '0.9', changefreq: 'daily' },
   { path: '/jobs', priority: '0.9', changefreq: 'daily' },
   { path: '/portal', priority: '0.8', changefreq: 'daily' },
+  { path: '/candidate', priority: '0.7', changefreq: 'daily' },
+  { path: '/candidate/portal', priority: '0.6', changefreq: 'daily' },
   { path: '/assessment-guide', priority: '0.8', changefreq: 'weekly' }
 ];
 

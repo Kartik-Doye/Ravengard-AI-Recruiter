@@ -1,11 +1,11 @@
 import type { Response, NextFunction } from "express";
-import { AuthRequest } from "./auth";
+import { AuthRequest, normalizeRole } from "./auth";
 import { db } from "../db/index";
 import { adminUsers } from "../db/schema";
 import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 
-export type AdminRole = "admin" | "reviewer" | "viewer" | "super_admin";
+export type AdminRole = "admin" | "reviewer" | "viewer" | "super_admin" | "hr_admin" | "hr_user" | "recruiter" | "hiring_manager" | "HR" | "ADMIN";
 
 export interface AdminAuthRequest extends AuthRequest {
   admin?: {
@@ -73,7 +73,18 @@ export const authAdmin = async (
       return res.status(403).json({ error: "Forbidden: Not an admin account." });
     }
 
-    const validRoles: AdminRole[] = ["admin", "reviewer", "viewer"];
+    const validRoles: AdminRole[] = [
+      "admin",
+      "super_admin",
+      "hr_admin",
+      "hr_user",
+      "recruiter",
+      "hiring_manager",
+      "reviewer",
+      "viewer",
+      "HR",
+      "ADMIN",
+    ];
     if (!validRoles.includes(adminRecord.role as AdminRole)) {
       return res.status(403).json({ error: "Forbidden: Unknown admin role." });
     }
@@ -95,13 +106,25 @@ export const authAdmin = async (
  * Example: router.post('/sessions/:id/flag', requireRole('reviewer'), handler)
  *
  * Role hierarchy: admin > reviewer > viewer
+ * Supports role normalization (e.g. 'ADMIN' -> 'super_admin').
  */
 export const requireRole = (...allowedRoles: AdminRole[]) => {
+  const normalizedAllowed = allowedRoles.map(r => normalizeRole(r));
+
   return (req: AdminAuthRequest, res: Response, next: NextFunction) => {
     if (!req.admin) {
       return res.status(401).json({ error: "Unauthorized: No admin context." });
     }
-    if (!allowedRoles.includes(req.admin.role)) {
+
+    const userNormalized = normalizeRole(req.admin.role);
+
+    const matches = allowedRoles.includes(req.admin.role) ||
+      normalizedAllowed.includes(userNormalized) ||
+      (normalizedAllowed.includes("hr_manager") && userNormalized === "recruiter") ||
+      (normalizedAllowed.includes("recruiter") && userNormalized === "hr_manager") ||
+      (userNormalized === "super_admin"); // Super admin bypass
+
+    if (!matches) {
       return res.status(403).json({
         error: `Forbidden: This action requires one of: [${allowedRoles.join(", ")}]. Your role: ${req.admin.role}.`,
       });

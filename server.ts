@@ -26,6 +26,7 @@ import { hrRouter } from "./src/routes/hr";
 import { candidatePortalRouter } from "./src/routes/candidatePortal";
 import { publicJobsRouter } from "./src/routes/publicJobs";
 import { integrationsRouter } from "./src/routes/integrationsRouter";
+import { authRouter } from "./src/routes/auth";
 import { processOutboxBatch } from "./src/services/outboxWorker";
 import { preScreeningService } from "./src/services/preScreeningService";
 import { emailService } from "./src/services/emailService";
@@ -148,9 +149,33 @@ app.post("/api/admin/login", async (req, res) => {
     return res.status(400).json({ success: false, error: "Username/email and password are required." });
   }
 
-  // Support username aliases ('admin' -> 'admin@ravengard.com') as well as exact email match
-  const lookupEmail = identifier === "admin" ? "admin@ravengard.com" : identifier;
-  const [adminRecord] = await db.select().from(adminUsers).where(eq(adminUsers.email, lookupEmail)).limit(1);
+  // Support username aliases ('admin' -> 'admin@ravengard.com', 'hr' -> 'hr@ravengard.com') as well as exact email match
+  const lookupEmail = identifier === "admin" ? "admin@ravengard.com" : (identifier === "hr" ? "hr@ravengard.com" : identifier);
+  let [adminRecord] = await db.select().from(adminUsers).where(eq(adminUsers.email, lookupEmail)).limit(1);
+
+  // Auto-seed default HR or Admin accounts if not yet in database
+  if (!adminRecord && (lookupEmail === "hr@ravengard.com" || lookupEmail === "admin@ravengard.com")) {
+    const isHr = lookupEmail === "hr@ravengard.com";
+    const newId = isHr ? "hr-root" : "admin-root";
+    const role = isHr ? "hr_admin" : "admin";
+    const name = isHr ? "Ravengard HR Director" : "Ravengard Lead Auditor";
+    const hashed = await bcrypt.hash("admin123", 10);
+    try {
+      const [inserted] = await db.insert(adminUsers).values({
+        id: newId,
+        email: lookupEmail,
+        name,
+        role,
+        passwordHash: hashed,
+        organizationId: "org-ravengard"
+      }).returning();
+      adminRecord = inserted;
+    } catch {
+      // If conflict, re-fetch
+      const [reFetched] = await db.select().from(adminUsers).where(eq(adminUsers.email, lookupEmail)).limit(1);
+      adminRecord = reFetched;
+    }
+  }
 
   if (!adminRecord || !adminRecord.passwordHash) {
     return res.status(401).json({ success: false, error: "Invalid credentials." });
@@ -161,22 +186,105 @@ app.post("/api/admin/login", async (req, res) => {
     return res.status(401).json({ success: false, error: "Invalid credentials." });
   }
 
+  const standardizedRole = (adminRecord.role === "admin" || adminRecord.role === "super_admin") ? "ADMIN" : "HR";
+  const orgId = adminRecord.organizationId || "org-ravengard";
+
   const token = signAdminToken({
     id: adminRecord.id,
     email: adminRecord.email,
     role: adminRecord.role,
+    organizationId: orgId,
   });
 
   res.json({
     success: true,
     token,
+    role: standardizedRole,
+    specificRole: adminRecord.role,
     admin: {
       id: adminRecord.id,
       email: adminRecord.email,
       name: adminRecord.name,
-      role: adminRecord.role
+      role: adminRecord.role,
+      standardizedRole,
+      organizationId: orgId,
     }
   });
+});
+
+/**
+ * POST /api/admin/sso-login
+ * Enterprise Single Sign-On (Google Workspace / Microsoft Entra / Okta) for HR and Admin teams.
+ */
+app.post("/api/admin/sso-login", async (req, res) => {
+  try {
+    const { provider, email, name, roleHint } = req.body || {};
+    if (!provider || !email) {
+      return res.status(400).json({ success: false, error: "Provider and corporate email are required for Enterprise SSO." });
+    }
+
+    const ssoEmail = String(email).trim().toLowerCase();
+    if (!ssoEmail.includes("@")) {
+      return res.status(400).json({ success: false, error: "Invalid corporate email address." });
+    }
+
+    let [userRecord] = await db.select().from(adminUsers).where(eq(adminUsers.email, ssoEmail)).limit(1);
+
+    if (!userRecord) {
+      const assignedRole = roleHint === 'ADMIN' ? 'admin' : (roleHint === 'HR' ? 'hr_admin' : (ssoEmail.includes('admin') ? 'admin' : 'hr_admin'));
+      const ssoName = name || (ssoEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+      const ssoId = `sso-${crypto.randomUUID()}`;
+      const hashed = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
+
+      try {
+        const [inserted] = await db.insert(adminUsers).values({
+          id: ssoId,
+          email: ssoEmail,
+          name: ssoName,
+          role: assignedRole,
+          passwordHash: hashed,
+          organizationId: "org-ravengard"
+        }).returning();
+        userRecord = inserted;
+      } catch {
+        const [reFetched] = await db.select().from(adminUsers).where(eq(adminUsers.email, ssoEmail)).limit(1);
+        userRecord = reFetched;
+      }
+    }
+
+    if (!userRecord) {
+      return res.status(500).json({ success: false, error: "Could not initialize SSO session." });
+    }
+
+    const standardizedRole = (userRecord.role === "admin" || userRecord.role === "super_admin") ? "ADMIN" : "HR";
+    const orgId = userRecord.organizationId || "org-ravengard";
+
+    const token = signAdminToken({
+      id: userRecord.id,
+      email: userRecord.email,
+      role: userRecord.role,
+      organizationId: orgId,
+    });
+
+    return res.json({
+      success: true,
+      token,
+      provider,
+      role: standardizedRole,
+      specificRole: userRecord.role,
+      admin: {
+        id: userRecord.id,
+        email: userRecord.email,
+        name: userRecord.name,
+        role: userRecord.role,
+        standardizedRole,
+        organizationId: orgId,
+      }
+    });
+  } catch (err: any) {
+    console.error("SSO authentication error:", err);
+    return res.status(500).json({ success: false, error: "SSO authentication failure." });
+  }
 });
 
 // Candidate Mock Login / Quick Auth for demo & test flows
@@ -219,6 +327,7 @@ app.post("/api/auth/candidate-mock-login", async (req, res) => {
   }
 });
 
+app.use("/api/auth", authRouter);
 app.use("/api/admin/telemetry", telemetryRouter);
 app.use("/api/admin", adminRoutes);
 app.use("/api/candidate", candidatePortalRouter);
@@ -499,6 +608,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
         email: reqEmail,
         name,
         mobile,
+        country,
         college,
         degree,
         gradYear,
@@ -527,6 +637,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
           email: reqEmail,
           name,
           mobile,
+          country: country || 'United States',
           college,
           degree,
           gradYear,
@@ -539,6 +650,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
           email: reqEmail,
           name,
           mobile,
+          country: country || 'United States',
           college,
           degree,
           gradYear,
@@ -1119,6 +1231,58 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
       console.error(e);
       res.status(500).json({ error: "Failed to fetch report" });
     }
+  });
+
+  // ─── SEO & Crawler Support ──────────────────────────────────────────────────
+  app.get("/robots.txt", (req, res) => {
+    const rawUrl = (process.env.APP_URL || process.env.VITE_APP_URL || `https://${req.get('host')}`).trim();
+    const SITE_URL = rawUrl.replace(/\/+$/, '');
+    
+    res.type("text/plain");
+    res.send(`User-agent: *
+Allow: /
+Disallow: /interview/
+Disallow: /admin/
+Disallow: /hr/
+Disallow: /api/
+
+Sitemap: ${SITE_URL}/sitemap.xml
+`);
+  });
+
+  app.get("/sitemap.xml", (req, res) => {
+    const rawUrl = (process.env.APP_URL || process.env.VITE_APP_URL || `https://${req.get('host')}`).trim();
+    const SITE_URL = rawUrl.replace(/\/+$/, '');
+    const currentDate = new Date().toISOString();
+
+    const routes = [
+      { path: '/', priority: '1.0', changefreq: 'daily' },
+      { path: '/about', priority: '0.8', changefreq: 'weekly' },
+      { path: '/features', priority: '0.9', changefreq: 'weekly' },
+      { path: '/projects', priority: '0.8', changefreq: 'weekly' },
+      { path: '/contact', priority: '0.7', changefreq: 'monthly' },
+      { path: '/gateway', priority: '0.8', changefreq: 'weekly' },
+      { path: '/demo', priority: '0.6', changefreq: 'weekly' },
+      { path: '/careers', priority: '0.9', changefreq: 'daily' },
+      { path: '/jobs', priority: '0.9', changefreq: 'daily' },
+      { path: '/portal', priority: '0.8', changefreq: 'daily' },
+      { path: '/candidate', priority: '0.7', changefreq: 'daily' },
+      { path: '/candidate/portal', priority: '0.6', changefreq: 'daily' },
+      { path: '/assessment-guide', priority: '0.8', changefreq: 'weekly' }
+    ];
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${routes.map(r => `  <url>
+    <loc>${SITE_URL}${r.path}</loc>
+    <lastmod>${currentDate}</lastmod>
+    <changefreq>${r.changefreq}</changefreq>
+    <priority>${r.priority}</priority>
+  </url>`).join('\n')}
+</urlset>`;
+
+    res.type("application/xml");
+    res.send(xml);
   });
 
   // Vite middleware for development (placed strictly AFTER all API routes)

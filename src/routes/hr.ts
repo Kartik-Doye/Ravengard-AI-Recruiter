@@ -14,8 +14,11 @@ import {
   integrationConfigs,
   outboxEvents,
   adminUsers,
+  rubrics,
+  rubricDimensions,
+  rubricCriteria,
 } from "../db/schema";
-import { eq, and, desc, sql, inArray, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, isNull, or } from "drizzle-orm";
 import { requireHrAuth, HrAuthRequest } from "../middleware/tenant";
 import { generateMagicToken } from "../services/magicTokenService";
 import { emailService } from "../services/emailService";
@@ -23,7 +26,7 @@ import {
   renderShortlistInvitationEmail,
   renderNonSelectionRejectionEmail,
 } from "../templates/emailTemplates";
-import { signAdminToken } from "../middleware/auth";
+import { signAdminToken, requireRole } from "../middleware/auth";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
@@ -106,23 +109,67 @@ hrRouter.get("/me", async (req: HrAuthRequest, res: Response) => {
 /**
  * POST /api/hr/jobs
  * Creates a new Job Post scoped to HR's organization.
+ * Validates rubric attachment and sets status to 'pending_approval' (enforcing Admin Gate).
  */
-hrRouter.post("/jobs", async (req: HrAuthRequest, res: Response) => {
+hrRouter.post("/jobs", requireRole("hr_manager", "recruiter", "super_admin") as any, async (req: HrAuthRequest, res: Response) => {
   const orgId = req.hr!.organizationId;
+  const userId = req.hr!.id;
   const {
     title,
     department,
+    location,
+    employmentType,
+    salaryRange,
     description,
+    requirements,
     requirementsJson,
     screeningThreshold,
     requireHumanRejectionApproval,
+    rubricId,
   } = req.body;
 
-  if (!title || !description) {
-    return res.status(400).json({ error: "Missing required fields: title and description." });
+  // 1. Basic field validation
+  if (!title || !department || !description) {
+    return res.status(400).json({
+      error: "Missing required fields: title, department, and description are mandatory.",
+    });
+  }
+
+  // 2. Security Check: If a rubricId is specified, verify it exists and belongs to this organization
+  if (rubricId) {
+    const [existingRubric] = await db
+      .select({ id: rubrics.id })
+      .from(rubrics)
+      .where(
+        and(
+          eq(rubrics.id, rubricId),
+          or(
+            eq(rubrics.organizationId, orgId),
+            isNull(rubrics.organizationId),
+            eq(rubrics.organizationId, "org-ravengard")
+          )
+        )
+      )
+      .limit(1);
+
+    if (!existingRubric) {
+      return res.status(404).json({
+        error: "Specified rubric not found or does not belong to your organization.",
+      });
+    }
   }
 
   const id = `job-${crypto.randomUUID()}`;
+
+  // Normalize requirements into string array
+  let parsedRequirements: string[] = [];
+  if (Array.isArray(requirements)) {
+    parsedRequirements = requirements;
+  } else if (Array.isArray(requirementsJson)) {
+    parsedRequirements = requirementsJson;
+  } else if (typeof requirements === "string") {
+    parsedRequirements = requirements.split(",").map((s: string) => s.trim()).filter(Boolean);
+  }
 
   try {
     const [newJob] = await db
@@ -130,39 +177,116 @@ hrRouter.post("/jobs", async (req: HrAuthRequest, res: Response) => {
       .values({
         id,
         organizationId: orgId,
+        rubricId: rubricId || null,
         title: title.trim(),
-        department: department ? department.trim() : null,
+        department: department.trim(),
+        location: location || "Remote",
+        employmentType: employmentType || "Full-time",
+        salaryRange: salaryRange || "$120k - $160k",
         description: description.trim(),
-        requirementsJson: requirementsJson || {},
+        requirementsJson: parsedRequirements,
         screeningThreshold: typeof screeningThreshold === "number" ? screeningThreshold : 70,
         requireHumanRejectionApproval:
           requireHumanRejectionApproval !== undefined
             ? Boolean(requireHumanRejectionApproval)
             : true,
-        status: "active",
+        status: "pending_approval", // Enforces Admin Gate
+        createdBy: userId,
       })
       .returning();
 
     // Audit log
     await db.insert(adminLogs).values({
       id: `log-${crypto.randomUUID()}`,
-      adminId: req.hr!.id,
+      adminId: userId,
       organizationId: orgId,
-      action: "JOB_CREATED",
+      action: "JOB_REQUISITION_SUBMITTED",
       target: id,
-      metadata: { title, department },
+      metadata: { title, department, rubricId, status: "pending_approval" },
     });
 
-    return res.status(201).json({ job: newJob });
+    return res.status(201).json({
+      success: true,
+      message: "Job requisition submitted for Admin approval.",
+      data: {
+        jobId: newJob.id,
+        status: newJob.status,
+        title: newJob.title,
+        createdAt: newJob.createdAt,
+      },
+      job: newJob,
+    });
   } catch (err: any) {
     console.error("Failed to create job:", err);
-    return res.status(500).json({ error: "Failed to create job posting." });
+    return res.status(500).json({ error: "Failed to create job posting.", details: err.message, cause: err.cause?.message || err.detail });
+  }
+});
+
+/**
+ * PUT /api/hr/jobs/:id/status
+ * Toggles a job between draft, pending_approval, published, active, and closed.
+ */
+hrRouter.put("/jobs/:id/status", requireRole("hr_manager", "super_admin") as any, async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+  const jobId = req.params.id;
+  const { status } = req.body;
+
+  const validStatuses = ["draft", "pending_approval", "published", "active", "closed", "archived"];
+  if (!status || !validStatuses.includes(status)) {
+    return res.status(400).json({
+      error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+    });
+  }
+
+  try {
+    const userRole = req.hr?.role || req.user?.role || req.admin?.role || "";
+    const isSuperAdmin = userRole === "super_admin" || userRole === "admin" || userRole === "ADMIN";
+
+    if ((status === "published" || status === "active") && !isSuperAdmin) {
+      return res.status(403).json({
+        error: "Forbidden: Only Super Admins can publish or activate job postings via the Approval Gate.",
+      });
+    }
+
+    const [existing] = await db
+      .select()
+      .from(jobs)
+      .where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId)))
+      .limit(1);
+
+    if (!existing) {
+      return res.status(404).json({ error: "Job posting not found in this organization." });
+    }
+
+    const [updatedJob] = await db
+      .update(jobs)
+      .set({ status, updatedAt: new Date() })
+      .where(and(eq(jobs.id, jobId), eq(jobs.organizationId, orgId)))
+      .returning();
+
+    await db.insert(adminLogs).values({
+      id: `log-${crypto.randomUUID()}`,
+      adminId: req.hr!.id,
+      organizationId: orgId,
+      action: "JOB_STATUS_CHANGED",
+      target: jobId,
+      metadata: { previousStatus: existing.status, newStatus: status },
+    });
+
+    return res.json({
+      success: true,
+      message: `Job status updated to ${status}.`,
+      job: updatedJob,
+    });
+  } catch (err: any) {
+    console.error("Failed to update job status:", err);
+    return res.status(500).json({ error: "Failed to update job status." });
   }
 });
 
 /**
  * GET /api/hr/jobs
- * Lists all jobs strictly scoped to HR user's organization.
+ * Lists all jobs strictly scoped to HR user's organization with attached rubric information.
  */
 hrRouter.get("/jobs", async (req: HrAuthRequest, res: Response) => {
   const orgId = req.hr!.organizationId;
@@ -173,6 +297,10 @@ hrRouter.get("/jobs", async (req: HrAuthRequest, res: Response) => {
       .from(jobs)
       .where(eq(jobs.organizationId, orgId))
       .orderBy(desc(jobs.createdAt));
+
+    // Get all rubrics for reference
+    const allRubrics = await db.select().from(rubrics);
+    const rubricsMap = new Map(allRubrics.map((r) => [r.id, r]));
 
     // Also get application count summary per job
     const pool = (db as any).session?.client || (global as any)._postgresPool;
@@ -195,16 +323,26 @@ hrRouter.get("/jobs", async (req: HrAuthRequest, res: Response) => {
       }
     }
 
-    const enrichedJobs = allJobs.map((j) => ({
-      ...j,
-      metrics: countsMap[j.id] || {
-        total: 0,
-        shortlisted: 0,
-        pending_review: 0,
-        completed: 0,
-        recommended: 0,
-      },
-    }));
+    const enrichedJobs = allJobs.map((j) => {
+      const attachedRubric = j.rubricId ? rubricsMap.get(j.rubricId) : null;
+      return {
+        ...j,
+        rubric: attachedRubric
+          ? {
+              id: attachedRubric.id,
+              title: attachedRubric.title || "Standard Evaluation Rubric",
+              department: attachedRubric.department || j.department,
+            }
+          : null,
+        metrics: countsMap[j.id] || {
+          total: 0,
+          shortlisted: 0,
+          pending_review: 0,
+          completed: 0,
+          recommended: 0,
+        },
+      };
+    });
 
     return res.json({ jobs: enrichedJobs });
   } catch (err: any) {
@@ -217,7 +355,7 @@ hrRouter.get("/jobs", async (req: HrAuthRequest, res: Response) => {
  * PATCH /api/hr/jobs/:id
  * Updates job configuration with strict tenant verification.
  */
-hrRouter.patch("/jobs/:id", async (req: HrAuthRequest, res: Response) => {
+hrRouter.patch("/jobs/:id", requireRole("hr_manager", "super_admin") as any, async (req: HrAuthRequest, res: Response) => {
   const orgId = req.hr!.organizationId;
   const jobId = req.params.id;
   const {
@@ -231,6 +369,15 @@ hrRouter.patch("/jobs/:id", async (req: HrAuthRequest, res: Response) => {
   } = req.body;
 
   try {
+    const userRole = req.hr?.role || req.user?.role || req.admin?.role || "";
+    const isSuperAdmin = userRole === "super_admin" || userRole === "admin" || userRole === "ADMIN";
+
+    if (status && (status === "published" || status === "active") && !isSuperAdmin) {
+      return res.status(403).json({
+        error: "Forbidden: Only Super Admins can publish or activate job postings via the Approval Gate.",
+      });
+    }
+
     const [existing] = await db
       .select()
       .from(jobs)
@@ -479,7 +626,7 @@ hrRouter.post("/applications/:id/status", async (req: HrAuthRequest, res: Respon
  * Human-in-the-Loop Safeguard:
  * Atomically approves pending rejections and dispatches Email #3 with polite constructive feedback.
  */
-hrRouter.post("/applications/batch-approve-rejections", async (req: HrAuthRequest, res: Response) => {
+hrRouter.post("/applications/batch-approve-rejections", requireRole("hr_manager", "super_admin") as any, async (req: HrAuthRequest, res: Response) => {
   const orgId = req.hr!.organizationId;
   const { applicationIds } = req.body;
 
@@ -896,12 +1043,12 @@ hrRouter.get("/settings/integrations", async (req: HrAuthRequest, res: Response)
  * POST /api/hr/rubrics
  * Creates a new AI scoring rubric with multi-dimensional criteria.
  */
-hrRouter.post("/rubrics", async (req: HrAuthRequest, res: Response) => {
+hrRouter.post("/rubrics", requireRole("hr_manager", "recruiter", "super_admin") as any, async (req: HrAuthRequest, res: Response) => {
   const { title, department, dimensions } = req.body || {};
   const orgId = req.hr!.organizationId;
 
-  if (!title || !department || !Array.isArray(dimensions)) {
-    return res.status(400).json({ error: "title, department, and dimensions array are required." });
+  if (!title || !department || !Array.isArray(dimensions) || dimensions.length === 0) {
+    return res.status(400).json({ error: "title, department, and non-empty dimensions array are required." });
   }
 
   const rubricId = `rubric-${crypto.randomUUID()}`;
@@ -914,16 +1061,27 @@ hrRouter.post("/rubrics", async (req: HrAuthRequest, res: Response) => {
     try {
       await client.query("BEGIN");
       await client.query(
-        `INSERT INTO rubrics (id, job_id, version) VALUES ($1, $2, 'v1.0') ON CONFLICT (id) DO NOTHING;`,
-        [rubricId, `job-org-${orgId}`]
+        `INSERT INTO rubrics (id, organization_id, title, department, job_id, version)
+         VALUES ($1, $2, $3, $4, $5, 'v1.0') ON CONFLICT (id) DO NOTHING;`,
+        [rubricId, orgId, title.trim(), department.trim(), `job-org-${orgId}`]
       );
 
       for (const dim of dimensions) {
         const dimId = `dim-${crypto.randomUUID()}`;
+        const dimName = dim.dimensionName || dim.name || "Core Competency";
+        const dimWeight = typeof dim.weight === "number" ? dim.weight : 20;
+        const dimInstruction = dim.evalInstruction || dim.description || "Evaluate candidate response for depth and rigor.";
+
         await client.query(
           `INSERT INTO rubric_dimensions (id, rubric_id, dimension_name, weight, eval_instruction)
            VALUES ($1, $2, $3, $4, $5);`,
-          [dimId, rubricId, dim.dimensionName || dim.name, dim.weight || 20, dim.evalInstruction || dim.description || "Evaluate candidate response."]
+          [dimId, rubricId, dimName, dimWeight, dimInstruction]
+        );
+
+        await client.query(
+          `INSERT INTO rubric_criteria (id, rubric_id, name, weight, description)
+           VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING;`,
+          [`crit-${crypto.randomUUID()}`, rubricId, dimName, dimWeight, dimInstruction]
         );
       }
 
@@ -943,22 +1101,40 @@ hrRouter.post("/rubrics", async (req: HrAuthRequest, res: Response) => {
 
 /**
  * GET /api/hr/rubrics
+ * Fetches all active rubrics for the HR organization + global presets.
  */
 hrRouter.get("/rubrics", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
   const pool = (db as any).session?.client || (global as any)._postgresPool;
   if (!pool) return res.status(500).json({ error: "Database client unavailable." });
 
   try {
-    const { rows: rubricsList } = await pool.query(`SELECT * FROM rubrics ORDER BY created_at DESC;`);
+    const { rows: rubricsList } = await pool.query(
+      `SELECT * FROM rubrics 
+       WHERE organization_id = $1 OR organization_id IS NULL OR organization_id = 'org-ravengard'
+       ORDER BY created_at DESC;`,
+      [orgId]
+    );
     const { rows: dimensions } = await pool.query(`SELECT * FROM rubric_dimensions;`);
 
     const enriched = rubricsList.map((r: any) => ({
-      ...r,
-      dimensions: dimensions.filter((d: any) => d.rubric_id === r.id),
+      id: r.id,
+      title: r.title || r.id,
+      department: r.department || "General",
+      version: r.version || "v1.0",
+      createdAt: r.created_at,
+      organizationId: r.organization_id,
+      dimensions: dimensions.filter((d: any) => d.rubric_id === r.id).map((d: any) => ({
+        id: d.id,
+        dimensionName: d.dimension_name,
+        weight: d.weight,
+        evalInstruction: d.eval_instruction,
+      })),
     }));
 
     return res.json({ success: true, rubrics: enriched });
   } catch (err: any) {
+    console.error("Failed to fetch rubrics:", err);
     return res.status(500).json({ error: "Failed to fetch rubrics." });
   }
 });
@@ -1228,7 +1404,7 @@ hrRouter.post("/applications/batch-reject", async (req: HrAuthRequest, res: Resp
  * POST /api/hr/applications/:id/offer
  * 1-Click Offer Execution: generates contract payload and pushes offer_signature task to candidate inbox.
  */
-hrRouter.post("/applications/:id/offer", async (req: HrAuthRequest, res: Response) => {
+hrRouter.post("/applications/:id/offer", requireRole("hr_manager", "super_admin") as any, async (req: HrAuthRequest, res: Response) => {
   const orgId = req.hr!.organizationId;
   const appId = req.params.id;
   const { baseSalary = "$155,000", bonus = "15% Target Annual Bonus", equity = "0.25% Stock Options (4-year vest)", startDate = "2026-11-01" } = req.body || {};

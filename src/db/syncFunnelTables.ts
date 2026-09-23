@@ -26,7 +26,15 @@ export async function syncFunnelTablesAndSeed() {
       `ALTER TABLE applications ADD COLUMN IF NOT EXISTS magic_token_used_at TIMESTAMP`,
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS location TEXT DEFAULT 'Remote'`,
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS employment_type TEXT DEFAULT 'Full-time'`,
-      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_range TEXT DEFAULT '$120k - $160k'`
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_range TEXT DEFAULT '$120k - $160k'`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS rubric_id TEXT`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS created_by TEXT`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS approval_feedback TEXT`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS approved_by TEXT`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP`,
+      `ALTER TABLE rubrics ADD COLUMN IF NOT EXISTS organization_id TEXT`,
+      `ALTER TABLE rubrics ADD COLUMN IF NOT EXISTS title TEXT`,
+      `ALTER TABLE rubrics ADD COLUMN IF NOT EXISTS department TEXT`
     ];
 
     for (const sql of initialAlters) {
@@ -322,11 +330,11 @@ export async function syncFunnelTablesAndSeed() {
 
     // 7. Seed Default Requisitions and Rubrics if needed
     const checkRubrics = await client.query(`SELECT COUNT(*)::int as count FROM rubrics;`);
+    const defaultRubricId = `rubric-data-analyst-01`;
     if (checkRubrics.rows[0].count === 0) {
-      const defaultRubricId = `rubric-data-analyst-01`;
       await client.query(`
-        INSERT INTO rubrics (id, job_id, version)
-        VALUES ($1, 'job-data-analyst-01', 'v1.0')
+        INSERT INTO rubrics (id, organization_id, title, department, job_id, version)
+        VALUES ($1, 'org-ravengard', 'Senior Data Analyst Assessment', 'Analytics & Business Intelligence', 'job-data-analyst-01', 'v1.0')
         ON CONFLICT (id) DO NOTHING;
       `, [defaultRubricId]);
 
@@ -349,7 +357,27 @@ export async function syncFunnelTablesAndSeed() {
           ON CONFLICT (id) DO NOTHING;
         `, [`crit-${crypto.randomUUID()}`, defaultRubricId, d.name, d.weight, d.desc]);
       }
+    } else {
+      // Ensure existing rubrics have title and department populated
+      await client.query(`
+        UPDATE rubrics
+        SET title = COALESCE(title, 'Senior Data Analyst Assessment'),
+            department = COALESCE(department, 'Analytics & Business Intelligence'),
+            organization_id = COALESCE(organization_id, 'org-ravengard')
+        WHERE title IS NULL;
+      `);
     }
+
+    // 7b. Seed HR Director & Admin accounts in admin_users if missing
+    await client.query(`
+      INSERT INTO admin_users (id, email, name, role, organization_id, password_hash)
+      VALUES 
+        ('admin-root', 'admin@ravengard.com', 'Ravengard Lead Auditor', 'admin', 'org-ravengard', '$2a$10$iKzHskGj9wz1WdJ2L2hH8eF5hSfZLskbLzQ.C2m8GjG9Gf2dM/G6G'),
+        ('hr-root', 'hr@ravengard.com', 'Ravengard HR Director', 'hr_admin', 'org-ravengard', '$2a$10$iKzHskGj9wz1WdJ2L2hH8eF5hSfZLskbLzQ.C2m8GjG9Gf2dM/G6G')
+      ON CONFLICT (email) DO UPDATE SET 
+        role = EXCLUDED.role,
+        organization_id = EXCLUDED.organization_id;
+    `);
 
     // 8. Ensure Published Jobs for Public Careers Portal
     await client.query(`

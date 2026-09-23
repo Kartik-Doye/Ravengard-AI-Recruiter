@@ -35,18 +35,22 @@ To deliver a single locked, automated pipeline (resume intelligence → structur
 *   `/interview` (Requires Waiting Room clearance)
 
 **Backend API Map:**
-*   `POST /api/register` - Validates and creates candidate, sends Firebase verification email.
+*   `POST /api/register` - Validates and creates candidate (with country and E.164 mobile), sends Firebase verification email.
+*   `POST /api/auth/candidate-mock-login` - Mock authentication endpoint for development and testing.
+*   `POST /api/candidate/parse-resume` - Parses uploaded PDF/DOCX resume and extracts candidate details.
 *   `GET /api/me` - Fetches candidate, active session, and merges live Firebase `email_verified` token claim.
-*   `POST /api/session/confirm-consent` - Verifies email, creates locked session, sets `thinkAgainUsesLeft: 2`.
+*   `POST /api/session/confirm-consent` - Verifies email, creates locked session with `assessmentExpiresAt` SLA window, sets `thinkAgainUsesLeft: 2`.
 *   `POST /api/session/:id/think-again` - Decrements think-again counter. Validates ownership and remaining uses.
 
 ## 6. Database Schema (Core Entities)
-*   **Candidates:** `id`, `email`, `name`, `mobile`, `college`, `degree`, `gradYear`, `preferredLanguage`.
-*   **Sessions:** `id`, `candidateId`, `locked` (boolean), `consentAcceptedAt`, `policyVersion`, `currentStage` (enum matching phases), `status`, `thinkAgainUsesLeft` (int, default 2).
+*   **Candidates:** `id`, `email`, `name`, `mobile` (E.164), `country` (default 'United States'), `college`, `degree`, `gradYear`, `preferredLanguage`, `emailVerified`.
+*   **Sessions:** `id`, `candidateId`, `locked` (boolean), `consentAcceptedAt`, `policyVersion`, `currentStage` (enum matching phases), `status`, `thinkAgainUsesLeft` (int, default 2), `assessmentExpiresAt` (timestamp, SLA deadline).
 *   **ResumeAnalyses:** `id`, `sessionId`, `rawResumeText`, `parsedData`.
 
 ## 7. Component Inventory
-*   `Registration.tsx`: Form with Zod validation.
+*   `Registration.tsx`: Internationalized candidate onboarding form with country selector, STD dialing code picker, and Zod validation.
+*   `countryData.ts`: Global country list, dialing codes, validation rules, and client-side locale/timezone auto-detection.
+*   `PasswordStrengthIndicator.tsx`: Real-time entropy, sequence/dictionary pattern matching, and contextual credential validation.
 *   `Welcome.tsx`: Polls for `email_verified`, handles consent transition.
 *   `auth.ts` (Backend Middleware): Parses Firebase token, injects `req.user`, enforces environment-based E2E bypass (`test-uid-*`).
 
