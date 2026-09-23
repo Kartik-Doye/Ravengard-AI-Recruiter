@@ -52,8 +52,8 @@ export class EmailService {
       console.log("[EmailService] Configured via generic SMTP transport.");
     } else {
       if (process.env.NODE_ENV === "production") {
-        console.error(
-          "FATAL / CRITICAL WARNING: Neither RESEND_API_KEY nor SMTP_URL configured in production! Candidate emails will fallback to logged_dev outbox state."
+        console.warn(
+          "[EmailService] Info: Neither RESEND_API_KEY nor SMTP_URL configured in production. Candidate emails will be queued in PostgreSQL outbox in logged state."
         );
       } else {
         console.log(

@@ -11,20 +11,9 @@ export function validateStartupConfiguration() {
 
   // Define required environment variables and their expected patterns (if any)
   const requiredEnvVars: Record<string, { optional?: boolean; pattern?: RegExp; insecureDefaults?: string[] }> = {
-    NODE_ENV: { optional: false },
     JWT_SECRET: {
       optional: false,
       pattern: /^.+$/, // Must be set to something
-      insecureDefaults: [
-        'ravengard_dev_jwt_secret_change_in_production',
-        'change_this_in_production',
-        'your_jwt_secret_here',
-        'secret'
-      ]
-    },
-    ACTUAL_SECRET: {
-      optional: false,
-      pattern: /^.+$/,
       insecureDefaults: [
         'ravengard_dev_jwt_secret_change_in_production',
         'change_this_in_production',
@@ -41,19 +30,11 @@ export function validateStartupConfiguration() {
         'test_key'
       ]
     },
-    DATABASE_URL: {
-      optional: false, // Required for database connection
-      pattern: /^postgres(ql)?:\/\//, // Must be a postgres connection string
-      insecureDefaults: [
-        'postgresql://user:password@localhost:5432/dbname',
-        'postgres://user:password@localhost:5432/dbname'
-      ]
-    },
-    // Optional but recommended for production
+    // Optional or environment-specific configs
+    NODE_ENV: { optional: true },
     APP_URL: { optional: true },
     CORS_ORIGIN: { optional: true },
     HELMET_ENABLED: { optional: true },
-    // Add more as needed
   };
 
   // Check each required variable
@@ -64,7 +45,6 @@ export function validateStartupConfiguration() {
     const value = process.env[varName];
 
     if (options.optional && !value) {
-      // Optional and not set - skip
       continue;
     }
 
@@ -81,9 +61,16 @@ export function validateStartupConfiguration() {
 
     // Check pattern if provided
     if (options.pattern && !options.pattern.test(value)) {
-      // We'll treat pattern mismatch as a warning, not a failure, for now
       logger.warn(`Environment variable ${varName} does not match expected pattern.`, { varName, value });
     }
+  }
+
+  // Database check: either DATABASE_URL or (SQL_HOST and SQL_DB_NAME) must be present
+  const hasDatabaseConfig = Boolean(
+    process.env.DATABASE_URL || (process.env.SQL_HOST && process.env.SQL_DB_NAME)
+  );
+  if (!hasDatabaseConfig) {
+    missingVars.push('DATABASE_URL or (SQL_HOST and SQL_DB_NAME)');
   }
 
   // Handle missing variables

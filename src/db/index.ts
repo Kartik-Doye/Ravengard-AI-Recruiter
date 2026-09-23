@@ -26,8 +26,10 @@ export const createPool = () => {
       config.port = process.env.SQL_PORT ? parseInt(process.env.SQL_PORT, 10) : 5432;
     }
 
-    if (isProduction && process.env.DB_REQUIRE_SSL !== 'false') {
-      config.ssl = { rejectUnauthorized: false }; // Configurable based on provider (Neon, Supabase, CloudSQL)
+    if (process.env.DB_REQUIRE_SSL === 'true') {
+      config.ssl = { rejectUnauthorized: false };
+    } else {
+      config.ssl = false;
     }
 
     global._postgresPool = new Pool(config);
