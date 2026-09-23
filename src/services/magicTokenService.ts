@@ -44,6 +44,7 @@ export function signCandidateMagicJwt(payload: CandidateTokenPayload): string {
 export function signCandidateProfileJwt(candidate: { id: string; email: string; name?: string | null }): string {
   return jwt.sign(
     {
+      id: candidate.id,
       candidateId: candidate.id,
       email: candidate.email,
       name: candidate.name || "",

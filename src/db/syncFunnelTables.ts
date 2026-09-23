@@ -1,10 +1,16 @@
-import { createPool } from "./index";
+import { createPool, createAdminPool } from "./index";
 import crypto from "crypto";
 
 export async function syncFunnelTablesAndSeed() {
-  const pool = createPool();
-  if (!pool) return;
-  const client = await pool.connect();
+  const adminPool = createAdminPool();
+  let client;
+  try {
+    client = await adminPool.connect();
+  } catch {
+    const fallbackPool = createPool();
+    if (!fallbackPool) return;
+    client = await fallbackPool.connect();
+  }
 
   try {
     // 1. Ensure table columns exist
@@ -359,6 +365,9 @@ export async function syncFunnelTablesAndSeed() {
   } catch (err: any) {
     console.error("[DB Sync] Warning during syncFunnelTablesAndSeed:", err.message);
   } finally {
-    client.release();
+    if (client) client.release();
+    try {
+      await adminPool.end();
+    } catch {}
   }
 }

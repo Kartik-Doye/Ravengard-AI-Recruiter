@@ -47,6 +47,21 @@ export const createPool = () => {
   return global._postgresPool;
 };
 
+export const createAdminPool = () => {
+  let config: PoolConfig = {
+    max: 5,
+    connectionTimeoutMillis: 15000,
+    idleTimeoutMillis: 30000,
+    host: process.env.SQL_HOST,
+    user: process.env.SQL_ADMIN_USER || process.env.SQL_USER,
+    password: process.env.SQL_ADMIN_PASSWORD || process.env.SQL_PASSWORD,
+    database: process.env.SQL_DB_NAME,
+    port: process.env.SQL_PORT ? parseInt(process.env.SQL_PORT, 10) : 5432,
+    ssl: process.env.DB_REQUIRE_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  };
+  return new Pool(config);
+};
+
 const pool = createPool();
 
 export const db = drizzle(pool, { schema });
