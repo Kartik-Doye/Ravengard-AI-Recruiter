@@ -1,6 +1,4 @@
-import { db, createPool } from "../db/index";
-import { hrNotifications, applications, sessions, interviewReports, aiEvaluations } from "../db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { createPool } from "../db/index";
 import { scoringService } from "./scoringService";
 import crypto from "crypto";
 
@@ -28,10 +26,31 @@ export async function processAbandonedSessions(): Promise<AbandonedSessionResult
   const processedIds: string[] = [];
 
   try {
-    // Check if sessions & applications tables exist
+    // Check if sessions table exists
     const tableCheck = await client.query(`SELECT to_regclass('public.sessions') as tbl;`);
     if (!tableCheck.rows[0]?.tbl) {
       return { processedCount: 0, sessionIds: [] };
+    }
+
+    // Defensively ensure required columns and tables exist in the schema
+    try {
+      await client.query(`
+        ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMP DEFAULT NOW();
+        ALTER TABLE sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
+        CREATE TABLE IF NOT EXISTS hr_notifications (
+          id TEXT PRIMARY KEY,
+          organization_id TEXT,
+          type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          message TEXT NOT NULL,
+          application_id TEXT,
+          candidate_id TEXT,
+          is_read BOOLEAN DEFAULT false,
+          created_at TIMESTAMP DEFAULT NOW()
+        );
+      `);
+    } catch (migErr) {
+      // Ignore if concurrent migration or permissions issue
     }
 
     // Find sessions in active interview stages that have not pinged heartbeat in > 5 minutes

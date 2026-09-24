@@ -38,7 +38,10 @@ export async function syncFunnelTablesAndSeed() {
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP`,
       `ALTER TABLE rubrics ADD COLUMN IF NOT EXISTS organization_id TEXT`,
       `ALTER TABLE rubrics ADD COLUMN IF NOT EXISTS title TEXT`,
-      `ALTER TABLE rubrics ADD COLUMN IF NOT EXISTS department TEXT`
+      `ALTER TABLE rubrics ADD COLUMN IF NOT EXISTS department TEXT`,
+      `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMP DEFAULT NOW()`,
+      `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`,
+      `CREATE TABLE IF NOT EXISTS hr_notifications (id TEXT PRIMARY KEY, organization_id TEXT, type TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, application_id TEXT, candidate_id TEXT, is_read BOOLEAN DEFAULT false, created_at TIMESTAMP DEFAULT NOW())`
     ];
 
     for (const sql of initialAlters) {
