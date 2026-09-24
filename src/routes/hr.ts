@@ -1474,4 +1474,305 @@ hrRouter.post("/applications/:id/offer", requireRole("hr_manager", "super_admin"
   }
 });
 
+/**
+ * GET /api/hr/notifications
+ * Retrieves real-time alerts (High Score, Integrity Flags, SLA Expirations, Partial Submissions)
+ */
+hrRouter.get("/notifications", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+  const pool = (db as any).session?.client || (global as any)._postgresPool;
+  if (!pool) return res.status(500).json({ error: "Database client unavailable." });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, type, title, message, application_id, candidate_id, metadata, is_read, created_at
+       FROM hr_notifications
+       WHERE organization_id = $1
+       ORDER BY created_at DESC
+       LIMIT 50;`,
+      [orgId]
+    );
+
+    const unreadCount = rows.filter((r: any) => !r.is_read).length;
+    return res.json({ notifications: rows, unreadCount });
+  } catch (err) {
+    console.error("Fetch notifications error:", err);
+    return res.json({ notifications: [], unreadCount: 0 });
+  }
+});
+
+/**
+ * PATCH /api/hr/notifications/:id/read
+ */
+hrRouter.patch("/notifications/:id/read", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+  const notifId = req.params.id;
+  const pool = (db as any).session?.client || (global as any)._postgresPool;
+  if (!pool) return res.status(500).json({ error: "Database client unavailable." });
+
+  try {
+    await pool.query(
+      `UPDATE hr_notifications SET is_read = true WHERE id = $1 AND organization_id = $2;`,
+      [notifId, orgId]
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to mark notification as read." });
+  }
+});
+
+/**
+ * POST /api/hr/notifications/mark-all-read
+ */
+hrRouter.post("/notifications/mark-all-read", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+  const pool = (db as any).session?.client || (global as any)._postgresPool;
+  if (!pool) return res.status(500).json({ error: "Database client unavailable." });
+
+  try {
+    await pool.query(
+      `UPDATE hr_notifications SET is_read = true WHERE organization_id = $1;`,
+      [orgId]
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to mark all as read." });
+  }
+});
+
+/**
+ * GET /api/hr/applications/:id/comments
+ * Team calibration notes on a candidate dossier
+ */
+hrRouter.get("/applications/:id/comments", async (req: HrAuthRequest, res: Response) => {
+  const appId = req.params.id;
+  const pool = (db as any).session?.client || (global as any)._postgresPool;
+  if (!pool) return res.status(500).json({ error: "Database client unavailable." });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, application_id, organization_id, author_id, author_name, author_role, comment_text, upvotes, tags, created_at
+       FROM dossier_comments
+       WHERE application_id = $1
+       ORDER BY created_at ASC;`,
+      [appId]
+    );
+    return res.json({ comments: rows });
+  } catch (err) {
+    return res.json({ comments: [] });
+  }
+});
+
+/**
+ * POST /api/hr/applications/:id/comments
+ * Add team calibration note
+ */
+hrRouter.post("/applications/:id/comments", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+  const userId = req.hr!.id;
+  const userName = req.hr!.name || req.hr!.email || "HR Reviewer";
+  const userRole = req.hr!.role || "hr_user";
+  const appId = req.params.id;
+  const { commentText, tags = [] } = req.body || {};
+
+  if (!commentText || !commentText.trim()) {
+    return res.status(400).json({ error: "Comment text cannot be empty." });
+  }
+
+  const pool = (db as any).session?.client || (global as any)._postgresPool;
+  if (!pool) return res.status(500).json({ error: "Database client unavailable." });
+
+  try {
+    const commentId = `comment-${crypto.randomUUID()}`;
+    const { rows } = await pool.query(
+      `INSERT INTO dossier_comments (id, application_id, organization_id, author_id, author_name, author_role, comment_text, upvotes, tags, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8, NOW())
+       RETURNING *;`,
+      [commentId, appId, orgId, userId, userName, userRole, commentText.trim(), JSON.stringify(tags)]
+    );
+
+    return res.json({ success: true, comment: rows[0] });
+  } catch (err) {
+    console.error("Insert comment error:", err);
+    return res.status(500).json({ error: "Failed to save comment." });
+  }
+});
+
+/**
+ * POST /api/hr/comments/:id/upvote
+ */
+hrRouter.post("/comments/:id/upvote", async (req: HrAuthRequest, res: Response) => {
+  const commentId = req.params.id;
+  const pool = (db as any).session?.client || (global as any)._postgresPool;
+  if (!pool) return res.status(500).json({ error: "Database client unavailable." });
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE dossier_comments SET upvotes = upvotes + 1 WHERE id = $1 RETURNING upvotes;`,
+      [commentId]
+    );
+    return res.json({ success: true, upvotes: rows[0]?.upvotes || 0 });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to upvote." });
+  }
+});
+
+/**
+ * POST /api/hr/rubric/generate
+ * AI-powered weighted rubric generator from raw Job Description
+ */
+hrRouter.post("/rubric/generate", async (req: HrAuthRequest, res: Response) => {
+  const { jobDescription, roleTitle, department } = req.body || {};
+
+  if (!jobDescription || !jobDescription.trim()) {
+    return res.status(400).json({ error: "Job description is required to generate rubric." });
+  }
+
+  try {
+    const { generateRubricFromJobDescription } = await import("../services/rubricService");
+    const generated = await generateRubricFromJobDescription(jobDescription, roleTitle, department);
+    return res.json({ success: true, rubric: generated });
+  } catch (err: any) {
+    console.error("AI Rubric generation error:", err);
+    return res.status(500).json({ error: "Failed to generate rubric from job description." });
+  }
+});
+
+/**
+ * POST /api/hr/applications/:id/generate-feedback-summary
+ * Generates growth-oriented constructive feedback for candidate on rejection
+ */
+hrRouter.post("/applications/:id/generate-feedback-summary", async (req: HrAuthRequest, res: Response) => {
+  const appId = req.params.id;
+  const pool = (db as any).session?.client || (global as any)._postgresPool;
+  if (!pool) return res.status(500).json({ error: "Database client unavailable." });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT a.id, a.candidate_id, c.name, c.email, j.title as job_title,
+              e.executive_summary, e.strengths, e.weaknesses, e.overall_score
+       FROM applications a
+       JOIN candidates c ON a.candidate_id = c.id
+       JOIN jobs j ON a.job_id = j.id
+       LEFT JOIN ai_evaluations e ON a.id = e.application_id
+       WHERE a.id = $1;`,
+      [appId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Application not found." });
+    }
+
+    const app = rows[0];
+    const strengthsList = Array.isArray(app.strengths) ? app.strengths : ["Solid grasp of core programming concepts", "Clear communication style"];
+    const weaknessesList = Array.isArray(app.weaknesses) ? app.weaknesses : ["Deep-dive distributed consensus", "Production edge-case concurrency handling"];
+
+    const constructiveSummary = `Thank you for interviewing for the ${app.job_title} role at Ravengard. While we are not moving forward at this time, our technical panel was impressed by your ${strengthsList.join(" and ")}. To prepare for future senior architecture interviews, we recommend deep-diving into ${weaknessesList.join(" and ")}.`;
+
+    const feedbackPayload = {
+      id: `fb-${crypto.randomUUID()}`,
+      applicationId: app.id,
+      candidateId: app.candidate_id,
+      strengths: strengthsList,
+      areasToImprove: weaknessesList,
+      learningResources: [
+        "Designing Data-Intensive Applications (Martin Kleppmann)",
+        "System Design Primer & Distributed Consensus Patterns"
+      ],
+      constructiveSummary,
+      status: "ready"
+    };
+
+    await pool.query(
+      `INSERT INTO candidate_feedback_summaries (id, application_id, candidate_id, strengths, areas_to_improve, learning_resources, constructive_summary, status, generated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'ready', NOW())
+       ON CONFLICT (application_id) DO UPDATE 
+       SET strengths = EXCLUDED.strengths,
+           areas_to_improve = EXCLUDED.areas_to_improve,
+           constructive_summary = EXCLUDED.constructive_summary;`,
+      [
+        feedbackPayload.id,
+        app.id,
+        app.candidate_id,
+        JSON.stringify(feedbackPayload.strengths),
+        JSON.stringify(feedbackPayload.areasToImprove),
+        JSON.stringify(feedbackPayload.learningResources),
+        constructiveSummary,
+      ]
+    );
+
+    return res.json({ success: true, feedback: feedbackPayload });
+  } catch (err: any) {
+    console.error("Generate feedback summary error:", err);
+    return res.status(500).json({ error: "Failed to generate feedback summary." });
+  }
+});
+
+/**
+ * POST /api/hr/candidates/bulk-invite
+ * Batch imports candidates via CSV rows and mints magic invitation tokens
+ */
+hrRouter.post("/candidates/bulk-invite", async (req: HrAuthRequest, res: Response) => {
+  const orgId = req.hr!.organizationId;
+  const { candidatesList = [], jobId } = req.body || {};
+
+  if (!Array.isArray(candidatesList) || candidatesList.length === 0) {
+    return res.status(400).json({ error: "candidatesList array cannot be empty." });
+  }
+
+  const pool = (db as any).session?.client || (global as any)._postgresPool;
+  if (!pool) return res.status(500).json({ error: "Database client unavailable." });
+
+  try {
+    const created: any[] = [];
+
+    for (const item of candidatesList) {
+      const email = String(item.email || "").trim().toLowerCase();
+      const name = String(item.name || email.split("@")[0]).trim();
+      const targetJobId = item.jobId || jobId || "job-senior-dist-sys";
+
+      if (!email || !email.includes("@")) continue;
+
+      const candidateId = `cand-${crypto.randomUUID()}`;
+      await pool.query(
+        `INSERT INTO candidates (id, email, name, organization_id, created_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (id) DO NOTHING;`,
+        [candidateId, email, name, orgId]
+      );
+
+      const appId = `app-${crypto.randomUUID()}`;
+      const magicToken = crypto.randomBytes(24).toString("hex");
+      const magicHash = crypto.createHash("sha256").update(magicToken).digest("hex");
+      const magicExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await pool.query(
+        `INSERT INTO applications (id, job_id, candidate_id, organization_id, status, magic_token_hash, magic_token_expires_at, created_at)
+         VALUES ($1, $2, $3, $4, 'shortlisted', $5, $6, NOW())
+         ON CONFLICT DO NOTHING;`,
+        [appId, targetJobId, candidateId, orgId, magicHash, magicExpiresAt]
+      );
+
+      created.push({
+        candidateId,
+        email,
+        name,
+        applicationId: appId,
+        inviteUrl: `/gateway?token=${magicToken}`
+      });
+    }
+
+    return res.json({
+      success: true,
+      processedCount: created.length,
+      candidates: created,
+      message: `Successfully generated magic tokens and staged invites for ${created.length} candidates.`
+    });
+  } catch (err: any) {
+    console.error("Bulk invite error:", err);
+    return res.status(500).json({ error: "Failed to process bulk candidate invites." });
+  }
+});
+
+
 

@@ -632,3 +632,12 @@ export async function evaluateAndScoreSession(
   });
 }
 
+export const generateFinalReport = evaluateAndScoreSession;
+
+export const scoringService = {
+  generateFinalReport: evaluateAndScoreSession,
+  evaluateAndScoreSession,
+};
+
+
+

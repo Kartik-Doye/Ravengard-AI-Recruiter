@@ -518,6 +518,84 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
     }
   });
 
+  // --- Phase 1: Candidate Heartbeat & Disconnect Auto-Submit Endpoints ---
+  app.post("/api/candidate/heartbeat", async (req: express.Request, res: express.Response) => {
+    try {
+      const sessionId = req.body?.sessionId || req.headers["x-session-id"];
+      const applicationId = req.body?.applicationId;
+
+      if (!sessionId && !applicationId) {
+        return res.status(400).json({ error: "Missing sessionId or applicationId for heartbeat." });
+      }
+
+      const pool = (db as any).session?.client || (global as any)._postgresPool;
+      if (pool) {
+        if (sessionId) {
+          await pool.query(
+            `UPDATE sessions SET last_active_at = NOW(), updated_at = NOW() WHERE id = $1;`,
+            [sessionId]
+          );
+        }
+        if (applicationId) {
+          await pool.query(
+            `UPDATE assessment_sessions SET last_active_at = NOW() WHERE application_id = $1;`,
+            [applicationId]
+          );
+        }
+      }
+
+      return res.json({ success: true, timestamp: new Date().toISOString() });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to record heartbeat." });
+    }
+  });
+
+  app.post("/api/candidate/auto-submit", async (req: express.Request, res: express.Response) => {
+    try {
+      const { sessionId, applicationId, reason = "client_disconnect" } = req.body || {};
+      if (!sessionId && !applicationId) {
+        return res.status(400).json({ error: "Missing sessionId or applicationId." });
+      }
+
+      const pool = (db as any).session?.client || (global as any)._postgresPool;
+      if (pool) {
+        if (sessionId) {
+          await pool.query(
+            `UPDATE sessions 
+             SET status = 'partial_submission', current_stage = 'report_generation', updated_at = NOW() 
+             WHERE id = $1;`,
+            [sessionId]
+          );
+        }
+        if (applicationId) {
+          await pool.query(
+            `UPDATE applications 
+             SET status = 'partial_submission', updated_at = NOW() 
+             WHERE id = $1;`,
+            [applicationId]
+          );
+        }
+      }
+
+      // Trigger asynchronous report generation for partial turn answers
+      if (sessionId) {
+        try {
+          const { scoringService } = await import("./src/services/scoringService");
+          scoringService.generateFinalReport(sessionId).catch((e: any) => console.warn("Async partial scoring notice:", e));
+        } catch {}
+      }
+
+      return res.json({
+        success: true,
+        status: "partial_submission",
+        message: "Candidate responses safely submitted as partial assessment."
+      });
+    } catch (err: any) {
+      console.error("Auto-submit error:", err);
+      return res.status(500).json({ error: "Failed to auto-submit session." });
+    }
+  });
+
   app.post("/api/contact", async (req, res) => {
     try {
       const { name, email, message } = req.body || {};
@@ -1414,6 +1492,14 @@ ${allRoutes.map(r => `  <url>
       isSlaTimeoutRunning = false;
     }
   }, 10000);
+
+  // Auto-Submit Heartbeat Worker (checks sessions inactive for >5 mins)
+  try {
+    const { startAutoSubmitWorker } = await import("./src/services/autoSubmitWorker");
+    startAutoSubmitWorker();
+  } catch (asErr) {
+    console.warn("AutoSubmitWorker init note:", asErr);
+  }
 
   // Global error handler
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

@@ -113,3 +113,91 @@ export async function ensureDefaultRubric(version: string = DEFAULT_RUBRIC_VERSI
 export async function getRubricByVersion(version: string = DEFAULT_RUBRIC_VERSION): Promise<RubricWithCriteria> {
   return ensureDefaultRubric(version);
 }
+
+export interface GeneratedRubricCriterion {
+  name: string;
+  weight: number;
+  description: string;
+}
+
+export interface GeneratedRubricResult {
+  title: string;
+  department?: string;
+  criteria: GeneratedRubricCriterion[];
+  rationale: string;
+}
+
+/**
+ * Parses a raw Job Description and generates 3-5 weighted rubric criteria summing to exactly 100%.
+ */
+export async function generateRubricFromJobDescription(
+  jobDescription: string,
+  roleTitle?: string,
+  department?: string
+): Promise<GeneratedRubricResult> {
+  const { LLMRouter } = await import("./llm/llmRouter");
+
+  const systemPrompt = `You are a Principal Engineering Hiring Architect. 
+Your job is to convert a raw Job Description into a highly objective, 3-5 criterion hiring evaluation rubric.
+CRITICAL RULES:
+1. Criteria weights MUST be integers and MUST sum up to exactly 100.
+2. Each criterion should have a clear technical or behavioral boundary and a concise evaluation description.
+3. Return strict JSON matching the schema:
+{
+  "title": string,
+  "department": string,
+  "criteria": [
+    { "name": string, "weight": number, "description": string }
+  ],
+  "rationale": string
+}`;
+
+  const userPrompt = `Role Title: ${roleTitle || "Senior Software Engineer"}
+Department: ${department || "Engineering"}
+
+Job Description:
+${jobDescription.slice(0, 4000)}
+
+Generate the weighted rubric criteria.`;
+
+  try {
+    const result = await LLMRouter.structuredOutput<GeneratedRubricResult>({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.2
+    });
+
+    if (result && Array.isArray(result.criteria) && result.criteria.length > 0) {
+      // Normalize weights so they sum to 100%
+      let total = result.criteria.reduce((sum, c) => sum + (Number(c.weight) || 0), 0);
+      if (total !== 100 && total > 0) {
+        result.criteria = result.criteria.map((c, i) => {
+          if (i === result.criteria.length - 1) {
+            const currentSum = result.criteria.slice(0, -1).reduce((s, x) => s + Math.round((Number(x.weight) / total) * 100), 0);
+            return { ...c, weight: 100 - currentSum };
+          }
+          return { ...c, weight: Math.round((Number(c.weight) / total) * 100) };
+        });
+      }
+      return result;
+    }
+  } catch (err) {
+    console.warn("[RubricService] Failed to generate AI rubric, returning fallback:", err);
+  }
+
+  // Fallback defaults
+  return {
+    title: roleTitle || "Technical Specialist",
+    department: department || "Engineering",
+    criteria: [
+      { name: "Technical Architecture & Design", weight: 35, description: "System decomposition, scalability, and framework proficiency." },
+      { name: "Problem Solving & Algorithmic Rigor", weight: 30, description: "Edge-case handling, data structures, and debugging efficiency." },
+      { name: "Code Quality & Best Practices", weight: 20, description: "Maintainability, testability, and error handling." },
+      { name: "Communication & Collaboration", weight: 15, description: "Clarity of thought, articulation, and trade-off justification." }
+    ],
+    rationale: "Default engineering rubric with standardized balanced weighting."
+  };
+}
+

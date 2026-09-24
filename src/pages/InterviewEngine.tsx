@@ -4,7 +4,9 @@ import { Button } from '../components/ui/Button';
 import { InterviewProgressStepper, InterviewStageKey } from '../components/interview/InterviewProgressStepper';
 import { AudioWaveformVisualizer } from '../components/interview/AudioWaveformVisualizer';
 import { VoiceInputToggle } from '../components/interview/VoiceInputToggle';
-import { Volume2, VolumeX, Sparkles, MessageSquare } from 'lucide-react';
+import { CodeSandbox } from '../components/interview/CodeSandbox';
+import { WhiteboardCanvas } from '../components/interview/WhiteboardCanvas';
+import { Volume2, VolumeX, Sparkles, MessageSquare, Code2, PenTool, Wifi, WifiOff } from 'lucide-react';
 
 export default function InterviewEngine({ session, onNext }: { session: any, onNext: (session: any) => void }) {
   const [loading, setLoading] = useState(true);
@@ -13,13 +15,18 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
   const [questionId, setQuestionId] = useState<string | null>(null);
   const [questionIndex, setQuestionIndex] = useState<number>(1);
   const [response, setResponse] = useState('');
+  const [codeContent, setCodeContent] = useState('');
+  const [codeLanguage, setCodeLanguage] = useState('python');
+  const [activeTab, setActiveTab] = useState<'text' | 'code' | 'whiteboard'>('text');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [enableVoiceNarration, setEnableVoiceNarration] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
   
   const token = localStorage.getItem('ravengard_uid');
   const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const heartbeatTimerRef = useRef<any>(null);
 
   // Map question index to explicit interview stages
   const getStageFromIndex = (idx: number): InterviewStageKey => {
@@ -28,6 +35,46 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
     if (idx === 3) return 'Behavioral';
     return 'Conclusion';
   };
+
+  // Heartbeat & Connection resilience
+  useEffect(() => {
+    const sendHeartbeat = async () => {
+      try {
+        const res = await fetch("/api/candidate/heartbeat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ sessionId: session.id })
+        });
+        if (res.ok) {
+          setIsConnected(true);
+        } else {
+          setIsConnected(false);
+        }
+      } catch {
+        setIsConnected(false);
+      }
+    };
+
+    sendHeartbeat();
+    heartbeatTimerRef.current = setInterval(sendHeartbeat, 15000);
+
+    // Auto-submit on window unload if mid-interview
+    const handleBeforeUnload = () => {
+      if (session?.id) {
+        navigator.sendBeacon(
+          "/api/candidate/auto-submit",
+          JSON.stringify({ sessionId: session.id, reason: "browser_unload" })
+        );
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [session?.id, token]);
 
   // Clean up any speech on unmount
   useEffect(() => {
@@ -187,7 +234,12 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
   };
 
   const handleSubmit = async () => {
-    if (!response.trim() || !questionId) return;
+    let combinedResponse = response.trim();
+    if (codeContent.trim()) {
+      combinedResponse += `\n\n\`\`\`${codeLanguage}\n${codeContent.trim()}\n\`\`\``;
+    }
+    if (!combinedResponse && !questionId) return;
+
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -202,12 +254,14 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
         const res = await fetch(`/api/interview/${session.id}/answer`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ questionId, responseText: response })
+          body: JSON.stringify({ questionId, responseText: combinedResponse || "Answer provided via interactive module" })
         });
         
         const data = await res.json();
         if (data.success) {
           success = true;
+          setResponse('');
+          setCodeContent('');
           const nextQ = questionIndex + 1;
           setQuestionIndex(nextQ);
           fetchNextQuestion(1, nextQ);
@@ -248,13 +302,30 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
   const currentStageKey = getStageFromIndex(questionIndex);
 
   return (
-    <div className="max-w-[760px] mx-auto py-8 px-4 space-y-6">
-      {/* 1. Linear Progress Stepper Component */}
-      <InterviewProgressStepper
-        currentStage={currentStageKey}
-        currentQuestionIndex={questionIndex}
-        totalQuestions={4}
-      />
+    <div className="max-w-[850px] mx-auto py-8 px-4 space-y-6">
+      {/* 1. Linear Progress Stepper Component & Connection Monitor */}
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <InterviewProgressStepper
+            currentStage={currentStageKey}
+            currentQuestionIndex={questionIndex}
+            totalQuestions={4}
+          />
+        </div>
+        <div className="ml-4 flex items-center gap-1.5 px-2.5 py-1 bg-slate-900 border border-slate-800 rounded-full text-[11px] font-mono shrink-0">
+          {isConnected ? (
+            <>
+              <Wifi className="w-3 h-3 text-emerald-400" />
+              <span className="text-emerald-300">Live Sync</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-3 h-3 text-rose-400 animate-pulse" />
+              <span className="text-rose-300">Reconnecting...</span>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* 2. Real-Time Audio Frequency Waveform Visualizer */}
       <AudioWaveformVisualizer
@@ -296,50 +367,114 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
         </Card>
       </div>
 
-      {/* Answer Area with Voice-to-Text Input Toggle */}
-      <Card className="p-1 bg-white/[0.03] border-white/10 overflow-hidden shadow-2xl">
-        {/* Voice Input Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-black/40 border-b border-white/10">
-          <VoiceInputToggle
-            onTranscript={handleVoiceTranscript}
+      {/* Workspace Modes Selector */}
+      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab('text')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              activeTab === 'text'
+                ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Voice & Text</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('code')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              activeTab === 'code'
+                ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Code2 className="w-3.5 h-3.5" />
+            <span>Code Sandbox</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('whiteboard')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              activeTab === 'whiteboard'
+                ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <PenTool className="w-3.5 h-3.5" />
+            <span>Architecture Canvas</span>
+          </button>
+        </div>
+        <span className="text-[11px] font-mono text-slate-500">
+          Auto-saved to session state
+        </span>
+      </div>
+
+      {/* Answer Body / Selected Workspace Mode */}
+      {activeTab === 'text' && (
+        <Card className="p-1 bg-white/[0.03] border-white/10 overflow-hidden shadow-2xl">
+          {/* Voice Input Toolbar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-black/40 border-b border-white/10">
+            <VoiceInputToggle
+              onTranscript={handleVoiceTranscript}
+              disabled={isStreaming || isSubmitting}
+            />
+            <span className="text-[11px] font-mono text-white/40">
+              {response.trim().split(/\s+/).filter(Boolean).length} words
+            </span>
+          </div>
+
+          <textarea
+            value={response}
+            onChange={(e) => setResponse(e.target.value)}
             disabled={isStreaming || isSubmitting}
+            placeholder={
+              isStreaming
+                ? "Wait for the AI question to complete..."
+                : "Type your answer or click 'Voice-to-Text Input' to speak using your microphone..."
+            }
+            className="w-full h-44 bg-transparent border-0 p-4 text-white focus:ring-0 resize-none font-light placeholder:text-white/30 leading-relaxed"
           />
-          <span className="text-[11px] font-mono text-white/40">
-            {response.trim().split(/\s+/).filter(Boolean).length} words
-          </span>
-        </div>
+        </Card>
+      )}
 
-        <textarea
-          value={response}
-          onChange={(e) => setResponse(e.target.value)}
+      {activeTab === 'code' && (
+        <div className="h-[380px]">
+          <CodeSandbox
+            code={codeContent}
+            setCode={setCodeContent}
+            language={codeLanguage}
+            setLanguage={setCodeLanguage}
+            readOnly={isStreaming || isSubmitting}
+          />
+        </div>
+      )}
+
+      {activeTab === 'whiteboard' && (
+        <div className="h-[380px]">
+          <WhiteboardCanvas readOnly={isStreaming || isSubmitting} />
+        </div>
+      )}
+
+      {/* Bottom Action Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 border border-white/10 rounded-xl bg-black/40">
+        <Button
+          variant="outline"
+          onClick={handleFinish}
           disabled={isStreaming || isSubmitting}
-          placeholder={
-            isStreaming
-              ? "Wait for the AI question to complete..."
-              : "Type your answer or click 'Voice-to-Text Input' to speak using your microphone..."
-          }
-          className="w-full h-44 bg-transparent border-0 p-4 text-white focus:ring-0 resize-none font-light placeholder:text-white/30 leading-relaxed"
-        />
+          className="text-xs font-mono uppercase tracking-wider text-slate-400 hover:text-slate-200"
+        >
+          Graceful Conclude
+        </Button>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-t border-white/10 bg-black/30">
-          <Button
-            variant="outline"
-            onClick={handleFinish}
-            disabled={isStreaming || isSubmitting}
-            className="text-xs font-mono uppercase tracking-wider"
-          >
-            Conclude Assessment
-          </Button>
-
-          <Button
-            onClick={handleSubmit}
-            disabled={isStreaming || isSubmitting || !response.trim()}
-            className="text-xs font-mono uppercase tracking-wider"
-          >
-            {isSubmitting ? "Submitting Response..." : "Submit Answer & Proceed"}
-          </Button>
-        </div>
-      </Card>
+        <Button
+          onClick={handleSubmit}
+          disabled={isStreaming || isSubmitting || (!response.trim() && !codeContent.trim())}
+          className="text-xs font-mono uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6"
+        >
+          {isSubmitting ? "Submitting Response..." : "Submit Turn & Next Question"}
+        </Button>
+      </div>
     </div>
   );
 }
+

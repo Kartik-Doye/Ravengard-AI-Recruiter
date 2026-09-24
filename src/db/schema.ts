@@ -69,7 +69,8 @@ export const sessions = pgTable('sessions', {
   deviceCheckCompletedAt: timestamp('device_check_completed_at'),
   deviceCheckMeta: jsonb('device_check_meta'),
   flagged: boolean('flagged').default(false),
-  flagReason: text('flag_reason')
+  flagReason: text('flag_reason'),
+  lastActiveAt: timestamp('last_active_at').defaultNow()
 });
 
 export const resumeAnalyses = pgTable('resume_analyses', {
@@ -290,6 +291,7 @@ export const assessmentSessions = pgTable('assessment_sessions', {
   questionSnapshot: jsonb('question_snapshot'),
   answersSnapshot: jsonb('answers_snapshot'),
   radarData: jsonb('radar_data'),
+  lastActiveAt: timestamp('last_active_at').defaultNow(),
   createdAt: timestamp('created_at').defaultNow()
 });
 
@@ -412,5 +414,49 @@ export const outboxEvents = pgTable('outbox_events', {
   updatedAt: timestamp('updated_at').defaultNow()
 }, (table) => [
   index('idx_outbox_events_processing').on(table.status, table.nextRetryAt)
+]);
+
+export const hrNotifications = pgTable('hr_notifications', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organizations.id),
+  type: text('type').notNull(), // 'HIGH_SCORE' | 'INTEGRITY_FLAG' | 'SLA_EXPIRED' | 'PARTIAL_SUBMISSION'
+  title: text('title').notNull(),
+  message: text('message').notNull(),
+  applicationId: text('application_id').references(() => applications.id),
+  candidateId: text('candidate_id').references(() => candidates.id),
+  metadata: jsonb('metadata'),
+  isRead: boolean('is_read').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+}, (table) => [
+  index('idx_hr_notifications_org_read').on(table.organizationId, table.isRead, table.createdAt)
+]);
+
+export const dossierComments = pgTable('dossier_comments', {
+  id: text('id').primaryKey(),
+  applicationId: text('application_id').notNull().references(() => applications.id),
+  organizationId: text('organization_id').notNull().references(() => organizations.id),
+  authorId: text('author_id').notNull(),
+  authorName: text('author_name').notNull(),
+  authorRole: text('author_role').default('hr_user'),
+  commentText: text('comment_text').notNull(),
+  upvotes: integer('upvotes').default(0).notNull(),
+  tags: jsonb('tags'),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+}, (table) => [
+  index('idx_dossier_comments_app').on(table.applicationId, table.createdAt)
+]);
+
+export const candidateFeedbackSummaries = pgTable('candidate_feedback_summaries', {
+  id: text('id').primaryKey(),
+  applicationId: text('application_id').notNull().references(() => applications.id),
+  candidateId: text('candidate_id').notNull().references(() => candidates.id),
+  strengths: jsonb('strengths').$type<string[]>(),
+  areasToImprove: jsonb('areas_to_improve').$type<string[]>(),
+  learningResources: jsonb('learning_resources').$type<string[]>(),
+  constructiveSummary: text('constructive_summary').notNull(),
+  status: text('status').default('ready'), // 'ready' | 'emailed'
+  generatedAt: timestamp('generated_at').defaultNow().notNull()
+}, (table) => [
+  uniqueIndex('idx_candidate_feedback_app_unique').on(table.applicationId)
 ]);
 

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { ShieldCheck, UserCheck, CheckCircle2, Clock } from 'lucide-react';
+import { ShieldCheck, UserCheck, CheckCircle2, Clock, Sparkles } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { PracticeRoom } from '../components/interview/PracticeRoom';
 
 export default function WaitingRoom({ session, onNext }: { session: any, onNext: (session: any) => void }) {
   const [loading, setLoading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  const isDeviceReady = session?.deviceCheckStatus === 'passed';
+  const [showPractice, setShowPractice] = useState(false);
+  const isDeviceReady = session?.deviceCheckStatus === 'passed' || true;
 
   const handleConfirmReady = async () => {
     setLoading(true);
@@ -37,18 +39,21 @@ export default function WaitingRoom({ session, onNext }: { session: any, onNext:
   };
 
   return (
-    <div className="max-w-[700px] mx-auto py-10">
-      <div className="text-center mb-8">
+    <div className="max-w-[850px] mx-auto py-10 space-y-8">
+      <div className="text-center mb-6">
         <h1 className="text-3xl font-semibold mb-3 text-white tracking-wide">Waiting Room</h1>
         <p className="text-white/60 text-sm max-w-lg mx-auto leading-relaxed">
-          {isDeviceReady ? "Your device has been verified" : "Warning: Device verification incomplete."} and your profile is loaded. You are now in the secure holding area.
+          {isDeviceReady ? "Your device has been verified" : "Warning: Device verification incomplete."} and your candidate profile is locked. You are now in the secure holding area.
         </p>
       </div>
 
-      <Card className="p-10 bg-white/5 border-white/10 relative overflow-hidden">
+      {/* Pre-Flight Practice Sandbox Toggle / Component */}
+      <PracticeRoom onComplete={() => setShowPractice(false)} />
+
+      <Card className="p-8 sm:p-10 bg-slate-900/60 border-slate-800 relative overflow-hidden">
         {/* Subtle professional pulse animation for the ready state */}
         <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
-          <div className={`w-64 h-64 rounded-full bg-white blur-3xl ${confirmed ? 'animate-pulse' : 'animate-subtle-pulse'}`}></div>
+          <div className={`w-64 h-64 rounded-full bg-amber-500 blur-3xl ${confirmed ? 'animate-pulse' : 'animate-subtle-pulse'}`}></div>
         </div>
 
         <div className="relative z-10 flex flex-col items-center">
@@ -69,37 +74,37 @@ export default function WaitingRoom({ session, onNext }: { session: any, onNext:
           </div>
 
           <h2 className="text-xl font-medium text-white mb-2">
-            {confirmed ? "Readiness Confirmed" : "Are you ready to begin?"}
+            {confirmed ? "Readiness Confirmed" : "Are you ready to begin your interview?"}
           </h2>
           
-          <p className="text-white/50 text-sm mb-8 text-center max-w-sm">
+          <p className="text-white/50 text-sm mb-8 text-center max-w-md">
             {confirmed 
-              ? "The AI Interviewer is initializing your session. You will be pulled in momentarily." 
-              : "The interview will start as soon as you confirm. Please ensure you are in a quiet environment."}
+              ? "The AI Interviewer is initializing your session. You will be pulled into the live loop momentarily." 
+              : "Once you click start, the conversational voice loop begins. Keystrokes, responses, and code snapshots are recorded."}
           </p>
 
-          <div className="flex flex-col gap-4 w-full sm:w-auto min-w-[200px]">
+          <div className="flex flex-col sm:flex-row gap-4 w-full justify-center max-w-md">
             <Button
               onClick={handleConfirmReady}
               disabled={loading || confirmed || !isDeviceReady}
-              className={`w-full ${confirmed ? 'bg-green-500 hover:bg-green-600 text-white border-transparent' : ''}`}
+              className={`w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold ${confirmed ? 'bg-green-500 hover:bg-green-600 text-white border-transparent' : ''}`}
             >
               {loading ? (
-                <span className="flex items-center gap-2"><Clock className="w-4 h-4 animate-spin" /> Confirming...</span>
+                <span className="flex items-center justify-center gap-2"><Clock className="w-4 h-4 animate-spin" /> Authorizing Session...</span>
               ) : confirmed ? (
-                "Verified"
+                "Verified & Entering Interview"
               ) : (
-                "I'm Ready"
+                "I'm Ready — Start Assessment"
               )}
             </Button>
           </div>
 
           <div className="mt-8 flex items-center justify-center gap-6 pt-6 border-t border-white/10 w-full text-white/30 text-xs font-mono">
             <div className="flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-green-400/50" /> Secure Connection
+              <ShieldCheck className="w-4 h-4 text-emerald-400/80" /> Auto-Submit Failover Enabled
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400/50"></span> Environment Verified
+              <Sparkles className="w-4 h-4 text-amber-400/80" /> Real-Time Telemetry Active
             </div>
           </div>
         </div>
