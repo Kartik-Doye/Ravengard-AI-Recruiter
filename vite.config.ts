@@ -1,11 +1,25 @@
-import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig } from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(async () => {
+  const plugins: any[] = [react()];
+
+  // Gracefully load @tailwindcss/vite plugin; if native oxide binding is missing in CI, PostCSS handles it
+  try {
+    const tailwindModule = await import('@tailwindcss/vite');
+    if (tailwindModule?.default) {
+      plugins.push(tailwindModule.default());
+    }
+  } catch (err: any) {
+    console.warn(
+      '[@tailwindcss/vite] Notice: Native oxide binary missing in environment. Using PostCSS pipeline instead.',
+      err?.message || err
+    );
+  }
+
   return {
-    plugins: [react(), tailwindcss()],
+    plugins,
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

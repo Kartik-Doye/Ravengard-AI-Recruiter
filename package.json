@@ -1,5 +1,5 @@
 {
-  "name": "react-example",
+  "name": "ravengard-ai-recruiter",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -25,6 +25,7 @@
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@libsql/client": "^0.17.4",
+    "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "bcryptjs": "^3.0.3",
@@ -47,6 +48,7 @@
     "nodemailer": "^9.0.4",
     "openai": "^7.18.0",
     "pg": "^8.22.0",
+    "postcss": "^8.5.28",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-helmet-async": "^3.0.0",
