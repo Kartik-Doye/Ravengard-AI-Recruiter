@@ -106,23 +106,22 @@ export default function Careers() {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg-0)] text-white pt-20 pb-16 px-6">
-      <div className="max-w-5xl mx-auto space-y-12">
+      <div className="max-w-6xl mx-auto space-y-12">
         {/* Hero Header */}
-        <div className="text-center space-y-4 max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-[var(--color-secondary)]">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Ravengard Talent & Engineering Opportunities</span>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white font-display">
+        <div className="text-center space-y-4 max-w-3xl mx-auto">
+          <p className="text-xs uppercase tracking-[0.3em] text-white/50 flex items-center justify-center gap-2">
+            <Sparkles className="w-4 h-4 text-[var(--color-secondary)]" /> Talent & Engineering Openings
+          </p>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight text-white font-display leading-[1.1]">
             Autonomous Assessment & Engineering Careers
           </h1>
-          <p className="text-sm text-white/60 leading-relaxed font-sans">
+          <p className="text-base md:text-lg text-white/70 leading-relaxed font-sans max-w-2xl mx-auto">
             Explore active openings, submit your technical credentials, and undergo our asynchronous pre-screening assessment powered by strict competency benchmarks.
           </p>
         </div>
 
         {/* Search & Filter Bar */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 bg-white/[0.02] border border-white/10 p-3 rounded-2xl backdrop-blur-md">
+        <div className="flex flex-col sm:flex-row items-center gap-4 glass-panel p-3 rounded-2xl border border-slate-800 backdrop-blur-xl">
           <div className="relative flex-1 w-full">
             <Search className="w-4 h-4 text-white/40 absolute left-3.5 top-3" />
             <input
@@ -130,41 +129,44 @@ export default function Careers() {
               placeholder="Search engineering positions, departments, or technologies..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-transparent text-xs text-white placeholder:text-white/30 focus:outline-none font-mono"
+              className="w-full pl-10 pr-4 py-2 bg-transparent text-sm text-white placeholder:text-white/30 focus:outline-none font-sans"
             />
           </div>
-          <span className="text-xs font-mono text-white/40 px-3">
+          <span className="text-xs text-white/40 px-3 font-sans">
             {filteredJobs.length} position{filteredJobs.length === 1 ? '' : 's'} available
           </span>
         </div>
 
         {/* Jobs Grid */}
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-6">
           {loading ? (
-            <div className="py-16 text-center text-white/40 font-mono text-xs animate-pulse">
+            <div className="py-20 text-center text-white/40 text-sm animate-pulse">
               Loading open positions...
             </div>
           ) : filteredJobs.length === 0 ? (
-            <div className="py-16 text-center text-white/40 font-mono text-xs border border-white/5 rounded-2xl">
+            <div className="py-20 text-center text-white/40 text-sm border border-slate-800/80 rounded-2xl glass-panel">
               No open positions found matching your search.
             </div>
           ) : (
             filteredJobs.map((job) => (
               <div
                 key={job.id}
-                className="p-6 rounded-2xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/10 hover:border-[var(--color-secondary)]/40 transition-all group flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
+                className="p-6 md:p-8 rounded-2xl glass-panel hover:border-slate-700 transition-all group flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl"
               >
-                <div className="space-y-2 max-w-2xl">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono text-[var(--color-secondary)] uppercase">
+                <div className="space-y-3 max-w-2xl">
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <span className="font-medium text-[var(--color-secondary)]">
                       {job.department || 'Engineering'}
                     </span>
-                    <span className="text-[11px] font-mono text-white/40">Full-Time</span>
+                    <span aria-hidden="true">·</span>
+                    <span>Full-Time</span>
+                    <span aria-hidden="true">·</span>
+                    <span>Remote / Hybrid</span>
                   </div>
-                  <h2 className="text-xl font-bold text-white group-hover:text-[var(--color-secondary)] transition-colors">
+                  <h2 className="text-2xl font-display font-semibold text-white group-hover:text-[var(--color-secondary)] transition-colors">
                     {job.title}
                   </h2>
-                  <p className="text-xs text-white/70 line-clamp-2 leading-relaxed font-sans">
+                  <p className="text-sm text-white/70 line-clamp-2 leading-relaxed">
                     {job.description}
                   </p>
                 </div>
@@ -175,10 +177,10 @@ export default function Careers() {
                     setSubmittedAppId(null);
                     setSubmitError(null);
                   }}
-                  className="px-5 py-2.5 rounded-xl bg-[var(--color-secondary)] text-black font-semibold text-xs font-mono flex items-center gap-2 hover:bg-[var(--color-secondary)]/90 transition-all flex-shrink-0 cursor-pointer shadow-md"
+                  className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-950 hover:bg-slate-100 hover:scale-[1.01] active:scale-[0.98] transition-all shadow-sm flex items-center gap-2 shrink-0 cursor-pointer"
                 >
                   <span>Apply Now</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4 text-slate-950" />
                 </button>
               </div>
             ))

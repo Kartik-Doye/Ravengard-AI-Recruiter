@@ -1,89 +1,84 @@
-# Ravengard AI Recruiter - Project Specification (PROJECT_SPEC.md)
+# Ravengard AI Recruiter — Project Specification (PROJECT_SPEC.md)
 
 ## 1. Project Overview
-Ravengard AI Recruiter is an AI-powered B2B interview screening platform. It replaces human first-round interviews by deploying an AI that provides a ranked, evidence-backed shortlist of candidates (including full transcripts, scorecards, and integrity reports). Secondary benefits include candidate interview practice and a personalized learning roadmap.
+Ravengard AI Recruiter is an enterprise-grade AI-powered assessment platform designed to act as a defensible, auditable first-pass filter for engineering hiring teams. The system conducts automated prescreening, real-time conversational voice assessments, silent integrity monitoring, and rubric-aligned scorecard generation.
 
-## 2. Product Goal
-To deliver a single locked, automated pipeline (resume intelligence → structured multi-persona interview → scored evaluation → ranked recommendation) that serves as a defensible, auditable first-pass filter for hiring teams.
+---
 
-## 3. Phase Breakdown
-*   **Phase 1 — Foundation (COMPLETED):** Locked candidate onboarding core. Registration, Welcome screen, Policy consent, Locked session creation, Resume upload/parsing, Session recovery, Route guarding.
-*   **Phase 2 — Device Check (COMPLETED):** Validates candidate device readiness. Camera/mic permissions, speaker test, browser check, fallback handling, session persistence for readiness.
-*   **Phase 3 — Waiting Room (NEXT/PENDING):** Controlled holding stage before the interview. Post-device-check waiting state, auto-transition setup, readiness confirmation.
-*   **Phase 4 — Interview Engine (PENDING):** Actual interview experience. Auto-start, stage sequencing, round logic, response capture.
-*   **Phase 5 — Anti-Cheat / Integrity Layer (PENDING):** Suspicious behavior detection, integrity signals, cheat-risk tracking, fallback alerts.
-*   **Phase 6 — Final Report (PENDING):** Score generation, summary report, strengths/gaps, structured output.
-*   **Phase 7 — Admin Access (PENDING):** Separate admin portal. Login, RBAC, candidate/session review, internal dashboards.
+## 2. Product Architecture & Phases
 
-## 4. User Flow
-1. **Registration:** User enters details (Name, Email, Phone, College, etc.).
-2. **Email Verification:** User receives Firebase Auth verification link.
-3. **Welcome/Consent:** User verifies email and accepts policy. Session is created and **locked**.
-4. **Resume Upload:** Candidate uploads resume. AI parses it.
-5. **Device Check:** Hardware capabilities are requested and verified.
-6. **Waiting Room:** Final holding area before the AI begins.
-7. **Interview:** Candidate interacts with AI interviewer.
-8. **Completion:** Candidate sees a completion state; Recruiter receives Final Report.
+### Phase 1 — Foundation (COMPLETED)
+- **Candidate Onboarding**: Registration with auto-detected country, ISO search, and E.164 phone formatting.
+- **Account Security**: Real-time password entropy meter with sequence/dictionary detection.
+- **Session Locking**: Immutable session creation on policy consent ("I Agree").
+- **Resume Intelligence**: Multi-format parsing (`unpdf` for PDF, `mammoth` for DOCX) extracting technical proficiencies.
 
-## 5. Route Map
-**Frontend Routes (Strictly Gated):**
-*   `/` (Registration / Welcome based on token)
-*   `/consent` (Requires Email Verification)
-*   `/resume` (Requires Consent)
-*   `/device-check` (Requires Resume)
-*   `/waiting-room` (Requires Device Check)
-*   `/interview` (Requires Waiting Room clearance)
+### Phase 2 — Hardware Readiness (COMPLETED)
+- **Device Checks**: Real-time camera & microphone permissions validation.
+- **Audio Feedback**: Frequency ping test for speaker verification.
+- **Browser Compatibility**: Strict WebRTC & MediaDevices API capability checks.
 
-**Backend API Map:**
-*   `POST /api/register` - Validates and creates candidate (with country and E.164 mobile), sends Firebase verification email.
-*   `POST /api/auth/candidate-mock-login` - Mock authentication endpoint for development and testing.
-*   `POST /api/candidate/parse-resume` - Parses uploaded PDF/DOCX resume and extracts candidate details.
-*   `GET /api/me` - Fetches candidate, active session, and merges live Firebase `email_verified` token claim.
-*   `POST /api/session/confirm-consent` - Verifies email, creates locked session with `assessmentExpiresAt` SLA window, sets `thinkAgainUsesLeft: 2`.
-*   `POST /api/session/:id/think-again` - Decrements think-again counter. Validates ownership and remaining uses.
+### Phase 3 — Waiting Room (COMPLETED)
+- **Holding Gate**: Pre-interview readiness checkpoint.
+- **Explicit Trigger**: "I'm Ready" confirmation button guarding the transition to Phase 4.
 
-## 6. Database Schema (Core Entities)
-*   **Candidates:** `id`, `email`, `name`, `mobile` (E.164), `country` (default 'United States'), `college`, `degree`, `gradYear`, `preferredLanguage`, `emailVerified`.
-*   **Sessions:** `id`, `candidateId`, `locked` (boolean), `consentAcceptedAt`, `policyVersion`, `currentStage` (enum matching phases), `status`, `thinkAgainUsesLeft` (int, default 2), `assessmentExpiresAt` (timestamp, SLA deadline).
-*   **ResumeAnalyses:** `id`, `sessionId`, `rawResumeText`, `parsedData`.
+### Phase 4 — Interview Engine (COMPLETED)
+- **Conversational Voice Loop**: Asynchronous and real-time dialogue loop powered by Sarah Voice Engine.
+- **Low-Latency Streaming**: Token-by-token Server-Sent Events (SSE).
+- **Dynamic Adaptability**: Context-aware follow-ups targeting resume competencies and candidate trade-offs.
 
-## 7. Component Inventory
-*   `Registration.tsx`: Internationalized candidate onboarding form with country selector, STD dialing code picker, and Zod validation.
-*   `countryData.ts`: Global country list, dialing codes, validation rules, and client-side locale/timezone auto-detection.
-*   `PasswordStrengthIndicator.tsx`: Real-time entropy, sequence/dictionary pattern matching, and contextual credential validation.
-*   `Welcome.tsx`: Polls for `email_verified`, handles consent transition.
-*   `auth.ts` (Backend Middleware): Parses Firebase token, injects `req.user`, enforces environment-based E2E bypass (`test-uid-*`).
+### Phase 5 — Anti-Cheat / Integrity Layer (COMPLETED)
+- **Silent Telemetry**: Non-blocking background signal collector (`/api/interview/:id/signal`).
+- **Signal Types**: `tab_blur`, `gaze_off`, `window_switch`, `long_pause_before_answer`, `sudden_text_appearance`.
+- **Integrity Score**: Risk aggregation persisted for review panels without interrupting the live interview.
 
-## 8. UI States and Error States
-*   **Verification Pending:** UI physically blocks progression, shows "Email Verification Required" shield alert.
-*   **Think-Again Depleted:** API returns 400 "No think-agains left", UI disables the action.
-*   **Invalid Token:** Middleware returns 401 Unauthorized, frontend logs user out.
+### Phase 6 — Final Report & Scorecards (COMPLETED)
+- **Deterministic Rubrics**: Zero-shot extraction evaluating Technical Architecture, Communication, and Integrity.
+- **Evidence Extraction**: Direct quotes and question-by-question scoring breakdown.
+- **Recommendations**: `strong_hire`, `hire`, `weak_hire`, `no_hire` synthesis.
 
-## 9. Fallback Rules
-*   If Firebase verification email fails to send natively, log warning but do not crash candidate creation (so manual intervention can occur).
-*   If permissions are blocked in Phase 2, show explicit recovery steps (e.g., "How to enable camera in Chrome") before allowing retry.
+### Phase 7 — Multi-Tenant Workspaces & Governance (COMPLETED)
+- **Role-Based Isolation**:
+  - **HR Portal (`/hr`)**: Requisitions draft builder (`HrJobsPage`), ATS pipeline (`HrAtsPipeline`), Candidate Dossiers, and Comparison Matrix. Status created as `pending_approval`.
+  - **Admin Portal (`/admin`)**: Super Admin Requisition Approval Gate (`JobApprovalGate`), Live Telemetry Dashboard, API & Organization Configuration.
+- **Tenant Quota Guard**: `requireTenantQuota.ts` enforcing a **100,000 token soft warning** (`X-Tenant-Quota-Warning`) and a **500,000 token hard block** (HTTP `429 Too Many Requests`).
 
-## 10. Testing Strategy
-*   Strict enforcement of `NODE_ENV=production` for real token validation.
-*   E2E test environments use `test-uid-*` bypass for automated flow testing.
+---
 
-## 11. Acceptance Criteria (Gate Rules)
-*   **No jumping phases:** The system strictly checks `sessions.currentStage` against the requested route.
-*   **Source of truth:** The backend Firebase token is the ultimate source of truth for auth/email states; frontend state is purely derived from backend responses.
-*   **Persistence:** Every critical transition (Consent -> Resume -> Device Check) must write to the database before the UI updates.
+## 3. Core Database Entities (PostgreSQL via Drizzle ORM)
 
-## 12. Flowchart (Mermaid)
-```mermaid
-graph TD
-    A[Registration] -->|Firebase Token| B(Email Verification)
-    B -->|email_verified: true| C[Policy Consent]
-    C -->|Lock Session| D[Resume Upload]
-    D --> E[Device Check]
-    E --> F[Waiting Room]
-    F --> G[Interview Engine]
-    G --> H[Final Report]
-```
+- **`organizations`**: Multi-tenant workspace metadata (`id`, `name`, `billingTier`, `isActive`, `createdAt`).
+- **`organization_admins`**: RBAC permissions (`id`, `organizationId`, `email`, `role`).
+- **`candidates`**: User identity and profile (`id`, `email`, `name`, `mobile` in E.164, `country`, `degree`, `gradYear`, `emailVerified`).
+- **`sessions`**: Locked interview states (`id`, `candidateId`, `currentStage`, `status`, `locked`, `assessmentExpiresAt`, `thinkAgainUsesLeft`).
+- **`jobs`**: Requisitions with status (`draft`, `pending_approval`, `published`, `archived`) and cutoff score thresholds.
+- **`integrity_signals`**: Telemetry log for suspicious events (`id`, `sessionId`, `signalType`, `metadata`, `timestamp`).
+- **`scorecards`**: Final structured evaluations (`id`, `sessionId`, `overallScore`, `technicalScore`, `communicationScore`, `recommendation`, `evidence`).
 
-## 13. Open Questions (Ambiguities)
-*   **Waiting Room Auto-transition:** What exact signal triggers the move from Waiting Room to Interview? (Is it a timed countdown, an AI backend ready-signal, or a manual "I am ready" button click?)
-*   **Interview Engine Tech Stack:** Are we using WebSockets, WebRTC, or simple HTTP polling for the AI conversation in Phase 4?
+---
+
+## 4. Key Endpoints
+
+### Candidate Flow
+- `POST /api/register` — Validates onboarding details and generates verification email.
+- `POST /api/candidate/parse-resume` — Parses uploaded resume into structured competencies.
+- `POST /api/session/confirm-consent` — Locks session and activates 60-minute assessment window.
+- `POST /api/candidate/interview/next-turn` — Evaluates candidate answer and streams next question via SSE (Quota protected).
+- `POST /api/interview/:id/signal` — Logs silent integrity events.
+- `GET /api/scorecard/:sessionId` — Retrieves finalized evaluation report.
+
+### HR & Admin Workspaces
+- `POST /api/hr/jobs` — Drafts new requisition with status `pending_approval`.
+- `PATCH /api/admin/jobs/:id/approve` — Publishes requisition (`status: 'published'`).
+- `PATCH /api/admin/jobs/:id/reject` — Reverts requisition to draft with rejection feedback.
+- `GET /api/admin/telemetry` — Fetches real-time token utilization and tenant quota health.
+
+---
+
+## 5. Design System Standards
+
+- **Theme**: Dark Slate palette with gold/amber accents (`var(--color-secondary)` / `#e6c687`).
+- **Headings**: `Playfair Display` (`font-display font-semibold`).
+- **Body**: `Plus Jakarta Sans` (`text-base md:text-lg text-white/70`).
+- **Cards**: `glass-panel p-8 rounded-3xl border border-slate-800 backdrop-blur-xl`.
+- **Primary CTAs**: `rounded-full bg-white px-8 py-4 text-sm font-semibold text-slate-950 hover:bg-slate-100`.

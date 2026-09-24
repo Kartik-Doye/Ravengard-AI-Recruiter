@@ -2,7 +2,8 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { candidates } from "../db/schema";
-import { db } from "../db/client";
+import { db } from "../db/index";
+import { eq, and } from "drizzle-orm";
 import { AuthRequest } from "./auth";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -44,9 +45,11 @@ export const requireAuth = async (
     };
 
     // Verify the user exists in the database
-    const user = await db.query(candidates).findFirst({
-      where: (col) => col.id === decoded.id && col.email === decoded.email,
-    });
+    const [user] = await db
+      .select()
+      .from(candidates)
+      .where(and(eq(candidates.id, decoded.id), eq(candidates.email, decoded.email)))
+      .limit(1);
 
     if (!user) {
       return res.status(401).json({ error: "Unauthorized: User not found" });

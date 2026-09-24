@@ -4,6 +4,7 @@ import HrLogin from './HrLogin';
 import HrAtsPipeline from './HrAtsPipeline';
 import HrCandidateDossier from './HrCandidateDossier';
 import HrComparisonMatrix from './HrComparisonMatrix';
+import { HrJobsPage } from './HrJobsPage';
 import {
   Building2,
   LogOut,
@@ -215,7 +216,7 @@ export default function HrGateway() {
       <main className="px-4 sm:px-6 py-6 max-w-[1440px] mx-auto">
         <Routes>
           <Route path="/" element={<HrAtsPipeline />} />
-          <Route path="/jobs" element={<HrJobsPlaceholder />} />
+          <Route path="/jobs" element={<HrJobsPage />} />
           <Route path="/candidates/:id" element={<HrCandidateDossier />} />
           <Route path="/comparison" element={<HrComparisonMatrix />} />
           <Route path="/integrations" element={<HrIntegrationsPlaceholder />} />

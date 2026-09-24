@@ -27,6 +27,7 @@ import {
 import { emailService } from "../services/emailService";
 import { renderAssessmentCompletedEmail } from "../templates/emailTemplates";
 import { processVoiceRecruiterTurn, RubricState } from "../services/llm/voiceRecruiterService";
+import { requireTenantQuota } from "../middleware/requireTenantQuota";
 
 export const candidatePortalRouter = Router();
 
@@ -590,7 +591,7 @@ candidatePortalRouter.post("/assessment/submit", requireCandidateAuth, async (re
  * POST /api/candidate/interview/next-turn
  * Real-time conversational turn with Google Gemini & dynamic rubric injection.
  */
-candidatePortalRouter.post("/interview/next-turn", async (req: Request, res: Response) => {
+candidatePortalRouter.post("/interview/next-turn", requireTenantQuota, async (req: Request, res: Response) => {
   try {
     const { message, history, rubricState, elapsedTimeMinutes, jobTitle, candidateName } = req.body || {};
 

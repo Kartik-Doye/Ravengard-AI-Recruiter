@@ -39,6 +39,7 @@ import { sanitizeCandidateRegistrationInput } from "./src/services/sanitizer";
 import { healthCheckRouter } from "./src/healthCheck";
 import { requestLogger } from "./src/middleware/requestLogger";
 import { errorHandler } from "./src/middleware/errorHandler";
+import { requireTenantQuota } from "./src/middleware/requireTenantQuota";
 import { logger } from "./src/utils/logger";
 import cookieParser from "cookie-parser";
 

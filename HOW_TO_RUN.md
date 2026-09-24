@@ -6,21 +6,16 @@ This guide covers setting up, configuring, running, and testing the **Ravengard 
 
 ## 1. Prerequisites
 
-Ensure your system has the required software installed (see [REQUIREMENTS.md](file:///e:/STUDIO%20Project/Ravengard/REQUIREMENTS.md) for full specs):
-- **Node.js**: v18.18+ or v20+ (`node -v`)
-- **npm**: v9+ (`npm -v`)
-- **PostgreSQL**: Running locally or accessible via network (`5432`)
+Ensure your environment meets the baseline requirements:
+- **Node.js**: `v18.18+` or `v20+` (`node -v`)
+- **npm**: `v9+` (`npm -v`)
+- **PostgreSQL**: Local or Cloud SQL instance (`5432`)
 
 ---
 
 ## 2. Installation
 
-1. Clone or navigate to the project directory:
-   ```bash
-   cd "e:\STUDIO Project\Ravengard"
-   ```
-
-2. Install project dependencies:
+1. Navigate to the project root directory:
    ```bash
    npm install
    ```
@@ -29,121 +24,76 @@ Ensure your system has the required software installed (see [REQUIREMENTS.md](fi
 
 ## 3. Environment Configuration
 
-1. If you do not have a `.env` file, copy `.env.example`:
+1. Copy `.env.example` to create your active `.env`:
    ```bash
    cp .env.example .env
    ```
 
-2. Verify that `.env` contains the required keys:
+2. Verify or update the following configuration variables:
    ```env
-   DATABASE_URL="postgresql://ravengard:ravengard_dev_2026@localhost:5432/ravengard"
-   JWT_SECRET="<your_jwt_secret_here>"
-   ACTUAL_SECRET="<your_actual_secret_here>"
-   GEMINI_API_KEY="<your_gemini_api_key>"
+   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ravengard"
+   JWT_SECRET="ravengard_dev_jwt_secret_change_in_production"
+   GEMINI_API_KEY="your_gemini_api_key_here"
    APP_URL="http://localhost:3000"
    PORT=3000
    NODE_ENV="development"
    ```
 
-> **Tip:** You can generate secure secrets using Node:
-> ```bash
-> node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-> ```
-
 ---
 
 ## 4. Database Setup & Migrations
 
-Push the Drizzle ORM schema to your PostgreSQL database:
+The server automatically runs `syncFunnelTables.ts` on startup to ensure all tables, billing tiers, and organizational schemas exist. To manually apply schema migrations:
 
 ```bash
 npm run db:push
 ```
 
-If you need to generate explicit SQL migration files:
-```bash
-npm run db:generate
-```
+To seed initial demonstration data (completed candidates, rubrics, and sample job requisitions):
 
-On server startup, default rubrics, organization entities, and the root administrator account (`admin@ravengard.com`) are automatically seeded.
+```bash
+npm run seed
+```
 
 ---
 
-## 5. Running the Application
+## 5. Development Server
 
-### A. Development Mode (Recommended)
-In development, Express and Vite run together in a unified process with hot reloading:
+Start the full-stack server (Express backend + React Vite client):
 
 ```bash
 npm run dev
 ```
 
-- **Candidate & Public Portal**: [http://localhost:3000](http://localhost:3000)
-- **Admin Login Portal**: [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
-- **API Health Check**: [http://localhost:3000/health](http://localhost:3000/health)
+The application will be live at **http://localhost:3000**.
 
-### B. Production Mode
-To build and run the optimized production bundle:
+---
+
+## 6. Portals & Key Routes
+
+| Portal | Route | Description |
+|---|---|---|
+| **Public Landing** | `/` | Editorial dark theme landing page with system architecture. |
+| **Candidate Gateway** | `/gateway` | Interactive assessment intake (Registration → Consent → Resume → Interview). |
+| **Assessment Guide** | `/assessment-guide` | Dimension criteria, scoring weights, and candidate evaluation standards. |
+| **Careers & Jobs** | `/careers` | Public job listings with instant application intake. |
+| **HR Workspace** | `/hr` | Requisition draft builder (`/hr/jobs`) and ATS pipeline review (`/hr/ats`). |
+| **Admin Workspace** | `/admin` | Job Approval Gate (`/admin/jobs`), Live Telemetry Quotas, and System Health. |
+| **Enterprise Demo** | `/contact` | Enterprise consultation and scheduler. |
+
+---
+
+## 7. Testing & Quality Checks
+
+Run TypeScript type-checking and automated tests:
 
 ```bash
-# 1. Build the frontend and bundle the server
+# Type check & lint
+npm run lint
+
+# Production build test
 npm run build
 
-# 2. Run the production server
-npm run start
+# Unit and integration test suite
+npm test
 ```
-
----
-
-## 6. Access Portals & Default Credentials
-
-### 1. Admin & Reviewer Dashboard
-- **URL**: [http://localhost:3000/admin/login](http://localhost:3000/admin/login)
-- **Default Email**: `admin@ravengard.com`
-- **Default Password**: `admin123` (or the hash configured in `.env` / database)
-- **Capabilities**: View candidates, review session stages, inspect interview transcripts, inspect anti-cheat integrity flags, and view AI scorecards.
-
-### 2. Candidate Assessment Flow
-- **URL**: [http://localhost:3000](http://localhost:3000)
-- **Sequence**:
-  1. Register with candidate details.
-  2. Complete email verification.
-  3. Accept consent policy (locks session).
-  4. Upload Resume (`.pdf` or `.docx`).
-  5. Complete Device Check (camera, mic, speaker).
-  6. Enter Waiting Room.
-  7. Start AI-driven interview stages.
-  8. View completion & final scorecard.
-
----
-
-## 7. Available Scripts & Testing
-
-| Command | Description |
-| :--- | :--- |
-| `npm run dev` | Starts development server (`tsx server.ts` with Vite middleware) |
-| `npm run build` | Cleans `dist`, generates sitemap, compiles Vite SPA & esbuild server |
-| `npm run start` | Runs the compiled production server (`node dist/server.cjs`) |
-| `npm run lint` / `npm run typecheck` | Validates TypeScript types across frontend and backend |
-| `npm test` | Runs unit and integration test suite with Vitest |
-| `npm run test:ui` | Opens interactive browser UI for Vitest |
-| `npm run test:public-apis` | Executes automated tests against public API endpoints |
-| `npm run test:admin:stress` | Runs concurrency and stress testing on admin routes |
-| `npm run qa` | Validates route configuration and phase transitions |
-
----
-
-## 8. Troubleshooting & FAQ
-
-### 1. Database Connection Refused (`ECONNREFUSED 127.0.0.1:5432`)
-- Ensure PostgreSQL service is started:
-  - Windows: Check `services.msc` for PostgreSQL, or run `net start postgresql-x64-16`.
-  - Linux/macOS: `sudo systemctl start postgresql` or `brew services start postgresql`.
-- Confirm database credentials match `.env` `DATABASE_URL`.
-
-### 2. Missing Environment Variables on Startup
-- The `src/startupValidator.ts` enforces `DATABASE_URL`, `JWT_SECRET`, `ACTUAL_SECRET`, and `GEMINI_API_KEY`.
-- If starting in `NODE_ENV=production`, ensure default placeholder strings are replaced with real secrets.
-
-### 3. Port Already in Use (`EADDRINUSE :::3000`)
-- Kill the process holding port 3000 or set `PORT=3001` in your `.env`.

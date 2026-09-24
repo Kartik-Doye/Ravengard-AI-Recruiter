@@ -15,6 +15,10 @@ export async function syncFunnelTablesAndSeed() {
   try {
     // 1. Ensure table columns exist
     const initialAlters = [
+      `CREATE TABLE IF NOT EXISTS organizations (id TEXT PRIMARY KEY, name TEXT NOT NULL, billing_tier TEXT NOT NULL DEFAULT 'enterprise', is_active BOOLEAN DEFAULT true, created_at TIMESTAMP DEFAULT NOW())`,
+      `ALTER TABLE organizations ADD COLUMN IF NOT EXISTS billing_tier TEXT DEFAULT 'enterprise'`,
+      `ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`,
+      `ALTER TABLE organizations ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()`,
       `ALTER TABLE candidates ADD COLUMN IF NOT EXISTS password_hash TEXT`,
       `ALTER TABLE applications ADD COLUMN IF NOT EXISTS assessment_expires_at TIMESTAMP`,
       `ALTER TABLE applications ADD COLUMN IF NOT EXISTS sla_expires_at TIMESTAMP`,

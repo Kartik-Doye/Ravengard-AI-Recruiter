@@ -1,4 +1,4 @@
-import { db } from "./index";
+import { db, createPool } from "./index";
 import {
   candidates,
   sessions,
@@ -18,6 +18,27 @@ import { ensureDefaultRubric } from "../services/rubricService";
 
 export async function seedCompletedCandidatesAndAdmin() {
   try {
+    // Ensure organizations table and columns exist before any Drizzle queries
+    const pool = createPool();
+    if (pool) {
+      try {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS organizations (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            billing_tier TEXT NOT NULL DEFAULT 'enterprise',
+            is_active BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT NOW()
+          );
+          ALTER TABLE organizations ADD COLUMN IF NOT EXISTS billing_tier TEXT DEFAULT 'enterprise';
+          ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+          ALTER TABLE organizations ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+        `);
+      } catch (tableErr) {
+        console.warn("Organizations table ensure notice:", tableErr);
+      }
+    }
+
     // 0. Ensure Default Rubrics (v1.0 and v2.4-enterprise-strict)
     await ensureDefaultRubric("v1.0");
     await ensureDefaultRubric("v2.4-enterprise-strict");

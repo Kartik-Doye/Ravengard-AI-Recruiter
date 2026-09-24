@@ -20,16 +20,28 @@
       (function() {
         var origError = console.error;
         var origWarn = console.warn;
+        var isWsError = function(msg) {
+          if (!msg) return false;
+          var s = String(msg).toLowerCase();
+          return (
+            s.indexOf('websocket') !== -1 ||
+            s.indexOf('failed to connect to websocket') !== -1 ||
+            s.indexOf('[vite] failed to connect') !== -1 ||
+            s.indexOf('closed without opened') !== -1 ||
+            s.indexOf('vite hmr') !== -1
+          );
+        };
+
         console.error = function() {
           var str = Array.prototype.join.call(arguments, ' ');
-          if (str.indexOf('WebSocket closed without opened') !== -1 || str.indexOf('failed to connect to websocket') !== -1 || str.indexOf('[vite] failed to connect') !== -1) {
+          if (isWsError(str)) {
             return;
           }
           return origError.apply(console, arguments);
         };
         console.warn = function() {
           var str = Array.prototype.join.call(arguments, ' ');
-          if (str.indexOf('WebSocket closed without opened') !== -1 || str.indexOf('failed to connect to websocket') !== -1 || str.indexOf('[vite] failed to connect') !== -1) {
+          if (isWsError(str)) {
             return;
           }
           return origWarn.apply(console, arguments);
@@ -37,14 +49,14 @@
         window.addEventListener('unhandledrejection', function (event) {
           var reason = event && event.reason;
           var msg = (reason && (reason.message || String(reason))) || '';
-          if (msg.indexOf('WebSocket closed without opened') !== -1 || msg.indexOf('failed to connect to websocket') !== -1) {
+          if (isWsError(msg)) {
             event.preventDefault();
             event.stopImmediatePropagation();
           }
         });
         window.addEventListener('error', function (event) {
           var msg = (event && (event.message || String(event))) || '';
-          if (msg.indexOf('WebSocket closed without opened') !== -1 || msg.indexOf('failed to connect to websocket') !== -1) {
+          if (isWsError(msg)) {
             event.preventDefault();
             event.stopImmediatePropagation();
           }

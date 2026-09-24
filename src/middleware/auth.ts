@@ -41,10 +41,11 @@ export const requireAuth = async (
 
   let token: string | undefined;
 
-  if (cookieToken) {
-    token = cookieToken;
-  } else if (authHeader && authHeader.startsWith("Bearer ")) {
+  // Prioritize Authorization header over cookies (fixes API fetch issues)
+  if (authHeader && authHeader.startsWith("Bearer ")) {
     token = authHeader.substring(7);
+  } else if (cookieToken) {
+    token = cookieToken;
   }
 
   if (!token) {
