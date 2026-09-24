@@ -17,6 +17,7 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
   const [response, setResponse] = useState('');
   const [codeContent, setCodeContent] = useState('');
   const [codeLanguage, setCodeLanguage] = useState('python');
+  const [lastExecutionReport, setLastExecutionReport] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'text' | 'code' | 'whiteboard'>('text');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -237,6 +238,13 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
     let combinedResponse = response.trim();
     if (codeContent.trim()) {
       combinedResponse += `\n\n\`\`\`${codeLanguage}\n${codeContent.trim()}\n\`\`\``;
+      if (lastExecutionReport) {
+        combinedResponse += `\n\n[WASM Test Execution: ${lastExecutionReport.passedCount}/${lastExecutionReport.totalCount} tests passed (${lastExecutionReport.runtimeMs}ms)]`;
+        const failed = lastExecutionReport.results?.filter((r: any) => !r.passed) || [];
+        if (failed.length > 0) {
+          combinedResponse += `\nFailed test details: ${failed.map((f: any) => `${f.name} (expected ${JSON.stringify(f.expected)}, got ${JSON.stringify(f.actual)})`).join("; ")}`;
+        }
+      }
     }
     if (!combinedResponse && !questionId) return;
 
@@ -262,6 +270,7 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
           success = true;
           setResponse('');
           setCodeContent('');
+          setLastExecutionReport(null);
           const nextQ = questionIndex + 1;
           setQuestionIndex(nextQ);
           fetchNextQuestion(1, nextQ);
@@ -444,6 +453,7 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
             setCode={setCodeContent}
             language={codeLanguage}
             setLanguage={setCodeLanguage}
+            onRunTest={(_c, _l, report) => setLastExecutionReport(report)}
             readOnly={isStreaming || isSubmitting}
           />
         </div>

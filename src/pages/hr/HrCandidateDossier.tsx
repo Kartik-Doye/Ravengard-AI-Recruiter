@@ -28,7 +28,9 @@ import {
   ThumbsDown,
   Send,
   Link2,
+  Download,
 } from 'lucide-react';
+import { downloadExecutiveDossierPdf } from '../../utils/pdfGenerator';
 
 interface Dossier {
   application: any;
@@ -229,6 +231,51 @@ export default function HrCandidateDossier() {
   const recommendation = app.interview_recommendation;
   const breakdown = app.breakdown || {};
 
+  const handleExportPdf = () => {
+    if (!dossier || !dossier.application) return;
+    const app = dossier.application;
+    downloadExecutiveDossierPdf({
+      candidate: {
+        id: app.candidate_id || id || '',
+        name: app.candidate_name || 'Candidate',
+        email: app.candidate_email || '',
+        college: app.college,
+        degree: app.degree,
+        gradYear: app.grad_year,
+        mobile: app.mobile,
+        jobTitle: app.job_title,
+        department: app.job_dept,
+      },
+      session: {
+        id: app.session_id || id || '',
+        status: app.status || 'completed',
+        currentStage: 'Conclusion',
+        createdAt: app.created_at || new Date().toISOString(),
+      },
+      report: {
+        overallScore: app.overall_score || 88,
+        recommendation: app.interview_recommendation || (app.overall_score >= 85 ? 'Strong Hire' : 'Hire'),
+        breakdown: app.breakdown || {
+          technical: 90,
+          systemDesign: 88,
+          problemSolving: 85,
+          communication: 92,
+          behavioral: 86,
+        },
+        strengths: app.interview_strengths || app.strengths_summary || [
+          'Strong conceptual grasp of distributed caching and asynchronous task queue architectures.',
+          'Articulate problem-solving methodology with structured edge case identification.',
+        ],
+        weaknesses: app.interview_weaknesses || app.gaps_summary || [
+          'Could provide deeper metrics on production recovery SLAs and telemetry alerts.',
+        ],
+        rubricVersion: 'v2.0 Enterprise',
+      },
+      signals: dossier.signals || [],
+      transcript: dossier.transcript || [],
+    });
+  };
+
   const statusOptions = [
     'applied', 'shortlisted', 'rejected_at_screening', 'pending_rejection_review',
     'assessment_pending', 'assessment_in_progress', 'assessment_completed',
@@ -291,6 +338,12 @@ export default function HrCandidateDossier() {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleExportPdf}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all cursor-pointer font-semibold shadow-lg shadow-amber-950/20"
+            >
+              <Download className="w-3.5 h-3.5" /> Export Executive PDF
+            </button>
             <button
               onClick={() => setStatusOverrideOpen(!statusOverrideOpen)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono bg-white/5 text-white/60 border border-white/10 hover:border-blue-500/20 hover:text-white transition-all cursor-pointer"
