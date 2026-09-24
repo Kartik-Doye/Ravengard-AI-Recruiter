@@ -13,14 +13,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('theme');
     if (saved === 'dark' || saved === 'light') return saved;
-    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    return 'dark'; // Force dark mode by default to mirror sleek dark homepage aesthetic
   });
 
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
-    localStorage.setItem('theme', theme);
+    root.classList.remove('light');
+    root.classList.add('dark');
+    // Ensure dark is active
+    if (theme === 'dark') {
+      root.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      root.classList.add('dark'); // Homepage aesthetic is dark-first across entire application
+      localStorage.setItem('theme', 'dark');
+    }
   }, [theme]);
 
   const toggleTheme = () => {

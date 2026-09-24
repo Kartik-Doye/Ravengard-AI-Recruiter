@@ -18,9 +18,9 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
     return (
       <motion.div
         ref={ref}
-        whileHover={hover ? { y: -6, scale: 1.01 } : undefined}
-        transition={{ duration: 0.22, ease: "easeOut" as any }}
-        className={`glass-panel rounded-[28px] border border-white/10 bg-white/5 backdrop-blur-xl ${className}`}
+        whileHover={hover ? { y: -4, scale: 1.005 } : undefined}
+        transition={{ duration: 0.2, ease: "easeOut" as any }}
+        className={`rounded-2xl border border-slate-800/80 bg-slate-900/50 backdrop-blur-xl shadow-xl text-slate-50 ${className}`}
         {...props}
       >
         {children}
@@ -40,5 +40,5 @@ export function CardBody({ children, className = '' }: { children: React.ReactNo
 }
 
 export function CardFooter({ children, className = '' }: { children: React.ReactNode, className?: string }) {
-  return <div className={`mt-6 pt-6 border-t border-white/5 flex items-center ${className}`}>{children}</div>;
+  return <div className={`mt-6 pt-6 border-t border-slate-800/80 flex items-center ${className}`}>{children}</div>;
 }

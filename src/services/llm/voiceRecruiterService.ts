@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { LLMRouter } from "./llmRouter.ts";
 
 interface TurnHistoryItem {
   role: "user" | "model";
@@ -23,6 +24,7 @@ export interface VoiceTurnRequest {
   elapsedTimeMinutes?: number;
   jobTitle?: string;
   candidateName?: string;
+  resumeText?: string;
 }
 
 export interface VoiceTurnResponse {
@@ -31,6 +33,7 @@ export interface VoiceTurnResponse {
   mode: "MODE_A_FAST_TRACK" | "MODE_B_DEEP_PROBING" | "MODE_C_HARD_CUTOFF" | "STANDARD_EVALUATION";
   isFinished: boolean;
   modelUsed: string;
+  ttfbMs?: number;
 }
 
 export async function processVoiceRecruiterTurn(req: VoiceTurnRequest): Promise<VoiceTurnResponse> {
@@ -62,7 +65,8 @@ export async function processVoiceRecruiterTurn(req: VoiceTurnRequest): Promise<
     },
     elapsedTimeMinutes = 4.0,
     jobTitle = "Senior Engineer / Data Analyst",
-    candidateName = "Candidate"
+    candidateName = "Candidate",
+    resumeText = ""
   } = req;
 
   // Determine Mode
@@ -91,6 +95,9 @@ Your tone is conversational, warm, concise, and technically sharp.
 - Keep your spoken answers to 2 to 4 sentences maximum before asking your single follow-up question.
 - Ask ONLY ONE focused question at a time. Never stack multiple questions in a single turn.
 
+# CANDIDATE RESUME CONTEXT
+${resumeText ? resumeText.trim().slice(0, 1500) : "No prior resume uploaded. Inquire directly about architectural foundations."}
+
 # LIVE SESSION METRICS
 - Elapsed Time: ${elapsedTimeMinutes.toFixed(1)} minutes
 - Active Mode: ${mode}
@@ -104,9 +111,75 @@ Acknowledge their clear technical depth and invite them to ask their questions f
 ` : mode === "MODE_C_HARD_CUTOFF" ? `
 HARD CUTOFF: Time limit reached (14+ minutes). Do not introduce new technical problems. Graciously wrap up the interview and explain that their dossier is being submitted to the hiring manager.
 ` : `
-DEEP PROBING: Follow up directly on the candidate's last answer. Dig into concrete architectural trade-offs, specific debugging techniques, or individual contributions using the STAR framework.
+DEEP PROBING: Follow up directly on the candidate's last answer. Dig into concrete architectural trade-offs, specific debugging techniques, or individual contributions using the STAR framework. Reference their resume context where applicable.
 `}
 `;
+
+  // Console-log system prompt on turn 1 for prompt validation
+  if (!history || history.length === 0) {
+    console.log(`[SARAH SYSTEM PROMPT INJECTION - TURN 1]:\n${systemInstruction}\n[RUBRIC INJECTED]:`, JSON.stringify(rubricState, null, 2));
+  }
+
+  const startTime = Date.now();
+
+  // Try LLMRouter (Groq -> OpenRouter -> Gemini) first for ultra-low latency sub-200ms TTFB
+  try {
+    const formattedMessages = [
+      { role: "system" as const, content: systemInstruction },
+      ...history.map((h) => ({ role: (h.role === "user" ? "user" : "assistant") as any, content: h.text })),
+      { role: "user" as const, content: message }
+    ];
+
+    let fullReply = "";
+    let ttfb = 0;
+
+    for await (const chunk of LLMRouter.chatCompletionStream({
+      messages: formattedMessages,
+      temperature: 0.4,
+      max_tokens: 250
+    })) {
+      const text = chunk.choices[0]?.delta?.content || "";
+      if (text) {
+        if (!ttfb) ttfb = Date.now() - startTime;
+        fullReply += text;
+      }
+    }
+
+    if (fullReply.trim().length > 0) {
+      let cleanReply = fullReply.replace(/[\*\_#`~]/g, "").replace(/[\u{1F600}-\u{1F64F}|\u{1F300}-\u{1F5FF}|\u{1F680}-\u{1F6FF}|\u{2600}-\u{26FF}|\u{2700}-\u{27BF}]/gu, "").trim();
+
+      const updatedRubric: RubricState = { ...rubricState };
+      if (elapsedTimeMinutes >= 4 && updatedRubric.technical_depth) {
+        updatedRubric.technical_depth.status = "COMPLETED";
+        updatedRubric.technical_depth.confidence = "HIGH";
+        updatedRubric.technical_depth.evidence_snippet = message.slice(0, 150);
+      }
+      if (elapsedTimeMinutes >= 7 && updatedRubric.problem_solving) {
+        updatedRubric.problem_solving.status = "COMPLETED";
+        updatedRubric.problem_solving.confidence = "HIGH";
+        updatedRubric.problem_solving.evidence_snippet = message.slice(0, 150);
+      }
+      if (elapsedTimeMinutes >= 10 && updatedRubric.communication) {
+        updatedRubric.communication.status = "COMPLETED";
+        updatedRubric.communication.confidence = "HIGH";
+      }
+
+      if (mode === "MODE_A_FAST_TRACK" || mode === "MODE_C_HARD_CUTOFF") {
+        isFinished = true;
+      }
+
+      return {
+        reply: cleanReply,
+        updatedRubricState: updatedRubric,
+        mode,
+        isFinished,
+        modelUsed: "llm-router-failover",
+        ttfbMs: ttfb || (Date.now() - startTime)
+      };
+    }
+  } catch (llmRouterErr: any) {
+    console.warn("[VoiceRecruiter] LLMRouter attempt failed, falling back to direct GenAI:", llmRouterErr.message);
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -122,7 +195,8 @@ DEEP PROBING: Follow up directly on the candidate's last answer. Dig into concre
       updatedRubricState: rubricState,
       mode,
       isFinished,
-      modelUsed: "fallback-deterministic"
+      modelUsed: "fallback-deterministic",
+      ttfbMs: Date.now() - startTime
     };
   }
 
@@ -181,7 +255,8 @@ DEEP PROBING: Follow up directly on the candidate's last answer. Dig into concre
       updatedRubricState: updatedRubric,
       mode,
       isFinished,
-      modelUsed: "gemini-2.5-flash"
+      modelUsed: "gemini-2.5-flash",
+      ttfbMs: Date.now() - startTime
     };
 
   } catch (err: any) {
@@ -191,7 +266,8 @@ DEEP PROBING: Follow up directly on the candidate's last answer. Dig into concre
       updatedRubricState: rubricState,
       mode,
       isFinished: false,
-      modelUsed: "fallback-error"
+      modelUsed: "fallback-error",
+      ttfbMs: Date.now() - startTime
     };
   }
 }

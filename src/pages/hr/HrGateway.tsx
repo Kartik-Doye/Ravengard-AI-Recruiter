@@ -82,10 +82,10 @@ export default function HrGateway() {
   // Loading state
   if (isAuthenticated === null) {
     return (
-      <div className="min-h-screen bg-[#090D16] flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-2 border-white/20 border-t-blue-500 rounded-full animate-spin" />
-          <span className="text-xs font-mono text-white/50 tracking-widest uppercase">
+          <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+          <span className="text-xs font-mono text-slate-400 tracking-widest uppercase">
             Verifying HR Portal Access...
           </span>
         </div>
@@ -111,39 +111,42 @@ export default function HrGateway() {
   ];
 
   const roleBadgeColors: Record<string, string> = {
-    hr_admin: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    hr_user: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    recruiter: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
-    hiring_manager: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-    super_admin: 'bg-red-500/20 text-red-300 border-red-500/30',
-    admin: 'bg-red-500/20 text-red-300 border-red-500/30',
+    hr_admin: 'bg-slate-900/80 text-slate-200 border-slate-800',
+    hr_user: 'bg-slate-900/80 text-slate-200 border-slate-800',
+    recruiter: 'bg-slate-900/80 text-slate-200 border-slate-800',
+    hiring_manager: 'bg-slate-900/80 text-slate-200 border-slate-800',
+    super_admin: 'bg-slate-900/80 text-slate-200 border-slate-800',
+    admin: 'bg-slate-900/80 text-slate-200 border-slate-800',
   };
 
-  const roleBadge = roleBadgeColors[hrUser?.role || ''] || 'bg-white/10 text-white/60 border-white/20';
+  const roleBadge = roleBadgeColors[hrUser?.role || ''] || 'bg-slate-900/80 text-slate-200 border-slate-800';
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-white font-sans selection:bg-blue-500/30 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-white/20 selection:text-white relative">
+      {/* Subtle ambient lighting matching homepage */}
+      <div className="absolute top-0 right-0 w-full h-[500px] bg-[radial-gradient(circle_at_top,rgba(120,140,255,0.08),transparent_60%)] pointer-events-none z-0" />
+
       {/* Top Navigation Bar */}
-      <header className="border-b border-white/8 px-6 py-3 bg-[#0B1120]/80 backdrop-blur-xl sticky top-0 z-50">
+      <header className="border-b border-slate-800 px-6 py-3.5 bg-slate-900/60 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
           <div className="flex items-center gap-6">
             {/* Brand */}
             <Link to="/hr" className="flex items-center gap-3 group">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/20 flex items-center justify-center group-hover:border-blue-400/40 transition-colors">
-                <Building2 className="w-4 h-4 text-blue-400" />
+              <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center group-hover:border-white/30 transition-colors shadow-sm">
+                <Building2 className="w-4 h-4 text-white" />
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-sm font-display font-semibold tracking-wider uppercase text-white">
+                <span className="text-base font-semibold tracking-wider uppercase text-slate-100">
                   Ravengard
                 </span>
-                <span className={`px-1.5 py-0.5 text-[9px] rounded border font-mono tracking-wider font-bold ${roleBadge}`}>
+                <span className={`px-2.5 py-0.5 text-[10px] rounded-full border font-mono tracking-wider font-semibold ${roleBadge}`}>
                   {(hrUser?.role || 'HR').replace(/_/g, ' ').toUpperCase()}
                 </span>
               </div>
             </Link>
 
             {/* Navigation */}
-            <nav className="hidden md:flex items-center gap-1 text-xs font-mono">
+            <nav className="hidden md:flex items-center gap-1.5 text-xs font-mono">
               {navLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive =
@@ -154,10 +157,10 @@ export default function HrGateway() {
                   <Link
                     key={link.path}
                     to={link.path}
-                    className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+                    className={`px-3.5 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 ${
                       isActive
-                        ? 'bg-blue-500/15 text-blue-300 font-medium border border-blue-500/20'
-                        : 'text-white/45 hover:text-white/80 hover:bg-white/5'
+                        ? 'bg-white text-slate-950 font-semibold shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
@@ -170,35 +173,35 @@ export default function HrGateway() {
 
           <div className="flex items-center gap-3">
             {/* Org indicator */}
-            <div className="flex items-center gap-1.5 text-[10px] text-white/35 font-mono">
-              <Shield className="w-3 h-3" />
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono">
+              <Shield className="w-3.5 h-3.5" />
               <span>{hrUser?.organizationId || 'org-ravengard'}</span>
             </div>
 
-            <div className="h-4 w-px bg-white/10" />
+            <div className="h-4 w-px bg-slate-800" />
 
             {/* User info */}
-            <span className="text-xs text-white/50 font-mono hidden sm:inline">
+            <span className="text-xs text-slate-300 font-mono hidden sm:inline">
               {hrUser?.email}
             </span>
 
-            <div className="h-4 w-px bg-white/10" />
+            <div className="h-4 w-px bg-slate-800" />
 
             {/* Public site link */}
             <a
               href="/"
-              className="inline-flex items-center gap-1 text-[10px] text-white/35 hover:text-white/60 transition-colors font-mono"
+              className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors font-mono px-3 py-1.5 rounded-full border border-slate-800 bg-slate-900/40 hover:bg-slate-900/80"
             >
               <ArrowLeft className="w-3 h-3" />
               <span>Site</span>
             </a>
 
-            <div className="h-4 w-px bg-white/10" />
+            <div className="h-4 w-px bg-slate-800" />
 
             {/* Logout */}
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-red-500/10 text-white/60 hover:text-red-300 text-xs font-mono transition-all cursor-pointer border border-white/8 hover:border-red-500/20"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/40 hover:bg-slate-900/80 text-slate-400 hover:text-rose-400 text-xs font-mono transition-all cursor-pointer border border-slate-800"
               title="Sign out of HR Session"
             >
               <LogOut className="w-3 h-3" />

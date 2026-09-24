@@ -13,7 +13,7 @@ export default function RootLayout() {
   // We hide the standard navbar/footer for the interview gateway so it remains an immersive, focused experience.
   if (isInterview) {
     return (
-      <>
+      <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col font-sans selection:bg-white/20 selection:text-white">
         <NetworkStatusBanner />
         <AnimatePresence mode="wait" initial={false}>
           {currentOutlet && (
@@ -29,14 +29,14 @@ export default function RootLayout() {
             </motion.div>
           )}
         </AnimatePresence>
-      </>
+      </div>
     );
   }
 
   return (
     <>
       <NetworkStatusBanner />
-      <div className="min-h-screen bg-[var(--color-bg-0)] flex flex-col font-sans text-[#F3F4F6]">
+      <div className="min-h-screen bg-slate-950 flex flex-col font-sans text-slate-50 selection:bg-white/20 selection:text-white">
         <SiteHeader />
 
         {/* Main Content with Smooth Page Transitions */}
@@ -49,7 +49,7 @@ export default function RootLayout() {
                 animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                 exit={{ opacity: 0, y: -10, filter: "blur(3px)" }}
                 transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                className="flex-1 flex flex-col w-full"
+                className="flex-1 flex flex-col w-full text-slate-50"
               >
                 {currentOutlet}
               </motion.div>

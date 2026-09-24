@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "ref" | "type"> {
-  variant?: 'solid' | 'ghost' | 'outline';
+  variant?: 'solid' | 'primary' | 'ghost' | 'secondary' | 'outline';
   href?: string;
   className?: string;
   type?: 'button' | 'submit' | 'reset';
@@ -32,13 +32,17 @@ export const Button = forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPr
     },
     ref
   ) => {
-    const base = 'inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060814]';
+    const base = 'inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold tracking-wide transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 cursor-pointer';
 
-    const styles = {
-      solid: 'bg-white text-[#060814]',
-      ghost: 'bg-white/5 text-white hover:bg-white/10 border border-white/10',
-      outline: 'border border-white/15 bg-transparent text-white hover:bg-white/5',
-    }[variant];
+    const styles: Record<string, string> = {
+      solid: 'bg-white text-slate-950 hover:bg-slate-100 shadow-sm active:bg-slate-200',
+      primary: 'bg-white text-slate-950 hover:bg-slate-100 shadow-sm active:bg-slate-200',
+      ghost: 'border border-slate-700/80 bg-slate-900/60 text-slate-200 hover:bg-slate-800/80 hover:text-white hover:border-slate-600 backdrop-blur-sm shadow-sm',
+      secondary: 'border border-slate-700/80 bg-slate-900/60 text-slate-200 hover:bg-slate-800/80 hover:text-white hover:border-slate-600 backdrop-blur-sm shadow-sm',
+      outline: 'border border-slate-700/80 bg-slate-900/40 text-slate-200 hover:bg-slate-800/80 hover:text-white hover:border-slate-600 backdrop-blur-sm shadow-sm',
+    };
+
+    const variantClass = styles[variant] || styles.solid;
 
     const motionProps = {
       whileHover: !disabled && !isLoading ? { y: -2, scale: 1.01 } : {},
@@ -61,7 +65,7 @@ export const Button = forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPr
     if (href) {
       return (
         <motion.div {...motionProps} className={`${widthClass} ${disabledClass} ${className}`}>
-          <Link ref={ref as React.Ref<HTMLAnchorElement>} to={href} className={`${base} ${styles} w-full`} onClick={onClick as any}>
+          <Link ref={ref as React.Ref<HTMLAnchorElement>} to={href} className={`${base} ${variantClass} w-full`} onClick={onClick as any}>
             {content}
           </Link>
         </motion.div>
@@ -76,7 +80,7 @@ export const Button = forwardRef<HTMLButtonElement | HTMLAnchorElement, ButtonPr
         disabled={disabled || isLoading}
         {...motionProps}
         {...props}
-        className={`${base} ${styles} ${widthClass} ${disabledClass} ${className}`}
+        className={`${base} ${variantClass} ${widthClass} ${disabledClass} ${className}`}
       >
         {content}
       </motion.button>

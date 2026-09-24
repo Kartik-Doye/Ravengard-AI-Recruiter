@@ -32,11 +32,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     
     const currentType = isPassword ? (showPassword ? 'text' : 'password') : type;
 
-    let stateClasses = 'border-white/10 focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]';
+    let stateClasses = 'border-slate-800 focus:border-white/40 focus:ring-white/20';
     if (error) {
-      stateClasses = 'border-[var(--color-error)]/50 focus:border-[var(--color-error)] focus:ring-[var(--color-error)]';
+      stateClasses = 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/20';
     } else if (success) {
-      stateClasses = 'border-[var(--color-success)]/50 focus:border-[var(--color-success)] focus:ring-[var(--color-success)]';
+      stateClasses = 'border-emerald-500/50 focus:border-emerald-500 focus:ring-emerald-500/20';
     }
 
     const plClass = leftIcon ? 'pl-10' : 'pl-4';
@@ -44,13 +44,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
     return (
       <div className={`flex flex-col gap-1.5 ${className}`}>
-        <label htmlFor={inputId} className="text-xs font-mono tracking-widest text-white/70 uppercase">
+        <label htmlFor={inputId} className="text-xs font-mono tracking-wider text-slate-300 uppercase">
           {label}
         </label>
         
         <div className="relative flex items-center">
           {leftIcon && (
-            <div className="absolute left-3 text-white/40 pointer-events-none flex items-center justify-center">
+            <div className="absolute left-3.5 text-slate-400 pointer-events-none flex items-center justify-center">
               {leftIcon}
             </div>
           )}
@@ -60,7 +60,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             type={currentType}
             disabled={disabled}
-            className={`w-full bg-black/40 text-white rounded-md border focus:ring-1 outline-none transition-all py-2.5 text-sm shadow-inner disabled:opacity-50 disabled:cursor-not-allowed ${stateClasses} ${plClass} ${prClass}`}
+            className={`w-full bg-slate-900/60 text-slate-50 placeholder:text-slate-500 rounded-xl border focus:ring-1 outline-none transition-all py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed ${stateClasses} ${plClass} ${prClass}`}
             {...props}
           />
 
