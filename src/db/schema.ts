@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, jsonb, pgEnum, uniqueIndex, index, check } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, jsonb, pgEnum, uniqueIndex, index, check, decimal } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const stageEnum = pgEnum('session_stage', [
@@ -560,5 +560,82 @@ export const interviewSchedules = pgTable('interview_schedules', {
   index('idx_interview_schedules_cand').on(table.candidateId, table.status),
   index('idx_interview_schedules_time').on(table.scheduledAt),
 ]);
+
+// --- FinOps & Token Budget Schema ---
+
+export const departmentBudgets = pgTable('department_budgets', {
+  id: text('id').primaryKey(),
+  department: text('department').notNull().unique(), // e.g. 'Engineering', 'Product', 'Design', 'Sales', 'Operations'
+  monthlyTokenCap: integer('monthly_token_cap').notNull().default(500000),
+  softWarningThreshold: integer('soft_warning_threshold').notNull().default(80), // Percentage (80%)
+  hardCapAction: text('hard_cap_action').notNull().default('DEGRADE_MODEL'), // 'BLOCK' | 'DEGRADE_MODEL' | 'NOTIFY'
+  currentMonthUsageTokens: integer('current_month_usage_tokens').notNull().default(0),
+  estimatedCostUsd: decimal('estimated_cost_usd', { precision: 10, scale: 4 }).default('0.0000'),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const tokenLedger = pgTable('token_ledger', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id').notNull(),
+  department: text('department').notNull(),
+  modelUsed: text('model_used').notNull(), // 'gpt-4o', 'claude-3-5-haiku', 'llama-3.3-70b', 'gemini-3.8-flash'
+  promptTokens: integer('prompt_tokens').notNull(),
+  completionTokens: integer('completion_tokens').notNull(),
+  sttSeconds: decimal('stt_seconds', { precision: 8, scale: 2 }).default('0.00'),
+  ttsCharacters: integer('tts_characters').default(0),
+  totalCostUsd: decimal('total_cost_usd', { precision: 10, scale: 6 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_token_ledger_dept').on(table.department, table.createdAt),
+  index('idx_token_ledger_session').on(table.sessionId),
+]);
+
+export const modelRoutingRules = pgTable('model_routing_rules', {
+  id: text('id').primaryKey(),
+  seniorityLevel: text('seniority_level').notNull().unique(), // 'INTERN', 'JUNIOR', 'MID', 'SENIOR', 'STAFF'
+  primaryModel: text('primary_model').notNull(),
+  fallbackModel: text('fallback_model').notNull(),
+  maxPromptTokensOverride: integer('max_prompt_tokens_override').default(4096),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// --- AI Persona & Rubric Studio Schema ---
+
+export const personaConfigs = pgTable('persona_configs', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull().default('default_org'),
+  personaName: text('persona_name').notNull().default('Sarah'),
+  strictnessLevel: integer('strictness_level').notNull().default(3), // 1 (Lenient) to 5 (Exacting)
+  interruptionPolicy: text('interruption_policy').notNull().default('ADAPTIVE'), // 'CONSERVATIVE' | 'ADAPTIVE' | 'AGGRESSIVE'
+  cadenceWordsPerMinute: integer('cadence_wpm').notNull().default(165),
+  probingSensitivity: integer('probing_sensitivity').notNull().default(4), // 1 to 5
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const rubricTemplates = pgTable('rubric_templates', {
+  id: text('id').primaryKey(),
+  jobId: text('job_id').notNull(),
+  version: integer('version').notNull().default(1),
+  title: text('title').notNull(),
+  dimensions: jsonb('dimensions').notNull(), // Array of { name, weight, description, 1_pt_desc ... 5_pt_desc }
+  status: text('status').notNull().default('DRAFT'), // 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_rubric_templates_job').on(table.jobId, table.status)
+]);
+
+export const promptVersions = pgTable('prompt_versions', {
+  id: text('id').primaryKey(),
+  rubricTemplateId: text('rubric_template_id').notNull(),
+  version: integer('version').notNull(),
+  systemPrompt: text('system_prompt').notNull(),
+  diffSummary: text('diff_summary'),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_prompt_versions_rubric').on(table.rubricTemplateId, table.version)
+]);
+
 
 

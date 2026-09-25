@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for Internal Team Shadow-Calibration Run and High-Fidelity Telemetry with Audit Logging. Sets up dedicated calibration session flags, side-by-side human vs AI scoring comparison matrix, real-time telemetry inspector, and end-to-end audit reporting.",
-  "updatedAt":  "2026-09-25T16:12:37.966220065Z",
+  "summary":  "Implementation plan for Ravengard Admin V2 incorporating FinOps & Token Budget Controller and AI Persona & Rubric Studio, featuring departmental hard/soft token caps, adaptive model degradation, automated rubric generation from job descriptions, and prompt versioning with diff inspection.",
+  "updatedAt":  "2026-09-25T16:24:38.722929363Z",
   "requestFeedback":  true,
   "userFacing":  true
 }
