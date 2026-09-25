@@ -28,14 +28,28 @@ import {
   ThumbsDown,
   Send,
   Link2,
+  FileCheck,
   Download,
+  Lock,
+  Sparkles,
+  Heart,
+  EyeOff,
 } from 'lucide-react';
 import { downloadExecutiveDossierPdf } from '../../utils/pdfGenerator';
+import { OfferDocumentModal } from '../../components/hr/OfferDocumentModal';
+import { CandidateGrowthScorecardModal } from '../../components/hr/CandidateGrowthScorecardModal';
+import { getRbacFetchHeaders } from '../../utils/rbacClient';
 
 interface Dossier {
   application: any;
   signals: any[];
   transcript: any[];
+  roleAccess?: {
+    role: string;
+    department: string;
+    canViewCompensation: boolean;
+    canGenerateOffer: boolean;
+  };
 }
 
 export default function HrCandidateDossier() {
@@ -46,6 +60,8 @@ export default function HrCandidateDossier() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusOverrideOpen, setStatusOverrideOpen] = useState(false);
+  const [offerModalOpen, setOfferModalOpen] = useState(false);
+  const [growthScorecardOpen, setGrowthScorecardOpen] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [auditNote, setAuditNote] = useState('');
   const [statusUpdating, setStatusUpdating] = useState(false);
@@ -55,12 +71,11 @@ export default function HrCandidateDossier() {
 
   useEffect(() => {
     const fetchDossier = async () => {
-      const token = localStorage.getItem('ravengard_hr_token');
-      if (!token || !id) return;
+      if (!id) return;
 
       try {
         const res = await fetch(`/api/hr/applications/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getRbacFetchHeaders(),
         });
 
         if (!res.ok) throw new Error('Failed to load candidate dossier.');
@@ -302,9 +317,16 @@ export default function HrCandidateDossier() {
                 <User className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <h1 className="text-lg font-display font-bold text-white">
-                  {app.candidate_name || 'Unknown Candidate'}
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-display font-bold text-white">
+                    {app.candidate_name || 'Unknown Candidate'}
+                  </h1>
+                  {dossier.roleAccess?.role === 'technical_interviewer' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                      <EyeOff className="w-3 h-3" /> Technical Reviewer Redacted
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-3 text-xs text-white/40 font-mono mt-0.5">
                   <span className="inline-flex items-center gap-1">
                     <Mail className="w-3 h-3" /> {app.candidate_email}
@@ -338,11 +360,35 @@ export default function HrCandidateDossier() {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2">
+            {/* Offer Generation Action */}
+            {dossier.roleAccess?.canGenerateOffer !== false && dossier.roleAccess?.role !== 'technical_interviewer' && (
+              <button
+                onClick={() => setOfferModalOpen(true)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer shadow-lg ${
+                  app.status === 'offered'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
+                    : 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 hover:from-amber-400 hover:to-amber-500 shadow-amber-950/20'
+                }`}
+              >
+                <FileCheck className="w-3.5 h-3.5" />
+                {app.status === 'offered' ? 'View Official Offer Document' : 'Execute Legal Offer'}
+              </button>
+            )}
+
+            {/* Candidate Growth Scorecard Action */}
+            <button
+              onClick={() => setGrowthScorecardOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono bg-purple-500/10 text-purple-300 border border-purple-500/30 hover:bg-purple-500/20 transition-all cursor-pointer font-semibold shadow-sm"
+              title="Preview candidate feedback report for employer brand goodwill"
+            >
+              <Heart className="w-3.5 h-3.5" /> Candidate Growth Scorecard
+            </button>
+
             <button
               onClick={handleExportPdf}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all cursor-pointer font-semibold shadow-lg shadow-amber-950/20"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:text-white transition-all cursor-pointer shadow-sm"
             >
-              <Download className="w-3.5 h-3.5" /> Export Executive PDF
+              <Download className="w-3.5 h-3.5" /> Export PDF
             </button>
             <button
               onClick={() => setStatusOverrideOpen(!statusOverrideOpen)}
@@ -372,9 +418,12 @@ export default function HrCandidateDossier() {
           </span>
           {app.job_dept && <span>· {app.job_dept}</span>}
           <span>· Applied {new Date(app.created_at).toLocaleDateString()}</span>
+          {app.salary_range && (
+            <span className="text-white/60">· {app.salary_range}</span>
+          )}
           <span
             className={`px-2 py-0.5 rounded font-bold border ${
-              app.status === 'recommended'
+              app.status === 'recommended' || app.status === 'offered'
                 ? 'bg-emerald-500/12 text-emerald-300 border-emerald-500/20'
                 : app.status === 'not_recommended' || app.status === 'rejected_at_screening'
                 ? 'bg-red-500/12 text-red-300 border-red-500/20'
@@ -668,39 +717,64 @@ export default function HrCandidateDossier() {
         </div>
 
         {signals.length > 0 ? (
-          <div className="space-y-1">
-            {signals.map((sig) => (
-              <div
-                key={sig.id}
-                className="flex items-center justify-between p-2 rounded-lg bg-white/[0.02] border border-white/5 text-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      sig.signal_type === 'tab_blur'
-                        ? 'bg-amber-400'
-                        : sig.signal_type === 'window_switch'
-                        ? 'bg-red-400'
-                        : sig.signal_type === 'copy_paste'
-                        ? 'bg-purple-400'
-                        : 'bg-white/30'
-                    }`}
-                  />
-                  <span className="font-mono text-white/60">
-                    {sig.signal_type?.replace(/_/g, ' ')}
-                  </span>
-                  <span className="text-white/25 font-mono">
-                    {sig.timestamp ? new Date(sig.timestamp).toLocaleTimeString() : '—'}
-                  </span>
-                </div>
-                <button
-                  onClick={() => handleClearTelemetry(sig.id)}
-                  className="text-[9px] font-mono text-white/25 hover:text-red-300 cursor-pointer"
+          <div className="space-y-1.5">
+            {signals.map((sig) => {
+              const isProxy = sig.signal_type === 'HIGH_RISK_PROXY_LATENCY';
+              const isSynthetic = sig.signal_type === 'HIGH_RISK_SYNTHETIC_INPUT' || sig.signal_type === 'UNIFORM_KEYSTROKE_INTERVAL';
+              const isDivergence = sig.signal_type === 'CROSS_MODAL_DIVERGENCE_FLAG';
+              const isProsody = sig.signal_type === 'UNNATURAL_READING_PROSODY';
+
+              let label = sig.signal_type?.replace(/_/g, ' ');
+              let badgeColor = 'bg-white/30';
+              let badgeBorder = 'border-white/10';
+
+              if (isProxy) {
+                label = 'Secondary-Device Proxy Latency (Delta TTFT > 1.8s Conversational Gap)';
+                badgeColor = 'bg-rose-500';
+                badgeBorder = 'border-rose-500/40 bg-rose-500/10 text-rose-300';
+              } else if (isSynthetic) {
+                label = 'Synthetic Keystroke Dynamics (Uniform 20ms Intervals / Chunk Paste)';
+                badgeColor = 'bg-amber-400';
+                badgeBorder = 'border-amber-500/40 bg-amber-500/10 text-amber-300';
+              } else if (isDivergence) {
+                label = 'Cross-Modal Divergence (Verbal Explanation Without Editor Typing)';
+                badgeColor = 'bg-purple-400';
+                badgeBorder = 'border-purple-500/40 bg-purple-500/10 text-purple-300';
+              } else if (isProsody) {
+                label = 'Reading Prosody Profiling (Monotone Cadence / Zero Spontaneous False Starts)';
+                badgeColor = 'bg-indigo-400';
+                badgeBorder = 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300';
+              } else if (sig.signal_type === 'tab_blur') {
+                badgeColor = 'bg-amber-400';
+              } else if (sig.signal_type === 'window_switch') {
+                badgeColor = 'bg-red-400';
+              }
+
+              return (
+                <div
+                  key={sig.id}
+                  className={`flex items-center justify-between p-2.5 rounded-lg border text-xs ${
+                    isProxy || isSynthetic || isDivergence ? badgeBorder : 'bg-white/[0.02] border-white/5'
+                  }`}
                 >
-                  Clear
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3">
+                    <span className={`w-2 h-2 rounded-full ${badgeColor} shrink-0`} />
+                    <span className="font-mono text-white/80 font-medium">
+                      {label}
+                    </span>
+                    <span className="text-white/30 font-mono text-[10px]">
+                      {sig.timestamp ? new Date(sig.timestamp).toLocaleTimeString() : '—'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleClearTelemetry(sig.id)}
+                    className="text-[9px] font-mono text-white/30 hover:text-red-300 cursor-pointer ml-2"
+                  >
+                    Clear
+                  </button>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="py-4 text-center">
@@ -800,6 +874,43 @@ export default function HrCandidateDossier() {
             {app.raw_resume_text}
           </pre>
         </div>
+      )}
+
+      {/* Automated Legal Offer Document Modal */}
+      {offerModalOpen && (
+        <OfferDocumentModal
+          applicationId={app.id}
+          candidateName={app.candidate_name || 'Candidate'}
+          candidateEmail={app.candidate_email}
+          jobTitle={app.job_title}
+          department={app.job_dept || 'Engineering'}
+          existingOffer={app.offer_details_json}
+          onClose={() => setOfferModalOpen(false)}
+          onOfferGenerated={(newOffer) => {
+            setDossier((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    application: {
+                      ...prev.application,
+                      status: 'offered',
+                      offer_details_json: newOffer,
+                    },
+                  }
+                : null
+            );
+          }}
+        />
+      )}
+
+      {/* Candidate Goodwill Growth Scorecard Modal */}
+      {growthScorecardOpen && (
+        <CandidateGrowthScorecardModal
+          applicationId={app.id}
+          candidateName={app.candidate_name || 'Candidate'}
+          jobTitle={app.job_title}
+          onClose={() => setGrowthScorecardOpen(false)}
+        />
       )}
     </div>
   );

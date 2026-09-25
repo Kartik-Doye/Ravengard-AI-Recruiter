@@ -48,10 +48,13 @@ export default function CommandPalette({ isOpen, setIsOpen, onNavigate }: any) {
         
         <div className="max-h-80 overflow-y-auto p-2">
           <div className="px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Navigation</div>
-          <button onClick={() => { onNavigate('dashboard'); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-left text-sm text-slate-700 dark:text-slate-300 transition-colors">
+          <button onClick={() => { onNavigate('dashboard'); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-left text-sm text-slate-700 dark:text-slate-300 transition-colors cursor-pointer">
             <Home className="w-4 h-4 text-slate-400" /> Dashboard
           </button>
-          <button onClick={() => { onNavigate('history'); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-left text-sm text-slate-700 dark:text-slate-300 transition-colors">
+          <button onClick={() => { onNavigate('schedule'); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-left text-sm text-slate-700 dark:text-slate-300 transition-colors cursor-pointer">
+            <Calendar className="w-4 h-4 text-violet-400" /> Calendar Scheduling
+          </button>
+          <button onClick={() => { onNavigate('history'); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-left text-sm text-slate-700 dark:text-slate-300 transition-colors cursor-pointer">
             <Clock className="w-4 h-4 text-slate-400" /> Interview History
           </button>
           <button onClick={() => { onNavigate('forms'); setIsOpen(false); }} className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-left text-sm text-slate-700 dark:text-slate-300 transition-colors">

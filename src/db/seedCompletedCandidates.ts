@@ -43,18 +43,74 @@ export async function seedCompletedCandidatesAndAdmin() {
     await ensureDefaultRubric("v1.0");
     await ensureDefaultRubric("v2.4-enterprise-strict");
 
-    // 1. Ensure Root Admin exists
-    const [existingAdmin] = await db.select().from(adminUsers).where(eq(adminUsers.email, 'admin@ravengard.com')).limit(1);
-    if (!existingAdmin) {
-      const hashed = await bcrypt.hash('admin123', 10);
+    // Ensure schema columns exist for adminUsers and jobs
+    if (pool) {
+      try {
+        await pool.query(`
+          ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS setup_token TEXT;
+          ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+          ALTER TABLE jobs ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+          ALTER TABLE candidates ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+        `);
+      } catch (colErr) {
+        console.warn("Schema extension notice:", colErr);
+      }
+    }
+
+    // 1. Ensure Primary Super Admin (madhunand@gmail.com) and Persona Accounts exist
+    const superAdminEmail = 'madhunand@gmail.com';
+    const hasExplicitPass = Boolean(process.env.SUPER_ADMIN_INIT_PASSWORD);
+    const autoSetupToken = crypto.randomBytes(16).toString('hex');
+    const initPassword = process.env.SUPER_ADMIN_INIT_PASSWORD || `SuperAdmin#${autoSetupToken.slice(0, 8)}!`;
+    const superHash = await bcrypt.hash(initPassword, 10);
+
+    const [existingSuperAdmin] = await db.select().from(adminUsers).where(eq(adminUsers.email, superAdminEmail)).limit(1);
+    if (!existingSuperAdmin) {
       await db.insert(adminUsers).values({
-        id: 'admin-root',
-        email: 'admin@ravengard.com',
-        name: 'Ravengard Lead Auditor',
-        role: 'admin',
-        passwordHash: hashed
+        id: 'admin-super-primary',
+        email: superAdminEmail,
+        name: 'Madhunand (Super Admin)',
+        role: 'super_admin',
+        department: 'Executive Oversight',
+        passwordHash: superHash,
+        setupToken: hasExplicitPass ? null : autoSetupToken,
       });
-      console.log('Seeded root admin: admin@ravengard.com / admin123');
+      console.log(`\n========================================================================`);
+      console.log(`[SUPER_ADMIN_BOOTSTRAP] Provisioned Primary Super Admin: ${superAdminEmail}`);
+      console.log(`Role: super_admin`);
+      if (!hasExplicitPass) {
+        console.log(`Auto-Generated Setup Token: ${autoSetupToken}`);
+        console.log(`Instant Setup URL: http://localhost:3000/admin/setup?token=${autoSetupToken}`);
+      }
+      console.log(`========================================================================\n`);
+    } else if (!existingSuperAdmin.passwordHash && !hasExplicitPass) {
+      await db.update(adminUsers)
+        .set({ setupToken: autoSetupToken, passwordHash: superHash })
+        .where(eq(adminUsers.email, superAdminEmail));
+      console.log(`[SUPER_ADMIN_BOOTSTRAP] Active Setup Token for ${superAdminEmail}: ${autoSetupToken}`);
+    }
+
+    const personas = [
+      { id: 'admin-root', email: 'admin@ravengard.com', name: 'Ravengard Lead Auditor', role: 'admin', dept: 'Compliance & Audit' },
+      { id: 'admin-recruiter', email: 'recruiter@ravengard.com', name: 'Sarah Jenkins (Recruiter)', role: 'recruiter', dept: 'Talent Acquisition' },
+      { id: 'admin-hm-eng', email: 'hiringmanager@ravengard.com', name: 'Alex Rivera (Engineering HM)', role: 'hiring_manager', dept: 'Engineering' },
+      { id: 'admin-tech-int', email: 'interviewer@ravengard.com', name: 'Devon Vance (Tech Interviewer)', role: 'technical_interviewer', dept: 'Engineering' },
+      { id: 'admin-finance', email: 'finance@ravengard.com', name: 'Morgan Taylor (Finance Approver)', role: 'finance_approver', dept: 'Finance' },
+    ];
+
+    for (const p of personas) {
+      const [existing] = await db.select().from(adminUsers).where(eq(adminUsers.email, p.email)).limit(1);
+      if (!existing) {
+        const hashed = await bcrypt.hash('admin123', 10);
+        await db.insert(adminUsers).values({
+          id: p.id,
+          email: p.email,
+          name: p.name,
+          role: p.role as any,
+          department: p.dept,
+          passwordHash: hashed
+        });
+      }
     }
 
     // 2. Ensure Default Organization exists

@@ -13,8 +13,18 @@ import {
   Users,
   Clock,
   X,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2,
+  DollarSign,
+  FileCheck,
+  RotateCcw,
+  Send,
+  Building,
+  Coins,
+  ArrowRight,
+  Filter
 } from 'lucide-react';
+import { getRbacFetchHeaders, getActiveRoleProfile } from '../../utils/rbacClient';
 
 interface JobRequisition {
   id: string;
@@ -23,7 +33,11 @@ interface JobRequisition {
   description: string;
   requirementsJson: string[];
   screeningThreshold: number;
-  status: string;
+  status: string; // 'draft' | 'pending_finance' | 'pending_tech_lead' | 'active' | 'published'
+  tokenBudget?: number;
+  approvalFeedback?: string;
+  financeApprovedBy?: string;
+  techApprovedBy?: string;
   createdAt: string;
   applicantCount: number;
   activeCount: number;
@@ -42,43 +56,40 @@ export function HrJobsPage() {
   const [jobs, setJobs] = useState<JobRequisition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterTab, setFilterTab] = useState<'all' | 'published' | 'pending' | 'draft'>('all');
+
+  // Active RBAC role
+  const [activeRole, setActiveRole] = useState(getActiveRoleProfile());
+
+  useEffect(() => {
+    const handleRoleChanged = (e: any) => {
+      setActiveRole(e.detail || getActiveRoleProfile());
+      fetchJobs();
+    };
+    window.addEventListener('ravengard_role_changed', handleRoleChanged);
+    return () => window.removeEventListener('ravengard_role_changed', handleRoleChanged);
+  }, []);
 
   // New Job Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
-  const [newDepartment, setNewDepartment] = useState('Infrastructure & Platform');
+  const [newDepartment, setNewDepartment] = useState('Engineering');
   const [newThreshold, setNewThreshold] = useState(70);
+  const [newTokenBudget, setNewTokenBudget] = useState(250000);
   const [newDescription, setNewDescription] = useState('');
-  const [newRequirements, setNewRequirements] = useState<string[]>(['Distributed Consensus', 'High-Concurrency Execution', 'Fault-Tolerant Architecture']);
+  const [newRequirements, setNewRequirements] = useState<string[]>([
+    'Distributed Consensus',
+    'High-Concurrency Execution',
+    'Fault-Tolerant Architecture'
+  ]);
   const [currentReqInput, setCurrentReqInput] = useState('');
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const closeCreateModal = () => {
-    setShowCreateModal(false);
-    setNewTitle('');
-    setNewDepartment('Infrastructure & Platform');
-    setNewThreshold(70);
-    setNewDescription('');
-    setNewRequirements(['Distributed Consensus', 'High-Concurrency Execution', 'Fault-Tolerant Architecture']);
-    setCurrentReqInput('');
-    setFormError(null);
-  };
-
-  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      const tag = currentReqInput.trim();
-      if (tag && !newRequirements.includes(tag)) {
-        setNewRequirements([...newRequirements, tag]);
-      }
-      setCurrentReqInput('');
-    }
-  };
-
-  const handleRemoveTag = (idx: number) => {
-    setNewRequirements(newRequirements.filter((_, i) => i !== idx));
-  };
+  // Rejection Notes Modal State
+  const [rejectingJobId, setRejectingJobId] = useState<string | null>(null);
+  const [rejectionNotes, setRejectionNotes] = useState('');
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   // Magic Link Modal state
   const [magicModalData, setMagicModalData] = useState<MagicLinkModalData | null>(null);
@@ -88,9 +99,8 @@ export function HrJobsPage() {
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('ravengard_hr_token');
       const res = await fetch('/api/hr/jobs', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getRbacFetchHeaders(),
       });
       if (!res.ok) {
         throw new Error('Failed to fetch job requisitions');
@@ -118,20 +128,20 @@ export function HrJobsPage() {
     try {
       setCreating(true);
       setFormError(null);
-      const token = localStorage.getItem('ravengard_hr_token');
       const res = await fetch('/api/hr/jobs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          ...getRbacFetchHeaders(),
         },
         body: JSON.stringify({
           title: newTitle.trim(),
           department: newDepartment.trim(),
           screeningThreshold: newThreshold,
+          tokenBudget: Number(newTokenBudget) || 250000,
           description: newDescription.trim(),
-          requirements: newRequirements
-        })
+          requirements: newRequirements,
+        }),
       });
 
       const data = await res.json();
@@ -139,8 +149,10 @@ export function HrJobsPage() {
         throw new Error(data.error || 'Failed to create job');
       }
 
-      setJobs(prev => [data.job, ...prev]);
-      closeCreateModal();
+      setJobs((prev) => [data.job, ...prev]);
+      setShowCreateModal(false);
+      setNewTitle('');
+      setNewDescription('');
     } catch (err: any) {
       setFormError(err.message || 'Error creating job');
     } finally {
@@ -148,13 +160,111 @@ export function HrJobsPage() {
     }
   };
 
+  // State Machine Action Handlers
+  const handleSubmitForApproval = async (jobId: string) => {
+    try {
+      setActionLoadingId(jobId);
+      const res = await fetch(`/api/hr/jobs/${jobId}/submit-approval`, {
+        method: 'POST',
+        headers: getRbacFetchHeaders(),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to submit requisition for finance review.');
+      }
+      const data = await res.json();
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: data.job.status } : j)));
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleApproveFinance = async (jobId: string) => {
+    try {
+      setActionLoadingId(jobId);
+      const res = await fetch(`/api/hr/jobs/${jobId}/approve-finance`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getRbacFetchHeaders(),
+        },
+        body: JSON.stringify({ approvedBudget: 250000 }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to approve token budget.');
+      }
+      const data = await res.json();
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: data.job.status, financeApprovedBy: data.job.finance_approved_by } : j)));
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleApproveTechLead = async (jobId: string) => {
+    try {
+      setActionLoadingId(jobId);
+      const res = await fetch(`/api/hr/jobs/${jobId}/approve-tech-lead`, {
+        method: 'POST',
+        headers: getRbacFetchHeaders(),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to approve AI rubric criteria.');
+      }
+      const data = await res.json();
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? { ...j, status: data.job.status, techApprovedBy: data.job.tech_approved_by } : j)));
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRejectToDraft = async () => {
+    if (!rejectingJobId) return;
+    if (!rejectionNotes.trim()) {
+      alert('Reviewer feedback notes are required to revert requisition to draft.');
+      return;
+    }
+
+    try {
+      setActionLoadingId(rejectingJobId);
+      const res = await fetch(`/api/hr/jobs/${rejectingJobId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getRbacFetchHeaders(),
+        },
+        body: JSON.stringify({ feedback: rejectionNotes.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to reject requisition.');
+      }
+      const data = await res.json();
+      setJobs((prev) =>
+        prev.map((j) => (j.id === rejectingJobId ? { ...j, status: 'draft', approvalFeedback: rejectionNotes.trim() } : j))
+      );
+      setRejectingJobId(null);
+      setRejectionNotes('');
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   const handleGenerateMagicLink = async (job: JobRequisition) => {
     try {
       setGeneratingForJobId(job.id);
-      const token = localStorage.getItem('ravengard_hr_token');
       const res = await fetch(`/api/hr/jobs/${job.id}/magic-link`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: getRbacFetchHeaders(),
       });
 
       if (!res.ok) {
@@ -168,7 +278,7 @@ export function HrJobsPage() {
         token: data.token,
         magicLink: data.magicLink,
         candidatePath: data.candidatePath,
-        expiresAt: data.expiresAt
+        expiresAt: data.expiresAt,
       });
       setCopied(false);
     } catch (err: any) {
@@ -185,38 +295,93 @@ export function HrJobsPage() {
     setTimeout(() => setCopied(false), 3000);
   };
 
+  const filteredJobs = jobs.filter((j) => {
+    if (filterTab === 'published') return j.status === 'active' || j.status === 'published';
+    if (filterTab === 'pending') return j.status === 'pending_finance' || j.status === 'pending_tech_lead';
+    if (filterTab === 'draft') return j.status === 'draft';
+    return true;
+  });
+
   return (
     <div className="space-y-8 pb-12">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-white/10 pb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 rounded bg-[var(--color-secondary)]/10 text-[var(--color-secondary)] text-[11px] font-mono uppercase tracking-wider font-semibold border border-[var(--color-secondary)]/20">
-              Requisition Control
+            <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 text-[11px] font-mono uppercase tracking-wider font-semibold border border-blue-500/20">
+              Workday-Grade Approval Chain
             </span>
-            <span className="text-xs text-white/40 font-mono">Phase 7 HR Module</span>
+            <span className="text-xs text-white/40 font-mono">
+              Active Context: {activeRole.name} ({activeRole.department})
+            </span>
           </div>
           <h1 className="text-2xl md:text-3xl font-display font-light text-white tracking-wide">
-            Job Requisitions & Magic Links
+            Requisition Approvals & Publishing
           </h1>
           <p className="text-sm text-white/60 mt-1 max-w-2xl font-sans">
-            Configure open roles, define minimum rubric criteria, and generate single-use cryptographic invitation tokens for pre-screened engineering candidates.
+            Multi-stage stakeholder approval state machine: Draft $\rightarrow$ Finance Budget Check $\rightarrow$ Tech Lead Rubric Review $\rightarrow$ Published.
           </p>
         </div>
 
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-semibold text-xs font-mono transition-all shadow-lg shadow-amber-950/20 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create Draft Requisition</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs Filter */}
+      <div className="flex items-center gap-2 text-xs font-mono">
         <button
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-medium text-sm transition-all shadow-lg shadow-amber-500/10 cursor-pointer"
+          onClick={() => setFilterTab('all')}
+          className={`px-3 py-1.5 rounded-full transition-all cursor-pointer ${
+            filterTab === 'all'
+              ? 'bg-white text-slate-950 font-bold shadow-sm'
+              : 'bg-white/5 text-white/50 hover:text-white'
+          }`}
         >
-          <Plus className="w-4 h-4" />
-          <span>New Job Opening</span>
+          All Requisitions ({jobs.length})
+        </button>
+        <button
+          onClick={() => setFilterTab('published')}
+          className={`px-3 py-1.5 rounded-full transition-all cursor-pointer ${
+            filterTab === 'published'
+              ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+              : 'bg-white/5 text-white/50 hover:text-white'
+          }`}
+        >
+          Published ({jobs.filter((j) => j.status === 'active' || j.status === 'published').length})
+        </button>
+        <button
+          onClick={() => setFilterTab('pending')}
+          className={`px-3 py-1.5 rounded-full transition-all cursor-pointer ${
+            filterTab === 'pending'
+              ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
+              : 'bg-white/5 text-white/50 hover:text-white'
+          }`}
+        >
+          Pending Approvals ({jobs.filter((j) => j.status === 'pending_finance' || j.status === 'pending_tech_lead').length})
+        </button>
+        <button
+          onClick={() => setFilterTab('draft')}
+          className={`px-3 py-1.5 rounded-full transition-all cursor-pointer ${
+            filterTab === 'draft'
+              ? 'bg-slate-300 text-slate-950 font-bold shadow-sm'
+              : 'bg-white/5 text-white/50 hover:text-white'
+          }`}
+        >
+          Drafts ({jobs.filter((j) => j.status === 'draft').length})
         </button>
       </div>
 
-      {/* Main Jobs Listing */}
+      {/* Jobs Listing Grid */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-8 h-8 border-2 border-white/20 border-t-[var(--color-secondary)] rounded-full animate-spin"></div>
+          <div className="w-8 h-8 border-2 border-white/20 border-t-blue-500 rounded-full animate-spin" />
           <span className="text-xs font-mono text-white/40 tracking-wider uppercase">Loading Open Requisitions...</span>
         </div>
       ) : error ? (
@@ -224,109 +389,396 @@ export function HrJobsPage() {
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>
         </div>
-      ) : jobs.length === 0 ? (
+      ) : filteredJobs.length === 0 ? (
         <div className="text-center py-16 border border-dashed border-white/10 rounded-xl bg-white/[0.02]">
           <Briefcase className="w-12 h-12 text-white/20 mx-auto mb-3" />
-          <p className="text-base text-white/70 font-medium">No job openings created yet.</p>
-          <p className="text-sm text-white/40 mt-1">Create your first role to start generating magic interview tokens.</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="mt-4 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-mono transition-colors"
-          >
-            + Create First Role
-          </button>
+          <p className="text-base text-white/70 font-medium">No requisitions found in this filter.</p>
+          <p className="text-sm text-white/40 mt-1">Create a new requisition or switch role in the toolbar.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {jobs.map((job) => (
-            <motion.div
-              key={job.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl border border-white/10 bg-white/[0.03] p-5 flex flex-col justify-between hover:border-white/20 transition-all hover:shadow-xl hover:shadow-black/40 group"
-            >
-              <div>
-                {/* Top Role Badges */}
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="text-[11px] font-mono text-white/50 tracking-wider uppercase bg-white/5 px-2 py-0.5 rounded border border-white/5">
-                    {job.department}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider font-semibold">
-                      {job.status}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filteredJobs.map((job) => {
+            const isDraft = job.status === 'draft';
+            const isPendingFinance = job.status === 'pending_finance';
+            const isPendingTech = job.status === 'pending_tech_lead';
+            const isPublished = job.status === 'active' || job.status === 'published';
+
+            return (
+              <motion.div
+                key={job.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 flex flex-col justify-between hover:border-white/20 transition-all hover:shadow-xl hover:shadow-black/40 group relative overflow-hidden"
+              >
+                <div>
+                  {/* Top Meta & Department */}
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono text-white/70 tracking-wider uppercase bg-white/5 px-2.5 py-0.5 rounded-full border border-white/10">
+                        {job.department}
+                      </span>
+                      {job.tokenBudget && (
+                        <span className="text-[10px] font-mono text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 flex items-center gap-1">
+                          <Coins className="w-3 h-3" />
+                          {job.tokenBudget.toLocaleString()} tokens
+                        </span>
+                      )}
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-mono uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border ${
+                        isPublished
+                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                          : isPendingFinance
+                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                          : isPendingTech
+                          ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                          : 'bg-white/10 text-white/60 border-white/10'
+                      }`}
+                    >
+                      {job.status.replace(/_/g, ' ')}
                     </span>
                   </div>
-                </div>
 
-                {/* Job Title */}
-                <h3 className="text-lg font-medium text-white group-hover:text-[var(--color-secondary)] transition-colors leading-snug">
-                  {job.title}
-                </h3>
+                  {/* Title & Description */}
+                  <h3 className="text-lg font-semibold text-white leading-snug group-hover:text-blue-300 transition-colors">
+                    {job.title}
+                  </h3>
+                  <p className="text-xs text-white/60 mt-2 line-clamp-2 leading-relaxed">
+                    {job.description}
+                  </p>
 
-                {/* Description */}
-                <p className="text-xs text-white/60 mt-2 line-clamp-3 leading-relaxed">
-                  {job.description}
-                </p>
+                  {/* Multi-Stage Approval State Machine Visualizer */}
+                  <div className="mt-5 p-3.5 rounded-xl bg-black/40 border border-white/8 space-y-2">
+                    <div className="text-[10px] font-mono text-white/40 uppercase tracking-wider flex items-center justify-between">
+                      <span>Approval Pipeline</span>
+                      <span>Stage Progression</span>
+                    </div>
 
-                {/* Requirements / Competency Tags */}
-                {Array.isArray(job.requirementsJson) && job.requirementsJson.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-3.5">
-                    {job.requirementsJson.slice(0, 3).map((req, i) => (
-                      <span
-                        key={i}
-                        className="text-[10px] font-mono text-white/70 bg-white/5 px-2 py-0.5 rounded border border-white/10"
+                    <div className="grid grid-cols-4 gap-1.5 text-[10px] font-mono pt-1">
+                      {/* Step 1: Draft */}
+                      <div
+                        className={`p-2 rounded-lg border text-center transition-all ${
+                          isDraft
+                            ? 'bg-white/10 text-white border-white/20 font-bold'
+                            : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                        }`}
                       >
-                        {req}
-                      </span>
-                    ))}
-                    {job.requirementsJson.length > 3 && (
-                      <span className="text-[10px] font-mono text-white/40 px-1 py-0.5">
-                        +{job.requirementsJson.length - 3} more
-                      </span>
+                        <div className="text-[9px] opacity-60">Stage 1</div>
+                        <div>Draft</div>
+                      </div>
+
+                      {/* Step 2: Finance */}
+                      <div
+                        className={`p-2 rounded-lg border text-center transition-all ${
+                          isPendingFinance
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold animate-pulse'
+                            : isPendingTech || isPublished
+                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                            : 'bg-white/5 text-white/30 border-white/5'
+                        }`}
+                      >
+                        <div className="text-[9px] opacity-60">Stage 2</div>
+                        <div>Finance</div>
+                      </div>
+
+                      {/* Step 3: Tech Lead */}
+                      <div
+                        className={`p-2 rounded-lg border text-center transition-all ${
+                          isPendingTech
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 font-bold animate-pulse'
+                            : isPublished
+                            ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                            : 'bg-white/5 text-white/30 border-white/5'
+                        }`}
+                      >
+                        <div className="text-[9px] opacity-60">Stage 3</div>
+                        <div>Tech Lead</div>
+                      </div>
+
+                      {/* Step 4: Published */}
+                      <div
+                        className={`p-2 rounded-lg border text-center transition-all ${
+                          isPublished
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold'
+                            : 'bg-white/5 text-white/30 border-white/5'
+                        }`}
+                      >
+                        <div className="text-[9px] opacity-60">Stage 4</div>
+                        <div>Live</div>
+                      </div>
+                    </div>
+
+                    {/* Rejection / Feedback Note if Reverted */}
+                    {job.approvalFeedback && isDraft && (
+                      <div className="mt-2 p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-300 text-[11px] font-sans flex items-start gap-2">
+                        <RotateCcw className="w-3.5 h-3.5 mt-0.5 text-rose-400 shrink-0" />
+                        <div>
+                          <span className="font-bold font-mono">Reviewer Rejection Note: </span>
+                          <span>"{job.approvalFeedback}"</span>
+                        </div>
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-
-              {/* Bottom Metrics & Actions */}
-              <div className="pt-5 mt-5 border-t border-white/10">
-                <div className="flex items-center justify-between text-xs font-mono text-white/50 mb-3.5">
-                  <div className="flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-white/40" />
-                    <span>{job.applicantCount} Submissions</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Shield className="w-3.5 h-3.5 text-amber-400/80" />
-                    <span className="text-amber-400/90">Cutoff: {job.screeningThreshold}%</span>
-                  </div>
                 </div>
 
-                {/* Generate Magic Link Button */}
-                <button
-                  onClick={() => handleGenerateMagicLink(job)}
-                  disabled={generatingForJobId === job.id}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/15 text-white text-xs font-mono transition-all border border-white/10 cursor-pointer disabled:opacity-50"
-                >
-                  {generatingForJobId === job.id ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
-                      <span>Minting Token...</span>
-                    </>
-                  ) : (
-                    <>
-                      <LinkIcon className="w-3.5 h-3.5 text-[var(--color-secondary)]" />
-                      <span>Generate Magic Link</span>
-                    </>
+                {/* Bottom Action Section */}
+                <div className="pt-5 mt-5 border-t border-white/10 space-y-3">
+                  {/* Contextual Approval Controls */}
+                  {isDraft && (
+                    <button
+                      onClick={() => handleSubmitForApproval(job.id)}
+                      disabled={actionLoadingId === job.id}
+                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-semibold transition-all cursor-pointer shadow-lg shadow-blue-950/20 disabled:opacity-50"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Submit for Finance Token Approval</span>
+                    </button>
                   )}
-                </button>
-              </div>
-            </motion.div>
-          ))}
+
+                  {isPendingFinance && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleApproveFinance(job.id)}
+                        disabled={actionLoadingId === job.id}
+                        className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono text-xs font-bold transition-all cursor-pointer shadow-md disabled:opacity-50"
+                        title="Authorize LLM Token allocation"
+                      >
+                        <DollarSign className="w-3.5 h-3.5" />
+                        <span>Approve Budget</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRejectingJobId(job.id);
+                          setRejectionNotes('');
+                        }}
+                        className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white/5 hover:bg-rose-500/20 hover:text-rose-300 text-white/70 font-mono text-xs transition-all border border-white/10 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Reject to Draft</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {isPendingTech && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleApproveTechLead(job.id)}
+                        disabled={actionLoadingId === job.id}
+                        className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono text-xs font-bold transition-all cursor-pointer shadow-md disabled:opacity-50"
+                        title="Authorize AI Rubric Criteria and Publish Requisition"
+                      >
+                        <FileCheck className="w-3.5 h-3.5" />
+                        <span>Approve & Publish</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setRejectingJobId(job.id);
+                          setRejectionNotes('');
+                        }}
+                        className="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white/5 hover:bg-rose-500/20 hover:text-rose-300 text-white/70 font-mono text-xs transition-all border border-white/10 cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Reject to Draft</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {isPublished && (
+                    <button
+                      onClick={() => handleGenerateMagicLink(job)}
+                      disabled={generatingForJobId === job.id}
+                      className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-mono text-xs font-semibold transition-all border border-white/10 cursor-pointer shadow-sm disabled:opacity-50"
+                    >
+                      {generatingForJobId === job.id ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          <span>Minting Invitation Token...</span>
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Generate Magic Invitation Link</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       )}
 
-      {/* ─── MODAL: Generate Magic Link Modal ─────────────────────────────── */}
+      {/* ─── MODAL: Rejection Feedback Note Modal ────────────────────── */}
+      <AnimatePresence>
+        {rejectingJobId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#12141a] border border-white/20 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative text-white"
+            >
+              <button
+                onClick={() => setRejectingJobId(null)}
+                className="absolute top-4 right-4 p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white">Revert Requisition to Draft</h3>
+                  <p className="text-xs text-white/50 font-mono">Workday compliance requires actionable feedback.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-mono text-white/70 mb-1">
+                    Feedback & Revision Instructions *
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={rejectionNotes}
+                    onChange={(e) => setRejectionNotes(e.target.value)}
+                    placeholder="e.g., Token budget exceeds Q3 engineering allocation. Reduce candidate pipeline cutoff or revise prompt weights."
+                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder-white/30 font-mono focus:outline-none focus:border-rose-500/40"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setRejectingJobId(null)}
+                    className="px-4 py-2 rounded-xl text-xs font-mono text-white/60 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRejectToDraft}
+                    disabled={!rejectionNotes.trim()}
+                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-mono text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-rose-950/20"
+                  >
+                    Confirm Reversion to Draft
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── MODAL: Create New Job Modal ─────────────────────────────── */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#12141a] border border-white/20 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative text-white"
+            >
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="absolute top-4 right-4 p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white">Create Job Requisition</h3>
+                  <p className="text-xs text-white/50 font-mono">Starts in Stage 1 (Draft) pending approval chain.</p>
+                </div>
+              </div>
+
+              {formError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
+                  {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleCreateJob} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-mono text-white/70 mb-1">Job Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="e.g., Staff Distributed Systems Architect"
+                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-blue-500/40"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono text-white/70 mb-1">Department</label>
+                    <select
+                      value={newDepartment}
+                      onChange={(e) => setNewDepartment(e.target.value)}
+                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-blue-500/40"
+                    >
+                      <option value="Engineering">Engineering</option>
+                      <option value="Product">Product</option>
+                      <option value="Infrastructure">Infrastructure</option>
+                      <option value="Security">Security</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono text-white/70 mb-1">Token Budget</label>
+                    <input
+                      type="number"
+                      value={newTokenBudget}
+                      onChange={(e) => setNewTokenBudget(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-blue-500/40"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-white/70 mb-1">Job Description *</label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                    placeholder="Describe role responsibilities and distributed systems focus..."
+                    className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-white font-mono focus:outline-none focus:border-blue-500/40"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-mono text-white/60 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creating}
+                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-lg shadow-blue-950/20"
+                  >
+                    {creating ? 'Saving Requisition...' : 'Create Draft'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── MODAL: Magic Link Generation Modal ──────────────────────── */}
       <AnimatePresence>
         {magicModalData && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -344,208 +796,31 @@ export function HrJobsPage() {
               </button>
 
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
                   <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-medium text-white">Unique Candidate Magic Link</h2>
+                  <h3 className="text-base font-semibold text-white">Cryptographic Magic Link</h3>
                   <p className="text-xs text-white/50 font-mono">{magicModalData.jobTitle}</p>
                 </div>
               </div>
 
-              <p className="text-xs text-white/70 leading-relaxed mb-4 font-sans">
-                This single-use cryptographic URL bypasses generic queues and locks directly into the candidate assessment pipeline with pre-configured rubric criteria.
-              </p>
-
-              {/* URL Box */}
-              <div className="p-3 bg-black/60 border border-white/10 rounded-xl mb-4 font-mono text-xs">
-                <div className="flex items-center justify-between text-white/40 mb-1.5 text-[10px] uppercase tracking-wider">
-                  <span>Candidate Access Endpoint</span>
-                  <span className="text-emerald-400">Valid for 7 Days</span>
-                </div>
-                <div className="break-all select-all text-amber-200/90 font-mono text-[11px] bg-white/[0.03] p-2 rounded border border-white/5">
-                  {magicModalData.magicLink}
-                </div>
+              <div className="p-3 bg-black/50 border border-white/10 rounded-xl font-mono text-xs break-all text-white/80 select-all mb-4">
+                {magicModalData.magicLink}
               </div>
 
-              {/* Token Details */}
-              <div className="flex items-center justify-between text-[11px] font-mono text-white/50 bg-white/[0.02] p-2.5 rounded-lg border border-white/5 mb-6">
-                <span>Token UUID:</span>
-                <span className="text-white/80 select-all">{magicModalData.token}</span>
+              <div className="flex items-center justify-between text-xs font-mono text-white/40 mb-5">
+                <span>Single-Use Token</span>
+                <span>Expires in 7 days</span>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleCopyLink}
-                  className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-mono text-xs font-semibold transition-all cursor-pointer ${
-                    copied
-                      ? 'bg-emerald-500 text-black'
-                      : 'bg-amber-400 hover:bg-amber-300 text-black'
-                  }`}
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Copied to Clipboard!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy Magic Link</span>
-                    </>
-                  )}
-                </button>
-
-                <a
-                  href={magicModalData.candidatePath}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3.5 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-mono transition-colors inline-flex items-center gap-1.5"
-                >
-                  <span>Test Link</span>
-                  <ExternalLink className="w-3.5 h-3.5 text-white/50" />
-                </a>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* ─── MODAL: Create New Job Opening ───────────────────────────────── */}
-      <AnimatePresence>
-        {showCreateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-[#12141a] border border-white/20 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative text-white"
-            >
               <button
-                onClick={closeCreateModal}
-                className="absolute top-4 right-4 p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                onClick={handleCopyLink}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-mono text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-blue-950/20"
               >
-                <X className="w-4 h-4" />
+                {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                <span>{copied ? 'Link Copied to Clipboard!' : 'Copy Magic Invitation Link'}</span>
               </button>
-
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[var(--color-secondary)]">
-                  <Briefcase className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-medium text-white">Create New Job Opening</h2>
-                  <p className="text-xs text-white/50 font-mono">Define technical profile and baseline cutoff</p>
-                </div>
-              </div>
-
-              {formError && (
-                <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleCreateJob} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-1.5">
-                    Job Title <span className="text-amber-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Senior Distributed Systems Engineer"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm focus:outline-none focus:border-amber-400 font-sans"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-1.5">
-                      Department
-                    </label>
-                    <select
-                      value={newDepartment}
-                      onChange={(e) => setNewDepartment(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm focus:outline-none focus:border-amber-400 font-sans"
-                    >
-                      <option value="Infrastructure & Platform">Infrastructure & Platform</option>
-                      <option value="Core Services & Backend">Core Services & Backend</option>
-                      <option value="Security & Compliance">Security & Compliance</option>
-                      <option value="Full Stack & Product">Full Stack & Product</option>
-                      <option value="Machine Learning / Systems">Machine Learning / Systems</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-1.5">
-                      Cutoff Threshold ({newThreshold}%)
-                    </label>
-                    <input
-                      type="range"
-                      min="50"
-                      max="95"
-                      step="5"
-                      value={newThreshold}
-                      onChange={(e) => setNewThreshold(Number(e.target.value))}
-                      className="w-full accent-amber-400 cursor-pointer mt-2 focus:outline-none focus:ring-2 focus:ring-amber-400 rounded-lg"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-1.5">
-                    Required Competencies (Press Enter to add)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Node.js"
-                    value={currentReqInput}
-                    onChange={(e) => setCurrentReqInput(e.target.value)}
-                    onKeyDown={handleAddTag}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm focus:outline-none focus:border-amber-400 font-sans mb-2"
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    {newRequirements.map((tag, idx) => (
-                      <span key={idx} className="inline-flex items-center gap-1 bg-slate-800 text-amber-400 text-xs px-2.5 py-1 rounded-md border border-slate-700">
-                        {tag}
-                        <button type="button" onClick={() => handleRemoveTag(idx)} className="hover:text-white">&times;</button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-white/70 uppercase tracking-wider mb-1.5">
-                    Job Description & Role Mission <span className="text-amber-400">*</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Summarize the core technical challenges, scale requirements, and mission for this role..."
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-black/40 border border-white/15 text-white text-sm focus:outline-none focus:border-amber-400 font-sans leading-relaxed resize-none"
-                  />
-                </div>
-
-                <div className="pt-3 flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={closeCreateModal}
-                    className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 text-xs font-mono transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={creating}
-                    className="px-5 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-semibold text-xs font-mono transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    {creating ? 'Submitting Requisition...' : 'Submit for Approval'}
-                  </button>
-                </div>
-              </form>
             </motion.div>
           </div>
         )}

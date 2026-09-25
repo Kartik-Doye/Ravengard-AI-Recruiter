@@ -99,6 +99,21 @@ export default function WaitingRoom({ session, onNext }: { session: any, onNext:
             </Button>
           </div>
 
+          {!confirmed && !loading && (
+            <div className="mt-3 text-center">
+              <a
+                href="/interview/schedule"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.href = '/interview/schedule';
+                }}
+                className="text-xs font-mono text-slate-400 hover:text-white inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                Need to take this later? Select an appointment slot from the Calendar
+              </a>
+            </div>
+          )}
+
           <div className="mt-8 flex items-center justify-center gap-6 pt-6 border-t border-white/10 w-full text-white/30 text-xs font-mono">
             <div className="flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-emerald-400/80" /> Auto-Submit Failover Enabled

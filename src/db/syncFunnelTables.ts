@@ -31,17 +31,27 @@ export async function syncFunnelTablesAndSeed() {
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS location TEXT DEFAULT 'Remote'`,
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS employment_type TEXT DEFAULT 'Full-time'`,
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_range TEXT DEFAULT '$120k - $160k'`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS token_budget INTEGER DEFAULT 50000`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS approval_feedback TEXT`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS approval_history JSONB DEFAULT '[]'::jsonb`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS finance_approved_by TEXT`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS finance_approved_at TIMESTAMP`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS tech_approved_by TEXT`,
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS tech_approved_at TIMESTAMP`,
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS rubric_id TEXT`,
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS created_by TEXT`,
-      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS approval_feedback TEXT`,
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS approved_by TEXT`,
       `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP`,
+      `ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'Engineering'`,
       `ALTER TABLE rubrics ADD COLUMN IF NOT EXISTS organization_id TEXT`,
       `ALTER TABLE rubrics ADD COLUMN IF NOT EXISTS title TEXT`,
       `ALTER TABLE rubrics ADD COLUMN IF NOT EXISTS department TEXT`,
       `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMP DEFAULT NOW()`,
       `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`,
-      `CREATE TABLE IF NOT EXISTS hr_notifications (id TEXT PRIMARY KEY, organization_id TEXT, type TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, application_id TEXT, candidate_id TEXT, is_read BOOLEAN DEFAULT false, created_at TIMESTAMP DEFAULT NOW())`
+      `CREATE TABLE IF NOT EXISTS hr_notifications (id TEXT PRIMARY KEY, organization_id TEXT, type TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, application_id TEXT, candidate_id TEXT, is_read BOOLEAN DEFAULT false, created_at TIMESTAMP DEFAULT NOW())`,
+      `CREATE TABLE IF NOT EXISTS audit_logs (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, user_id TEXT, user_email TEXT NOT NULL, user_name TEXT, user_role TEXT NOT NULL, user_department TEXT, action TEXT NOT NULL, resource_type TEXT NOT NULL, resource_id TEXT NOT NULL, details JSONB NOT NULL, ip_address TEXT, created_at TIMESTAMP DEFAULT NOW())`,
+      `CREATE TABLE IF NOT EXISTS shadow_calibrations (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, job_id TEXT NOT NULL, candidate_id TEXT NOT NULL, candidate_name TEXT NOT NULL, human_score INTEGER NOT NULL, human_recommendation TEXT NOT NULL, ai_score INTEGER NOT NULL, ai_recommendation TEXT NOT NULL, interviewer_id TEXT, interviewer_name TEXT NOT NULL, variance INTEGER NOT NULL, notes TEXT, calibrated_weights_snapshot JSONB, created_at TIMESTAMP DEFAULT NOW())`,
+      `CREATE TABLE IF NOT EXISTS eeo_audits (id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, audit_period TEXT NOT NULL, total_assessed INTEGER NOT NULL, impact_ratio TEXT NOT NULL, passes_four_fifths_rule BOOLEAN NOT NULL DEFAULT true, cohort_metrics JSONB NOT NULL, certificate_hash TEXT NOT NULL, compliance_standard TEXT NOT NULL DEFAULT 'EEOC Title VII & EU AI Act Annex IV', generated_by TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW())`
     ];
 
     for (const sql of initialAlters) {
@@ -131,6 +141,28 @@ export async function syncFunnelTablesAndSeed() {
         completed_at TIMESTAMP
       );
     `);
+
+    // 6b. Create Interview Schedules table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS interview_schedules (
+        id TEXT PRIMARY KEY,
+        candidate_id TEXT NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+        session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+        scheduled_at TIMESTAMP NOT NULL,
+        end_time TIMESTAMP NOT NULL,
+        timezone TEXT NOT NULL DEFAULT 'UTC',
+        round_type TEXT NOT NULL DEFAULT 'ai_technical',
+        status TEXT NOT NULL DEFAULT 'confirmed',
+        notes TEXT,
+        calendar_event_uid TEXT,
+        meeting_link TEXT,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_interview_schedules_cand ON interview_schedules(candidate_id, status);
+      CREATE INDEX IF NOT EXISTS idx_interview_schedules_time ON interview_schedules(scheduled_at);
+    `);
+
 
     // Seed MCQ Questions if empty
     const checkQuestions = await client.query(`SELECT COUNT(*)::int as count FROM mcq_questions;`);
@@ -375,25 +407,75 @@ export async function syncFunnelTablesAndSeed() {
       `);
     }
 
-    // 7b. Seed HR Director & Admin accounts in admin_users if missing
+    // 7b. Seed Granular Admin/HR accounts in admin_users with Department Sandboxing
     await client.query(`
-      INSERT INTO admin_users (id, email, name, role, organization_id, password_hash)
+      INSERT INTO admin_users (id, email, name, role, department, organization_id, password_hash)
       VALUES 
-        ('admin-root', 'admin@ravengard.com', 'Ravengard Lead Auditor', 'admin', 'org-ravengard', '$2a$10$iKzHskGj9wz1WdJ2L2hH8eF5hSfZLskbLzQ.C2m8GjG9Gf2dM/G6G'),
-        ('hr-root', 'hr@ravengard.com', 'Ravengard HR Director', 'hr_admin', 'org-ravengard', '$2a$10$iKzHskGj9wz1WdJ2L2hH8eF5hSfZLskbLzQ.C2m8GjG9Gf2dM/G6G')
+        ('admin-root', 'admin@ravengard.com', 'Ravengard Lead Auditor', 'super_admin', 'Executive Oversight', 'org-ravengard', '$2a$10$iKzHskGj9wz1WdJ2L2hH8eF5hSfZLskbLzQ.C2m8GjG9Gf2dM/G6G'),
+        ('hr-root', 'hr@ravengard.com', 'Ravengard HR Director', 'hr_admin', 'People Operations', 'org-ravengard', '$2a$10$iKzHskGj9wz1WdJ2L2hH8eF5hSfZLskbLzQ.C2m8GjG9Gf2dM/G6G'),
+        ('recruiter-01', 'recruiter@ravengard.com', 'Elena Rostova (Lead Recruiter)', 'recruiter', 'Talent Acquisition', 'org-ravengard', '$2a$10$iKzHskGj9wz1WdJ2L2hH8eF5hSfZLskbLzQ.C2m8GjG9Gf2dM/G6G'),
+        ('hm-eng-01', 'hm.eng@ravengard.com', 'Marcus Chen (VP Engineering)', 'hiring_manager', 'Engineering', 'org-ravengard', '$2a$10$iKzHskGj9wz1WdJ2L2hH8eF5hSfZLskbLzQ.C2m8GjG9Gf2dM/G6G'),
+        ('hm-prod-01', 'hm.product@ravengard.com', 'Sophia Patel (Head of Product)', 'hiring_manager', 'Product', 'org-ravengard', '$2a$10$iKzHskGj9wz1WdJ2L2hH8eF5hSfZLskbLzQ.C2m8GjG9Gf2dM/G6G'),
+        ('tech-int-01', 'tech.interviewer@ravengard.com', 'Devon Vance (Principal Architect)', 'technical_interviewer', 'Engineering', 'org-ravengard', '$2a$10$iKzHskGj9wz1WdJ2L2hH8eF5hSfZLskbLzQ.C2m8GjG9Gf2dM/G6G'),
+        ('fin-app-01', 'finance@ravengard.com', 'Claire Sinclair (VP Finance & Budget)', 'finance_approver', 'Finance', 'org-ravengard', '$2a$10$iKzHskGj9wz1WdJ2L2hH8eF5hSfZLskbLzQ.C2m8GjG9Gf2dM/G6G')
       ON CONFLICT (email) DO UPDATE SET 
         role = EXCLUDED.role,
+        department = EXCLUDED.department,
         organization_id = EXCLUDED.organization_id;
     `);
 
-    // 8. Ensure Published Jobs for Public Careers Portal
+    // 8. Ensure Multi-Stage Jobs with Real Department Sandboxing and Approval Histories
     await client.query(`
-      INSERT INTO jobs (id, organization_id, title, department, description, requirements_json, screening_threshold, status, location, employment_type, salary_range)
+      INSERT INTO jobs (id, organization_id, title, department, description, requirements_json, screening_threshold, status, token_budget, location, employment_type, salary_range, approval_history)
       VALUES 
-        ('job-data-analyst-01', 'org-ravengard', 'Senior Data Analyst (High-Throughput)', 'Analytics & Business Intelligence', 'Lead analytical architecture, data modeling, SQL query optimization, and real-time dashboard analytics across high-throughput distributed pipelines.', '["Advanced SQL & Window Functions", "Data Modeling & Normalization", "Distributed Systems & Telemetry", "Business Metric Forecasting"]'::jsonb, 70, 'active', 'Remote / Hybrid', 'Full-time', '$135,000 - $170,000'),
-        ('job-backend-eng-01', 'org-ravengard', 'Staff Backend Systems Engineer', 'Core Platform', 'Architect high-throughput transactional outboxes, real-time streaming engines, and fault-tolerant microservices using TypeScript, Node.js, and PostgreSQL.', '["Node.js & TypeScript", "PostgreSQL & Drizzle ORM", "Distributed Systems", "Server-Sent Events & Realtime Pipelines"]'::jsonb, 75, 'active', 'San Francisco, CA / Remote', 'Full-time', '$180,000 - $225,000'),
-        ('job-frontend-lead-01', 'org-ravengard', 'Lead Frontend Architect', 'User Experience', 'Design ultra-responsive, accessible candidate evaluation workflows, voice-orb visualizers, and real-time HR pipeline dashboards with Tailwind CSS and React.', '["React 19 & TypeScript", "Tailwind CSS & Design Systems", "Web Speech & Audio Visualizers", "Performance Optimization"]'::jsonb, 70, 'active', 'New York, NY / Remote', 'Full-time', '$160,000 - $200,000')
-      ON CONFLICT (id) DO UPDATE SET status = 'active';
+        ('job-data-analyst-01', 'org-ravengard', 'Senior Data Analyst (High-Throughput)', 'Engineering', 'Lead analytical architecture, data modeling, SQL query optimization, and real-time dashboard analytics across high-throughput distributed pipelines.', '["Advanced SQL & Window Functions", "Data Modeling & Normalization", "Distributed Systems & Telemetry", "Business Metric Forecasting"]'::jsonb, 70, 'published', 65000, 'Remote / Hybrid', 'Full-time', '$135,000 - $170,000', '[{"stage":"draft","action":"SUBMIT_FOR_APPROVAL","user":"recruiter@ravengard.com","timestamp":"2026-09-20T10:00:00Z"},{"stage":"pending_finance","action":"FINANCE_APPROVED","user":"finance@ravengard.com","notes":"Token budget 65,000 approved within Q3 envelope","timestamp":"2026-09-21T14:30:00Z"},{"stage":"pending_tech_lead","action":"TECH_LEAD_APPROVED","user":"hm.eng@ravengard.com","notes":"Rubric weights verified against Level 5 engineering competency matrix","timestamp":"2026-09-22T09:15:00Z"}]'::jsonb),
+        ('job-backend-eng-01', 'org-ravengard', 'Staff Backend Systems Engineer', 'Engineering', 'Architect high-throughput transactional outboxes, real-time streaming engines, and fault-tolerant microservices using TypeScript, Node.js, and PostgreSQL.', '["Node.js & TypeScript", "PostgreSQL & Drizzle ORM", "Distributed Systems", "Server-Sent Events & Realtime Pipelines"]'::jsonb, 75, 'published', 80000, 'San Francisco, CA / Remote', 'Full-time', '$180,000 - $225,000', '[{"stage":"draft","action":"SUBMIT_FOR_APPROVAL","user":"recruiter@ravengard.com","timestamp":"2026-09-18T08:00:00Z"},{"stage":"pending_finance","action":"FINANCE_APPROVED","user":"finance@ravengard.com","notes":"Approved $180k-$225k band with 80k token allocation","timestamp":"2026-09-18T16:00:00Z"},{"stage":"pending_tech_lead","action":"TECH_LEAD_APPROVED","user":"hm.eng@ravengard.com","notes":"STAR rubric benchmarks validated","timestamp":"2026-09-19T11:00:00Z"}]'::jsonb),
+        ('job-frontend-lead-01', 'org-ravengard', 'Lead Frontend Architect', 'Engineering', 'Design ultra-responsive, accessible candidate evaluation workflows, voice-orb visualizers, and real-time HR pipeline dashboards with Tailwind CSS and React.', '["React 19 & TypeScript", "Tailwind CSS & Design Systems", "Web Speech & Audio Visualizers", "Performance Optimization"]'::jsonb, 70, 'pending_tech_lead', 50000, 'New York, NY / Remote', 'Full-time', '$160,000 - $200,000', '[{"stage":"draft","action":"SUBMIT_FOR_APPROVAL","user":"recruiter@ravengard.com","timestamp":"2026-09-24T09:00:00Z"},{"stage":"pending_finance","action":"FINANCE_APPROVED","user":"finance@ravengard.com","notes":"Token budget 50,000 confirmed","timestamp":"2026-09-24T15:30:00Z"}]'::jsonb),
+        ('job-product-lead-01', 'org-ravengard', 'Principal AI Product Manager', 'Product', 'Define the multi-modal product roadmap for voice assessment agents, candidate evaluation rubrics, and enterprise ATS compliance workflows.', '["Enterprise SaaS Strategy", "AI/ML Product Lifecycle", "B2B Compliance Frameworks", "Customer Discovery"]'::jsonb, 75, 'pending_finance', 45000, 'Seattle, WA / Remote', 'Full-time', '$175,000 - $210,000', '[{"stage":"draft","action":"SUBMIT_FOR_APPROVAL","user":"recruiter@ravengard.com","timestamp":"2026-09-25T07:30:00Z"}]'::jsonb),
+        ('job-security-eng-01', 'org-ravengard', 'Lead Security & Anti-Cheat Researcher', 'Engineering', 'Engineer synthetic telemetry detectors, keystroke interval analyzers, and secondary-device proxy classifiers for live interview environments.', '["Keystroke Biometrics", "Audio Cadence & Prosody Analysis", "Network Forensics", "Secondary Device Detection"]'::jsonb, 80, 'draft', 60000, 'Remote', 'Full-time', '$190,000 - $230,000', '[]'::jsonb)
+      ON CONFLICT (id) DO UPDATE SET 
+        token_budget = EXCLUDED.token_budget,
+        approval_history = EXCLUDED.approval_history;
+    `);
+
+    // 9. Seed Initial Immutable Audit Logs for Enterprise Compliance Defensibility
+    await client.query(`
+      INSERT INTO audit_logs (id, organization_id, user_id, user_email, user_name, user_role, user_department, action, resource_type, resource_id, details, ip_address)
+      VALUES 
+        ('audit-01', 'org-ravengard', 'hm-eng-01', 'hm.eng@ravengard.com', 'Marcus Chen', 'hiring_manager', 'Engineering', 'RUBRIC_UPDATE', 'rubric', 'rubric-data-analyst-01', '{"field":"Technical Depth Weight","before":35,"after":40,"justification":"Elevated SQL index optimization weight to meet Q3 distributed systems standard"}'::jsonb, '192.168.1.104'),
+        ('audit-02', 'org-ravengard', 'fin-app-01', 'finance@ravengard.com', 'Claire Sinclair', 'finance_approver', 'Finance', 'JOB_APPROVAL_TRANSITION', 'job', 'job-data-analyst-01', '{"fromState":"pending_finance","toState":"pending_tech_lead","tokenBudget":65000,"notes":"Approved within talent acquisition infrastructure envelope"}'::jsonb, '10.0.4.12'),
+        ('audit-03', 'org-ravengard', 'admin-root', 'admin@ravengard.com', 'Ravengard Lead Auditor', 'super_admin', 'Executive Oversight', 'EEOC_BIAS_AUDIT_GENERATED', 'eeo_audit', 'eeo-2026-q3', '{"standard":"EEOC Title VII & EU AI Act Annex IV","cohortImpactRatio":"0.94","status":"PASSED_FOUR_FIFTHS_RULE"}'::jsonb, '172.16.0.1')
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // 10. Seed Shadow Mode Calibration Benchmarks (Karat Killer Engine)
+    await client.query(`
+      INSERT INTO shadow_calibrations (id, organization_id, job_id, candidate_id, candidate_name, human_score, human_recommendation, ai_score, ai_recommendation, interviewer_id, interviewer_name, variance, notes, calibrated_weights_snapshot)
+      VALUES
+        ('calib-01', 'org-ravengard', 'job-backend-eng-01', 'cand-001', 'Arjun Mehta', 88, 'STRONG_HIRE', 86, 'STRONG_HIRE', 'hm-eng-01', 'Marcus Chen (VP Eng)', 2, 'Candidate displayed deep mastery of Raft log compaction and atomic write semantics. Human and AI fully aligned.', '{"distributed_systems":40,"code_efficiency":35,"clarity":25}'::jsonb),
+        ('calib-02', 'org-ravengard', 'job-backend-eng-01', 'cand-002', 'Elena Rostova', 74, 'HIRE', 76, 'HIRE', 'tech-int-01', 'Devon Vance (Principal)', 2, 'Solid query indexing strategy; slight hesitation on lock-free queue concurrency.', '{"distributed_systems":40,"code_efficiency":35,"clarity":25}'::jsonb),
+        ('calib-03', 'org-ravengard', 'job-backend-eng-01', 'cand-003', 'Kavita Iyer', 92, 'STRONG_HIRE', 90, 'STRONG_HIRE', 'hm-eng-01', 'Marcus Chen (VP Eng)', 2, 'Flawless distributed transaction boundary handling under network partition simulation.', '{"distributed_systems":40,"code_efficiency":35,"clarity":25}'::jsonb),
+        ('calib-04', 'org-ravengard', 'job-data-analyst-01', 'cand-004', 'Dmitri Volkov', 58, 'NO_HIRE', 55, 'NO_HIRE', 'tech-int-01', 'Devon Vance (Principal)', 3, 'Failed to identify quadratic Cartesian product in SQL join plan.', '{"sql_depth":45,"modeling":30,"clarity":25}'::jsonb),
+        ('calib-05', 'org-ravengard', 'job-data-analyst-01', 'cand-005', 'Sarah Jenkins', 82, 'HIRE', 84, 'HIRE', 'hm-eng-01', 'Marcus Chen (VP Eng)', 2, 'Demonstrated excellent window function partitioning and pipeline metric forecasting.', '{"sql_depth":45,"modeling":30,"clarity":25}'::jsonb)
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // 11. Seed EU AI Act & EEOC Bias Immunity Certificate
+    await client.query(`
+      INSERT INTO eeo_audits (id, organization_id, audit_period, total_assessed, impact_ratio, passes_four_fifths_rule, cohort_metrics, certificate_hash, compliance_standard, generated_by)
+      VALUES (
+        'eeo-2026-q3',
+        'org-ravengard',
+        'Q3 2026 (Rolling 90-Day Statistical Sample)',
+        142,
+        '0.94',
+        true,
+        '{"selectionRateProtected":0.46,"selectionRateBenchmark":0.49,"disparateImpactRatio":0.938,"pValue":0.78,"standardDeviation":0.42,"verbatimEvidenceRatio":1.0,"demographicProxyExclusion":true,"cohorts":[{"name":"Female Candidates","assessed":68,"selected":32,"rate":0.471,"ratioVsBenchmark":0.96},{"name":"Male Candidates","assessed":74,"selected":36,"rate":0.486,"ratioVsBenchmark":1.0},{"name":"Underrepresented Minorities","assessed":41,"selected":19,"rate":0.463,"ratioVsBenchmark":0.952}]}'::jsonb,
+        '0x7f9a8b1c4e2d3f6a89b0c1d2e3f4a5b6c7d8e9f0123456789abcdef012345678',
+        'EEOC Title VII Uniform Guidelines & EU AI Act Article 14 / Annex IV',
+        'Ravengard Automated Bias Immunity Engine v4.2'
+      )
+      ON CONFLICT (id) DO NOTHING;
     `);
 
     console.log("[DB Sync] Funnel tables, question banks, rubrics, and published requisitions synchronized successfully.");

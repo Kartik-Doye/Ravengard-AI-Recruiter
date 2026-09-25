@@ -31,6 +31,19 @@ The data model treats the `session` as the anchor for all runtime data, enforcin
 - **resume_parses / resume_intelligence:** Session-specific resume snapshot (ATS score, parsed skills, work experience).
 - **integrity_signals:** Real-time telemetry log for anti-cheat and session monitoring (`tab_blur`, `gaze_off`, `window_switch`).
 - **interview_questions & interview_responses:** Schema-checked round-level AI/candidate exchanges.
+- **interview_schedules:** Persistent calendar slot bookings and appointments for autonomous evaluation sessions.
+  - `id` (text, primary key)
+  - `candidate_id` (foreign key -> candidates.id, ON DELETE CASCADE)
+  - `session_id` (foreign key -> sessions.id, ON DELETE SET NULL)
+  - `scheduled_at` (timestamp, not null)
+  - `end_time` (timestamp, not null)
+  - `timezone` (text, default 'UTC')
+  - `round_type` (text, default 'ai_technical')
+  - `status` (text, default 'confirmed' - 'confirmed' | 'rescheduled' | 'cancelled' | 'completed')
+  - `notes` (text)
+  - `calendar_event_uid` (text, RFC 5545 UID)
+  - `meeting_link` (text)
+  - `created_at` / `updated_at` (timestamp, default now())
 - **scorecards & final_reports:** Final holistic scoring, competency breakdowns, rubric versioning, and hiring recommendation.
 
 ## 2. Implementation & Governance

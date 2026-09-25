@@ -46,6 +46,7 @@ export const candidates = pgTable('candidates', {
   githubData: jsonb('github_data'),
   timezone: text('timezone'),
   country: text('country'),
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow()
 });
 
@@ -179,9 +180,12 @@ export const adminUsers = pgTable('admin_users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
   name: text('name').notNull(),
-  role: text('role').notNull().default('viewer'), // 'super_admin' | 'admin' | 'hr_admin' | 'hr_user' | 'recruiter' | 'reviewer' | 'viewer'
+  role: text('role').notNull().default('viewer'), // 'super_admin' | 'admin' | 'hr_admin' | 'hr_user' | 'recruiter' | 'hiring_manager' | 'technical_interviewer' | 'finance_approver' | 'reviewer' | 'viewer'
+  department: text('department').default('Engineering'),
   organizationId: text('organization_id').references(() => organizations.id),
   passwordHash: text('password_hash'),
+  setupToken: text('setup_token'),
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow()
 });
 
@@ -195,6 +199,26 @@ export const adminLogs = pgTable('admin_logs', {
   metadata: jsonb('metadata')
 });
 
+export const auditLogs = pgTable('audit_logs', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull(),
+  userId: text('user_id'),
+  userEmail: text('user_email').notNull(),
+  userName: text('user_name'),
+  userRole: text('user_role').notNull(),
+  userDepartment: text('user_department'),
+  action: text('action').notNull(), // 'JOB_APPROVAL_TRANSITION' | 'SCORE_OVERRIDE' | 'OFFER_GENERATED' | 'RUBRIC_UPDATE' | 'STATUS_CHANGE' | 'TELEMETRY_CLEARED' | 'LLM_DELETE_BLOCKED' | 'PURGE_DEMO_DATA'
+  resourceType: text('resource_type').notNull(), // 'job' | 'application' | 'rubric' | 'candidate' | 'calibration' | 'eeo_audit' | 'database_security_boundary'
+  resourceId: text('resource_id').notNull(),
+  details: jsonb('details').notNull(),
+  ipAddress: text('ip_address'),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+}, (table) => [
+  index('idx_audit_logs_org_created').on(table.organizationId, table.createdAt),
+  index('idx_audit_logs_action').on(table.action),
+  index('idx_audit_logs_resource').on(table.resourceType, table.resourceId),
+]);
+
 export const jobs = pgTable('jobs', {
   id: text('id').primaryKey(),
   organizationId: text('organization_id').notNull().references(() => organizations.id),
@@ -204,15 +228,22 @@ export const jobs = pgTable('jobs', {
   location: text('location').default('Remote'),
   employmentType: text('employment_type').default('Full-time'),
   salaryRange: text('salary_range').default('$120k - $160k'),
+  tokenBudget: integer('token_budget').notNull().default(50000),
   description: text('description').notNull(),
   requirementsJson: jsonb('requirements_json'), // target competencies, target skills, rubric criteria
   screeningThreshold: integer('screening_threshold').notNull().default(70),
   requireHumanRejectionApproval: boolean('require_human_rejection_approval').notNull().default(true),
-  status: text('status').notNull().default('published'), // 'pending_approval' | 'published' | 'active' | 'closed' | 'draft' | 'archived'
+  status: text('status').notNull().default('published'), // 'draft' | 'pending_finance' | 'pending_tech_lead' | 'published' | 'active' | 'closed' | 'archived'
   approvalFeedback: text('approval_feedback'),
+  approvalHistory: jsonb('approval_history'),
+  financeApprovedBy: text('finance_approved_by'),
+  financeApprovedAt: timestamp('finance_approved_at'),
+  techApprovedBy: text('tech_approved_by'),
+  techApprovedAt: timestamp('tech_approved_at'),
   approvedBy: text('approved_by'),
   approvedAt: timestamp('approved_at'),
   createdBy: text('created_by'),
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 }, (table) => [
@@ -220,6 +251,57 @@ export const jobs = pgTable('jobs', {
   index('jobs_org_created_idx').on(table.organizationId, table.createdAt),
   index('jobs_org_status_idx').on(table.organizationId, table.status)
 ]);
+
+export const antiCheatProfiles = pgTable('anti_cheat_profiles', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id').references(() => sessions.id),
+  applicationId: text('application_id').references(() => applications.id),
+  deltaTtftAvgMs: integer('delta_ttft_avg_ms').default(450),
+  deltaTtftMaxMs: integer('delta_ttft_max_ms').default(600),
+  secondaryDeviceRiskScore: integer('secondary_device_risk_score').default(0), // 0 - 100
+  prosodyScore: integer('prosody_score').default(92), // 0-100 naturalness
+  rapidProbeCount: integer('rapid_probe_count').default(0),
+  rapidProbePassed: integer('rapid_probe_passed').default(0),
+  crossModalDivergenceCount: integer('cross_modal_divergence_count').default(0),
+  riskFlags: jsonb('risk_flags').$type<string[]>(),
+  telemetryLog: jsonb('telemetry_log'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow()
+});
+
+export const shadowCalibrations = pgTable('shadow_calibrations', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull(),
+  jobId: text('job_id').notNull(),
+  candidateId: text('candidate_id').notNull(),
+  candidateName: text('candidate_name').notNull(),
+  humanScore: integer('human_score').notNull(), // 0-100
+  humanRecommendation: text('human_recommendation').notNull(), // 'STRONG_HIRE' | 'HIRE' | 'NO_HIRE'
+  aiScore: integer('ai_score').notNull(), // 0-100
+  aiRecommendation: text('ai_recommendation').notNull(),
+  interviewerId: text('interviewer_id'),
+  interviewerName: text('interviewer_name').notNull(),
+  variance: integer('variance').notNull(),
+  notes: text('notes'),
+  calibratedWeightsSnapshot: jsonb('calibrated_weights_snapshot'),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+}, (table) => [
+  index('idx_shadow_calibrations_job').on(table.jobId),
+]);
+
+export const eeoAudits = pgTable('eeo_audits', {
+  id: text('id').primaryKey(),
+  organizationId: text('organization_id').notNull(),
+  auditPeriod: text('audit_period').notNull(),
+  totalAssessed: integer('total_assessed').notNull(),
+  impactRatio: text('impact_ratio').notNull(),
+  passesFourFifthsRule: boolean('passes_four_fifths_rule').default(true).notNull(),
+  cohortMetrics: jsonb('cohort_metrics').notNull(),
+  certificateHash: text('certificate_hash').notNull(),
+  complianceStandard: text('compliance_standard').default('EEOC Title VII & EU AI Act Annex IV').notNull(),
+  generatedBy: text('generated_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull()
+});
 
 export const systemTelemetry = pgTable('system_telemetry', {
   id: text('id').primaryKey(),
@@ -459,4 +541,24 @@ export const candidateFeedbackSummaries = pgTable('candidate_feedback_summaries'
 }, (table) => [
   uniqueIndex('idx_candidate_feedback_app_unique').on(table.applicationId)
 ]);
+
+export const interviewSchedules = pgTable('interview_schedules', {
+  id: text('id').primaryKey(),
+  candidateId: text('candidate_id').notNull().references(() => candidates.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id').references(() => sessions.id, { onDelete: 'set null' }),
+  scheduledAt: timestamp('scheduled_at').notNull(),
+  endTime: timestamp('end_time').notNull(),
+  timezone: text('timezone').default('UTC').notNull(),
+  roundType: text('round_type').default('ai_technical').notNull(), // 'ai_technical' | 'hr_behavioral' | 'system_architecture' | 'cto_final'
+  status: text('status').default('confirmed').notNull(), // 'confirmed' | 'rescheduled' | 'cancelled' | 'completed'
+  notes: text('notes'),
+  calendarEventUid: text('calendar_event_uid'),
+  meetingLink: text('meeting_link'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_interview_schedules_cand').on(table.candidateId, table.status),
+  index('idx_interview_schedules_time').on(table.scheduledAt),
+]);
+
 

@@ -1,15 +1,115 @@
-import { CheckCircle2, PlayCircle, FileCheck2, Lightbulb, Flag, ShieldAlert } from 'lucide-react';
-import { useState } from 'react';
+import { CheckCircle2, PlayCircle, FileCheck2, Lightbulb, Flag, ShieldAlert, Calendar, Clock, ExternalLink } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { Skeleton } from './ui/Skeleton';
 
-export default function Dashboard({ candidate, session, resumeText, onResumeSession }: { candidate: any, session: any, resumeText?: string | null, onResumeSession: () => void }) {
+export default function Dashboard({ 
+  candidate, 
+  session, 
+  resumeText, 
+  onResumeSession,
+  onOpenSchedule
+}: { 
+  candidate: any; 
+  session: any; 
+  resumeText?: string | null; 
+  onResumeSession: () => void;
+  onOpenSchedule?: () => void;
+}) {
   const isComplete = session?.currentStage === 'dashboard' || session?.status === 'completed';
   const [showPreview, setShowPreview] = useState(false);
+  const [scheduledSlot, setScheduledSlot] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (!candidate?.id) return;
+    const token = localStorage.getItem('ravengard_uid') || candidate?.id;
+    fetch(`/api/candidate/scheduling/my-schedule?candidateId=${encodeURIComponent(candidate?.id)}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.schedules) {
+          const active = d.schedules.find((s: any) => s.status === 'confirmed' && new Date(s.scheduledAt) > new Date());
+          setScheduledSlot(active || null);
+        }
+      })
+      .catch(() => {});
+  }, [candidate?.id]);
 
   return (
     <div className="max-w-[900px] mx-auto w-full">
-      <h1 className="text-3xl font-semibold mb-2 text-white">Command Center</h1>
-      <p className="text-white/50 mb-8 font-mono text-xs tracking-wider uppercase">CANDIDATE: {candidate.name}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-semibold mb-1 text-white">Command Center</h1>
+          <p className="text-white/50 font-mono text-xs tracking-wider uppercase">CANDIDATE: {candidate.name}</p>
+        </div>
+        {onOpenSchedule && (
+          <button
+            onClick={onOpenSchedule}
+            className="self-start sm:self-auto bg-slate-900/80 hover:bg-slate-800 text-white text-xs font-mono uppercase tracking-wider px-4 py-2.5 rounded-lg border border-slate-700/80 hover:border-violet-500/50 flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+          >
+            <Calendar className="w-3.5 h-3.5 text-violet-400" />
+            {scheduledSlot ? 'Manage Scheduled Slot' : 'Calendar Scheduling'}
+          </button>
+        )}
+      </div>
+
+      {/* Calendar Scheduled Appointment Banner (if booked) */}
+      {scheduledSlot && (
+        <div className="glass-panel p-6 rounded-xl border border-emerald-500/30 bg-emerald-950/20 mb-6 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                <Calendar className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-300 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded">
+                  Scheduled Assessment Confirmed
+                </span>
+                <p className="text-white text-sm font-medium mt-1 font-mono">
+                  {new Date(scheduledSlot.scheduledAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} at{' '}
+                  {new Date(scheduledSlot.scheduledAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
+                </p>
+                <p className="text-slate-400 text-xs mt-0.5">
+                  Track: <strong className="text-slate-200 capitalize">{scheduledSlot.roundType.replace('_', ' ')}</strong> (45 Mins) • Timezone: {scheduledSlot.timezone}
+                </p>
+              </div>
+            </div>
+            {onOpenSchedule && (
+              <button
+                onClick={onOpenSchedule}
+                className="text-xs font-mono uppercase tracking-wider bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-emerald-800/40 px-3.5 py-2 rounded-lg transition-colors cursor-pointer self-start sm:self-auto"
+              >
+                Change Slot
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Persistent Scheduling Promotion Card if not yet booked */}
+      {!scheduledSlot && onOpenSchedule && (
+        <div className="glass-panel p-6 rounded-xl border border-violet-500/20 bg-violet-950/10 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-9 h-9 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0 mt-0.5">
+              <Calendar className="w-4 h-4 text-violet-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-white">Interview Calendar Scheduling</h3>
+              <p className="text-slate-400 text-xs mt-0.5 max-w-lg leading-relaxed">
+                Need to plan ahead? Pick from verified 45-minute enterprise assessment windows to take your interview at a convenient time.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onOpenSchedule}
+            className="text-xs font-mono uppercase tracking-wider bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg transition-all shadow-sm shrink-0 cursor-pointer"
+          >
+            Select Slot
+          </button>
+        </div>
+      )}
+
 
       {session && !isComplete && (
         <div className="glass-panel p-8 rounded-xl border border-[var(--color-primary)]/30 shadow-[0_0_30px_rgba(139,92,246,0.1)] mb-8 relative overflow-hidden group">

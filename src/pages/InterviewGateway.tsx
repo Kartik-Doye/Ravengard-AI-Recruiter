@@ -16,6 +16,7 @@ import Dashboard from '../components/Dashboard';
 import Layout from '../components/Layout';
 import ErrorBoundary from '../components/ErrorBoundary';
 import CommandPalette from '../components/CommandPalette';
+import CalendarScheduler from '../components/interview/CalendarScheduler';
 import { Skeleton } from '../components/ui/Skeleton';
 import { ApiTimeoutFallback } from "../components/layout/ApiTimeoutFallback";
 import { useToast } from '../contexts/ToastContext';
@@ -35,25 +36,34 @@ export default function InterviewGateway() {
   const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const isInterviewSubRoute = location.pathname.startsWith('/interview/') && location.pathname !== '/interview/dashboard';
+  const isScheduleRoute = location.pathname === '/interview/schedule';
+  const isInterviewSubRoute = location.pathname.startsWith('/interview/') && location.pathname !== '/interview/dashboard' && !isScheduleRoute;
   const initialStage = location.pathname.includes('/consent') ? 'consent' : 'welcome';
   const [preSessionStage, setPreSessionStage] = useState<'welcome' | 'consent'>(initialStage);
   const [resumeText, setResumeText] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<'dashboard' | 'session'>(() => isInterviewSubRoute ? 'session' : 'dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'session' | 'schedule'>(() => isScheduleRoute ? 'schedule' : (isInterviewSubRoute ? 'session' : 'dashboard'));
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   
   // Flag to ensure session resumption toast executes exactly once across mounts/renders
   const hasRestoredRef = useRef(false);
   
   useEffect(() => {
-    if (activeSession?.locked && activeSession?.status === 'active') {
+    if (location.pathname === '/interview/schedule') {
+      setCurrentView('schedule');
+    } else if (location.pathname === '/interview/dashboard') {
+      setCurrentView('dashboard');
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (activeSession?.locked && activeSession?.status === 'active' && !isScheduleRoute) {
       setCurrentView('session');
       if (!hasRestoredRef.current) {
         hasRestoredRef.current = true;
         addToast('info', 'Resuming session...');
       }
     }
-  }, [activeSession?.id, activeSession?.locked, activeSession?.status]);
+  }, [activeSession?.id, activeSession?.locked, activeSession?.status, isScheduleRoute]);
 
   useEffect(() => {
     const uid = localStorage.getItem('ravengard_uid');
@@ -92,7 +102,9 @@ export default function InterviewGateway() {
         setResumeText(data.resumeText || null);
         
         if (!silent) {
-          if (data.activeSession?.locked && data.activeSession?.status === 'active') {
+          if (location.pathname === '/interview/schedule') {
+            setCurrentView('schedule');
+          } else if (data.activeSession?.locked && data.activeSession?.status === 'active') {
             setCurrentView('session');
             if (!hasRestoredRef.current) {
               hasRestoredRef.current = true;
@@ -169,7 +181,7 @@ export default function InterviewGateway() {
   
   const { activeStage } = useInterviewFlow(
     currentView === 'session' ? effectiveSession : null,
-    loading || !user || !candidate || currentView === 'dashboard'
+    loading || !user || !candidate || currentView !== 'session'
   );
 
   if (isTimeout) {
@@ -250,7 +262,7 @@ export default function InterviewGateway() {
     }
   };
 
-  const displayStage = currentView === 'dashboard' ? 'dashboard' : activeStage;
+  const displayStage = currentView === 'dashboard' ? 'dashboard' : (currentView === 'schedule' ? 'schedule' : activeStage);
 
   return (
     <ErrorBoundary>
@@ -258,17 +270,21 @@ export default function InterviewGateway() {
         isOpen={isCommandPaletteOpen} 
         setIsOpen={setIsCommandPaletteOpen} 
         onNavigate={(view: any) => {
-          if (view === 'dashboard' && activeSession?.locked && activeSession?.status === 'active') {
+          if (view === 'schedule') {
+            setCurrentView('schedule');
+            navigate('/interview/schedule');
+            addToast('info', 'Switched to interview scheduling.');
+          } else if (view === 'dashboard' && activeSession?.locked && activeSession?.status === 'active') {
             setCurrentView('session');
             addToast('info', 'Switched to active session.');
           } else if (view === 'dashboard') {
             setCurrentView('dashboard');
+            navigate('/interview/dashboard');
             addToast('info', 'Switched to dashboard.');
           } else {
-            addToast('error', 'Navigation to ' + view + ' is part of Phase 2!');
+            addToast('error', 'Navigation to ' + view + ' is not available.');
           }
         }}
-        
       />
       
       <Layout 
@@ -276,14 +292,37 @@ export default function InterviewGateway() {
         session={activeSession} 
         currentStageName={displayStage}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-        onPauseSession={() => setCurrentView('dashboard')}
-        onBackStep={activeStage !== 'welcome' ? handleBackStep : undefined}
+        onPauseSession={() => {
+          setCurrentView('dashboard');
+          navigate('/interview/dashboard');
+        }}
+        onOpenSchedule={() => {
+          setCurrentView('schedule');
+          navigate('/interview/schedule');
+        }}
+        onBackStep={activeStage !== 'welcome' && currentView === 'session' ? handleBackStep : undefined}
       >
-        {currentView === 'dashboard' ? (
+        {currentView === 'schedule' ? (
+          <CalendarScheduler
+            candidate={candidate}
+            session={activeSession}
+            onBack={() => {
+              setCurrentView('dashboard');
+              navigate('/interview/dashboard');
+            }}
+            onSlotBooked={() => {
+              addToast('success', 'Assessment slot reserved and synced to database.');
+            }}
+          />
+        ) : currentView === 'dashboard' ? (
           <Dashboard
             candidate={candidate}
             session={activeSession}
             resumeText={resumeText}
+            onOpenSchedule={() => {
+              setCurrentView('schedule');
+              navigate('/interview/schedule');
+            }}
             onResumeSession={() => {
               setCurrentView('session');
               if (!hasRestoredRef.current) {
@@ -294,6 +333,7 @@ export default function InterviewGateway() {
           />
         ) : (
           <Routes>
+             <Route path="schedule" element={<CalendarScheduler candidate={candidate} session={activeSession} onBack={() => { setCurrentView('dashboard'); navigate('/interview/dashboard'); }} />} />
              <Route path="welcome" element={<ProtectedRoute activeSession={effectiveSession} loading={loading} allowedStage="welcome"><Welcome onNext={(session) => { if(session.currentStage === 'consent') setPreSessionStage('consent'); else setActiveSession(session); setCurrentView('session'); }} candidate={candidate} /></ProtectedRoute>} />
              <Route path="consent" element={<ProtectedRoute activeSession={effectiveSession} loading={loading} allowedStage="consent"><Consent session={effectiveSession} onNext={(session) => { setActiveSession(session); setCurrentView('session'); }} /></ProtectedRoute>} />
              <Route path="upload" element={<ProtectedRoute activeSession={effectiveSession} loading={loading} allowedStage={["resume", "resume_upload"]}><ResumeUpload session={activeSession} onNext={(session, text) => { setActiveSession(session); if (text) setResumeText(text); setCurrentView('session'); }} /></ProtectedRoute>} />

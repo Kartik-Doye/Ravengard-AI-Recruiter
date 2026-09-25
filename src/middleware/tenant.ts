@@ -19,7 +19,8 @@ export interface HrAuthRequest extends AuthRequest {
     id: string;
     email: string;
     name: string;
-    role: "hr_admin" | "hr_user" | "recruiter" | "hiring_manager" | "super_admin" | "admin";
+    role: "hr_admin" | "hr_user" | "recruiter" | "hiring_manager" | "technical_interviewer" | "finance_approver" | "super_admin" | "admin";
+    department: string;
     organizationId: string;
   };
   candidate?: CandidateTokenPayload;
@@ -60,17 +61,32 @@ export const requireHrAuth = async (
       return res.status(403).json({ error: "Forbidden: Account not registered for HR or Admin access." });
     }
 
-    const role = userRecord.role;
-    const isSuperAdmin = role === "super_admin" || role === "admin";
-    const isHr =
-      role === "hr_admin" ||
-      role === "hr_user" ||
-      role === "recruiter" ||
-      role === "hiring_manager";
+    const rawRole = userRecord.role;
+    const isSuperAdmin = rawRole === "super_admin" || rawRole === "admin";
+    const allowedRoles = [
+      "super_admin",
+      "admin",
+      "hr_admin",
+      "hr_user",
+      "recruiter",
+      "hiring_manager",
+      "technical_interviewer",
+      "finance_approver",
+    ];
 
-    if (!isSuperAdmin && !isHr) {
+    if (!allowedRoles.includes(rawRole)) {
       return res.status(403).json({ error: "Forbidden: Insufficient privileges for HR portal." });
     }
+
+    // Role & Department Emulation for testing granular RBAC in the switcher toolbar
+    const emulatedRole = req.headers["x-emulated-role"] ? String(req.headers["x-emulated-role"]) : null;
+    const emulatedDept = req.headers["x-emulated-department"] ? String(req.headers["x-emulated-department"]) : null;
+
+    const effectiveRole = emulatedRole && allowedRoles.includes(emulatedRole)
+      ? emulatedRole
+      : (isSuperAdmin ? "super_admin" : rawRole);
+
+    const effectiveDept = emulatedDept || userRecord.department || "Engineering";
 
     // For super admins, allow tenant switching via header if provided; otherwise default to user's org or org-ravengard
     let activeOrgId = userRecord.organizationId || "org-ravengard";
@@ -86,7 +102,8 @@ export const requireHrAuth = async (
       id: userRecord.id,
       email: userRecord.email,
       name: userRecord.name,
-      role: (isSuperAdmin ? "super_admin" : role) as any,
+      role: effectiveRole as any,
+      department: effectiveDept,
       organizationId: activeOrgId,
     };
 

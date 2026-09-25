@@ -344,4 +344,131 @@ paths:
                         createdAt:
                           type: string
                           format: date-time
+
+  /candidate/scheduling/slots:
+    get:
+      summary: Query Available Calendar Slots
+      description: Returns available 45-minute enterprise interview slots across upcoming weekdays, filtering out booked slots.
+      parameters:
+        - in: query
+          name: days
+          schema:
+            type: integer
+            default: 14
+        - in: query
+          name: timezone
+          schema:
+            type: string
+            default: UTC
+        - in: query
+          name: roundType
+          schema:
+            type: string
+            default: ai_technical
+      responses:
+        '200':
+          description: Slots retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  timezone:
+                    type: string
+                    example: America/New_York
+                  days:
+                    type: array
+                    items:
+                      type: object
+                  slots:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        date:
+                          type: string
+                        startTime:
+                          type: string
+                        endTime:
+                          type: string
+                        isAvailable:
+                          type: boolean
+
+  /candidate/scheduling/book:
+    post:
+      summary: Reserve and Persist Interview Slot
+      description: Reserves a selected calendar slot for the candidate and saves it to the database with conflict detection and iCal generation.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - scheduledAt
+              properties:
+                candidateId:
+                  type: string
+                sessionId:
+                  type: string
+                scheduledAt:
+                  type: string
+                  format: date-time
+                endTime:
+                  type: string
+                  format: date-time
+                timezone:
+                  type: string
+                  example: America/New_York
+                roundType:
+                  type: string
+                  example: ai_technical
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Slot reserved and persisted successfully
+        '409':
+          description: Slot conflict - slot is already reserved
+
+  /candidate/scheduling/my-schedule:
+    get:
+      summary: Get Candidate Scheduled Appointments
+      description: Returns active and past interview reservations for the authenticated candidate.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Scheduled appointments retrieved successfully
+
+  /candidate/scheduling/cancel:
+    post:
+      summary: Cancel Scheduled Interview Appointment
+      description: Releases a reserved slot and marks the schedule record as cancelled.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - scheduleId
+              properties:
+                scheduleId:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Appointment successfully cancelled
 ```
+

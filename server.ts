@@ -27,6 +27,7 @@ import { candidatePortalRouter } from "./src/routes/candidatePortal";
 import { publicJobsRouter } from "./src/routes/publicJobs";
 import { integrationsRouter } from "./src/routes/integrationsRouter";
 import { authRouter } from "./src/routes/auth";
+import { schedulingRouter } from "./src/routes/scheduling";
 import { processOutboxBatch } from "./src/services/outboxWorker";
 import { preScreeningService } from "./src/services/preScreeningService";
 import { emailService } from "./src/services/emailService";
@@ -40,8 +41,9 @@ import { healthCheckRouter } from "./src/healthCheck";
 import { requestLogger } from "./src/middleware/requestLogger";
 import { errorHandler } from "./src/middleware/errorHandler";
 import { requireTenantQuota } from "./src/middleware/requireTenantQuota";
-import { logger } from "./src/utils/logger";
 import cookieParser from "cookie-parser";
+import { enterpriseAuditInterceptor } from "./src/services/enterpriseAuditService";
+import { llmDatabaseSafetyGuard } from "./src/middleware/llmDatabaseSafetyGuard";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -141,8 +143,71 @@ const globalLimiter = rateLimit({
 
 
 app.use(globalLimiter);
+app.use("/api", llmDatabaseSafetyGuard);
 // We don't apply adminLimiter globally, we'll apply it to a new /api/admin router later, or directly to routes starting with /api/admin.
 app.use("/api/admin", adminLimiter);
+
+// ─── Super Admin Setup Token Exchange Endpoint ──────────────────────────────
+app.post("/api/auth/setup-admin", async (req, res) => {
+  try {
+    const { token, email, newPassword } = req.body || {};
+    const targetEmail = String(email || "madhunand@gmail.com").trim().toLowerCase();
+
+    if (!token || typeof token !== "string" || !token.trim()) {
+      return res.status(400).json({ success: false, error: "Setup token is required." });
+    }
+    if (!newPassword || typeof newPassword !== "string" || newPassword.length < 8) {
+      return res.status(400).json({ success: false, error: "New password must be at least 8 characters long." });
+    }
+
+    const [adminRecord] = await db.select().from(adminUsers).where(eq(adminUsers.email, targetEmail)).limit(1);
+    if (!adminRecord) {
+      return res.status(404).json({ success: false, error: "Target administrator account not found." });
+    }
+
+    // Verify setup token
+    if (adminRecord.setupToken && adminRecord.setupToken !== token.trim()) {
+      return res.status(401).json({ success: false, error: "Invalid or expired setup token." });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    const [updated] = await db.update(adminUsers)
+      .set({
+        passwordHash: newHash,
+        setupToken: null // Invalidate setup token upon first use
+      })
+      .where(eq(adminUsers.email, targetEmail))
+      .returning();
+
+    const orgId = updated.organizationId || "org-ravengard";
+    const jwtToken = signAdminToken({
+      id: updated.id,
+      email: updated.email,
+      role: updated.role,
+      organizationId: orgId
+    });
+
+    console.log(`[AUTH] Super Admin password configured successfully for ${targetEmail}`);
+
+    return res.json({
+      success: true,
+      message: "Super Admin credentials initialized successfully.",
+      token: jwtToken,
+      admin: {
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        role: updated.role,
+        department: updated.department,
+        organizationId: orgId
+      }
+    });
+  } catch (err: any) {
+    console.error("Admin setup token error:", err);
+    return res.status(500).json({ success: false, error: "Failed to configure admin credentials." });
+  }
+});
+
 app.post("/api/admin/login", async (req, res) => {
   const body = req.body || {};
   const identifier = String(body.email || body.username || "").trim().toLowerCase();
@@ -339,10 +404,12 @@ app.post("/api/auth/candidate-mock-login", async (req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/admin/telemetry", telemetryRouter);
-app.use("/api/admin", adminRoutes);
+app.use("/api/admin", enterpriseAuditInterceptor, adminRoutes);
 app.use("/api/candidate", candidatePortalRouter);
 app.use("/api/candidate", candidateRoutes);
-app.use("/api/hr", hrRouter);
+app.use("/api/candidate/scheduling", schedulingRouter);
+app.use("/api/scheduling", schedulingRouter);
+app.use("/api/hr", enterpriseAuditInterceptor, hrRouter);
 app.use("/api/v1/integrations", integrationsRouter);
 app.use("/api/candidate/portal", candidatePortalRouter);
 app.use("/api/jobs", publicJobsRouter);
@@ -1246,16 +1313,38 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
         metadata: JSON.stringify(enrichedMeta)
       });
 
-      // If suspicious proxy/vpn detected, flag session asynchronously for review
+      const { AntiCheatService } = await import("./src/services/antiCheatService");
+      const evaluation = AntiCheatService.evaluateSignal({
+        sessionId,
+        interviewSessionId,
+        signalType,
+        metadata: typeof metadata === 'object' ? metadata : { raw: metadata }
+      });
+
+      // If suspicious proxy/vpn or high-risk secondary-device / keystroke forensics detected, flag session asynchronously
+      let flagReasonText: string | null = evaluation.flagReason;
       if (proxyReputation?.isProxyOrVpn) {
+        flagReasonText = 'Suspicious proxy/VPN connection detected during candidate interview session';
+      }
+
+      if (flagReasonText) {
         await db.update(sessions).set({
           flagged: true,
-          flagReason: 'Suspicious proxy/VPN connection detected during candidate interview session'
+          flagReason: flagReasonText
         }).where(eq(sessions.id, sessionId));
       }
 
-      // Non-blocking response to maintain candidate flow
-      res.json({ success: true, logged: true, signalId });
+      // Non-blocking response to maintain candidate flow, returning evaluation metrics
+      res.json({
+        success: true,
+        logged: true,
+        signalId,
+        evaluation: {
+          riskLevel: evaluation.riskLevel,
+          recommendedAction: evaluation.recommendedAction,
+          adaptiveProbePrompt: evaluation.recommendedAction === 'PROBE_RAPIDLY' ? AntiCheatService.generateRapidProbeQuestion() : null
+        }
+      });
     } catch (error: any) {
       console.error("Failed to log integrity signal:", error);
       res.status(500).json({ error: "Failed to log signal" });

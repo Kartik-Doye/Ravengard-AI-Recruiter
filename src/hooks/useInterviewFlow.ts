@@ -29,8 +29,9 @@ export function useInterviewFlow(activeSession: any, loading: boolean) {
   const enforceFlow = useCallback(() => {
     if (loading || !activeSession) return;
     
-    // If we're on a route that doesn't match our allowed stage, redirect
-    if (location.pathname !== expectedRoute && location.pathname.startsWith('/interview')) {
+    // Exempt non-stage routes like schedule and dashboard
+    const isExempt = location.pathname === '/interview/dashboard' || location.pathname === '/interview/schedule';
+    if (!isExempt && location.pathname !== expectedRoute && location.pathname.startsWith('/interview')) {
       navigate(expectedRoute, { replace: true });
     }
   }, [activeStage, loading, location.pathname, expectedRoute, navigate, !activeSession]);

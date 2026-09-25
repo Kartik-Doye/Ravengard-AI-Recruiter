@@ -1,5 +1,5 @@
 import { ReactNode, useState } from 'react';
-import { HelpCircle, Hexagon, ArrowLeft } from 'lucide-react';
+import { HelpCircle, Hexagon, ArrowLeft, Calendar } from 'lucide-react';
 import { motion } from 'motion/react';
 import { transitions, variants } from '../theme/motion';
 import { Modal } from './ui/Modal';
@@ -14,15 +14,16 @@ interface LayoutProps {
   onOpenCommandPalette?: () => void;
   onPauseSession?: () => void;
   onBackStep?: () => void;
+  onOpenSchedule?: () => void;
 }
 
-export default function Layout({ children, candidate, session, currentStageName, onOpenCommandPalette, onPauseSession, onBackStep }: LayoutProps) {
+export default function Layout({ children, candidate, session, currentStageName, onOpenCommandPalette, onPauseSession, onBackStep, onOpenSchedule }: LayoutProps) {
   const currentStage = session?.currentStage || currentStageName || 'welcome';
   const status = session?.status || 'none';
   
   const [showExitModal, setShowExitModal] = useState(false);
 
-  const stages = ['registration', 'welcome', 'consent', 'resume', 'instructions', 'device_check', 'waiting_room', 'interview_hr_friendly', 'dashboard'];
+  const stages = ['registration', 'welcome', 'consent', 'resume', 'instructions', 'device_check', 'waiting_room', 'interview_hr_friendly', 'dashboard', 'schedule'];
   const currentIndex = stages.indexOf(currentStage);
   const progressPercentage = Math.max(0, Math.min(100, ((currentIndex + 1) / stages.length) * 100));
 
@@ -52,6 +53,18 @@ export default function Layout({ children, candidate, session, currentStageName,
                   className="text-slate-400 hover:text-white font-mono uppercase tracking-widest text-xs py-1.5 px-3"
                 >
                   Dashboard
+                </Button>
+              </div>
+            )}
+            {onOpenSchedule && (
+              <div className="ml-2">
+                <Button 
+                  variant={currentStageName === 'schedule' ? 'secondary' : 'ghost'} 
+                  onClick={onOpenSchedule}
+                  className="text-slate-300 hover:text-white font-mono uppercase tracking-widest text-xs py-1.5 px-3 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Calendar className="w-3.5 h-3.5 text-violet-400" />
+                  Schedule
                 </Button>
               </div>
             )}
@@ -98,7 +111,8 @@ export default function Layout({ children, candidate, session, currentStageName,
               <NavItem label="Device Check" active={currentStage === 'device_check'} completed={currentIndex > stages.indexOf('device_check')} />
               <NavItem label="Waiting Room" active={currentStage === 'waiting_room'} completed={currentIndex > stages.indexOf('waiting_room')} />
               <NavItem label="Interview" active={currentStage.startsWith('interview_')} completed={currentIndex > stages.indexOf('interview_hr_friendly')} />
-              <NavItem label="Dashboard" active={currentStage === 'dashboard'} completed={false} />
+              <NavItem label="Dashboard" active={currentStage === 'dashboard'} completed={false} onClick={onPauseSession} />
+              <NavItem label="Schedule Interview" active={currentStage === 'schedule'} completed={false} onClick={onOpenSchedule} />
             </nav>
           </div>
           <div className="mt-auto pt-6 border-t border-slate-800/80">
@@ -155,7 +169,7 @@ export default function Layout({ children, candidate, session, currentStageName,
   );
 }
 
-function NavItem({ label, active, completed }: { label: string, active: boolean, completed: boolean }) {
+function NavItem({ label, active, completed, onClick }: { label: string, active: boolean, completed: boolean, onClick?: () => void }) {
   let colorClass = "text-slate-400 hover:text-slate-200 hover:bg-white/5";
   let bgClass = "bg-transparent";
   let dotClass = "bg-slate-600";
@@ -170,9 +184,13 @@ function NavItem({ label, active, completed }: { label: string, active: boolean,
   }
 
   return (
-    <div className={`flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm transition-all duration-200 ${colorClass} ${bgClass}`}>
+    <div 
+      onClick={onClick}
+      className={`flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm transition-all duration-200 ${colorClass} ${bgClass} ${onClick ? 'cursor-pointer' : ''}`}
+    >
       <div className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${dotClass}`}></div>
       <span className="tracking-wide text-xs">{label}</span>
     </div>
   );
 }
+

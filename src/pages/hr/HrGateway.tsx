@@ -5,6 +5,10 @@ import HrAtsPipeline from './HrAtsPipeline';
 import HrCandidateDossier from './HrCandidateDossier';
 import HrComparisonMatrix from './HrComparisonMatrix';
 import { HrJobsPage } from './HrJobsPage';
+import { RoleDepartmentSwitcher } from '../../components/admin/RoleDepartmentSwitcher';
+import { AuditLogViewer } from '../../components/admin/AuditLogViewer';
+import { BiasImmunityCenter } from '../../components/hr/BiasImmunityCenter';
+import { ShadowCalibrationDashboard } from '../../components/hr/ShadowCalibrationDashboard';
 import {
   Building2,
   LogOut,
@@ -15,6 +19,9 @@ import {
   GitCompare,
   Key,
   Shield,
+  Lock,
+  Scale,
+  Sliders,
 } from 'lucide-react';
 
 interface HrUser {
@@ -106,8 +113,11 @@ export default function HrGateway() {
 
   const navLinks = [
     { label: 'ATS Pipeline', path: '/hr', icon: LayoutDashboard },
-    { label: 'Job Postings', path: '/hr/jobs', icon: Briefcase },
-    { label: 'Comparison', path: '/hr/comparison', icon: GitCompare },
+    { label: 'Requisitions & Approvals', path: '/hr/jobs', icon: Briefcase },
+    { label: 'Comparison & Blind Review', path: '/hr/comparison', icon: GitCompare },
+    { label: 'Audit Trail', path: '/hr/audit', icon: Lock },
+    { label: 'Bias Immunity', path: '/hr/eeo', icon: Scale },
+    { label: 'Shadow Calibration', path: '/hr/calibration', icon: Sliders },
     { label: 'API & Integrations', path: '/hr/integrations', icon: Key },
   ];
 
@@ -127,8 +137,11 @@ export default function HrGateway() {
       {/* Subtle ambient lighting matching homepage */}
       <div className="absolute top-0 right-0 w-full h-[500px] bg-[radial-gradient(circle_at_top,rgba(120,140,255,0.08),transparent_60%)] pointer-events-none z-0" />
 
+      {/* Interactive Role & Department Switcher Toolbar */}
+      <RoleDepartmentSwitcher />
+
       {/* Top Navigation Bar */}
-      <header className="border-b border-slate-800 px-6 py-3.5 bg-slate-900/60 backdrop-blur-xl sticky top-0 z-50">
+      <header className="border-b border-slate-800 px-6 py-3.5 bg-slate-900/60 backdrop-blur-xl sticky top-[41px] z-30">
         <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
           <div className="flex items-center gap-6">
             {/* Brand */}
@@ -147,7 +160,7 @@ export default function HrGateway() {
             </Link>
 
             {/* Navigation */}
-            <nav className="hidden md:flex items-center gap-1.5 text-xs font-mono">
+            <nav className="hidden xl:flex items-center gap-1.5 text-xs font-mono">
               {navLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive =
@@ -158,7 +171,7 @@ export default function HrGateway() {
                   <Link
                     key={link.path}
                     to={link.path}
-                    className={`px-3.5 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-full transition-all duration-200 flex items-center gap-1.5 ${
                       isActive
                         ? 'bg-white text-slate-950 font-semibold shadow-sm'
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
@@ -210,6 +223,31 @@ export default function HrGateway() {
             </button>
           </div>
         </div>
+
+        {/* Mobile / Tablet Nav overflow */}
+        <div className="flex xl:hidden overflow-x-auto py-2 gap-1.5 text-xs font-mono border-t border-white/5 mt-2">
+          {navLinks.map((link) => {
+            const Icon = link.icon;
+            const isActive =
+              link.path === '/hr'
+                ? location.pathname === '/hr' || location.pathname === '/hr/'
+                : location.pathname.startsWith(link.path);
+            return (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                  isActive
+                    ? 'bg-white text-slate-950 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {link.label}
+              </Link>
+            );
+          })}
+        </div>
       </header>
 
       {/* Main Content */}
@@ -219,6 +257,9 @@ export default function HrGateway() {
           <Route path="/jobs" element={<HrJobsPage />} />
           <Route path="/candidates/:id" element={<HrCandidateDossier />} />
           <Route path="/comparison" element={<HrComparisonMatrix />} />
+          <Route path="/audit" element={<AuditLogViewer />} />
+          <Route path="/eeo" element={<BiasImmunityCenter />} />
+          <Route path="/calibration" element={<ShadowCalibrationDashboard />} />
           <Route path="/integrations" element={<HrIntegrationsPlaceholder />} />
           <Route path="*" element={<Navigate to="/hr" replace />} />
         </Routes>

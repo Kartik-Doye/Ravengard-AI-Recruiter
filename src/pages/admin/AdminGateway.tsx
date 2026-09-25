@@ -12,6 +12,7 @@ import { JobsPage } from './JobsPage';
 import { JobApprovalGate } from './JobApprovalGate';
 import { AdminTelemetryDashboard } from './AdminTelemetryDashboard';
 import { ApiSettings } from '../../components/admin/ApiSettings';
+import { AdminSettings } from './AdminSettings';
 import { ShieldCheck, LogOut, ArrowLeft } from 'lucide-react';
 import { AdminLayout } from '../../components/layout/AdminLayout';
 
@@ -95,6 +96,7 @@ export default function AdminGateway() {
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/flags" element={<FlagQueue />} />
           <Route path="/api-settings" element={<ApiSettings />} />
+          <Route path="/settings" element={<AdminSettings />} />
           <Route path="/sessions/:id" element={<SessionDetail />} />
           <Route path="/session/:id" element={<SessionDetail />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />

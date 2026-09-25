@@ -30,6 +30,7 @@ export function AdminLayout({
     { label: 'Scorecards & Reports', path: '/admin/reports' },
     { label: 'Flagged Review Queue', path: '/admin/flags' },
     { label: 'API & Integrations', path: '/admin/api-settings' },
+    { label: 'Settings & Security', path: '/admin/settings' },
   ];
 
   const links = navLinks || defaultLinks;

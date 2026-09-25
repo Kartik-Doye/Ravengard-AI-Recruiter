@@ -8,18 +8,65 @@ interface AdminLoginProps {
 }
 
 export default function AdminLogin({ onSuccess }: AdminLoginProps) {
-  const [activeTab, setActiveTab] = useState<'password' | 'sso'>('password');
-  const [roleMode, setRoleMode] = useState<'HR' | 'ADMIN'>('HR');
-  const [username, setUsername] = useState('hr@ravengard.com');
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const searchParams = new URLSearchParams(location.search);
+  const initialToken = searchParams.get('token') || '';
+
+  const [activeTab, setActiveTab] = useState<'password' | 'sso' | 'setup'>(initialToken ? 'setup' : 'password');
+  const [roleMode, setRoleMode] = useState<'HR' | 'ADMIN'>('ADMIN');
+  const [username, setUsername] = useState('madhunand@gmail.com');
   const [password, setPassword] = useState('admin123');
+  const [setupTokenInput, setSetupTokenInput] = useState(initialToken);
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [setupSuccess, setSetupSuccess] = useState<string | null>(null);
   const [ssoDomain, setSsoDomain] = useState('ravengard.com');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ssoLoading, setSsoLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
+
+  const handleSetupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/setup-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: username.trim(),
+          token: setupTokenInput.trim(),
+          newPassword: newAdminPassword.trim()
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.token) {
+        setSetupSuccess('Super Admin password set successfully! Redirecting...');
+        localStorage.setItem('ravengard_admin_token', data.token);
+        localStorage.setItem('ravengard_hr_token', data.token);
+        if (data.admin) {
+          localStorage.setItem('ravengard_admin_user', JSON.stringify(data.admin));
+          localStorage.setItem('ravengard_hr_user', JSON.stringify(data.admin));
+        }
+        onSuccess(data.token);
+        setTimeout(() => {
+          navigate('/admin', { replace: true });
+        }, 1200);
+      } else {
+        setError(data.error || 'Failed to verify setup token.');
+      }
+    } catch (err: any) {
+      console.error('Setup token exchange error:', err);
+      setError('Unable to verify setup token with the server.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRoleSelect = (mode: 'HR' | 'ADMIN') => {
     setRoleMode(mode);
@@ -204,6 +251,18 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
               <Globe className="w-3.5 h-3.5 text-slate-300" />
               <span>Enterprise SSO</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('setup')}
+              className={`pb-2.5 px-3 font-medium border-b-2 transition-colors flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'setup'
+                  ? 'border-purple-400 text-purple-300 font-semibold'
+                  : 'border-transparent text-slate-400 hover:text-purple-300'
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5 text-purple-400" />
+              <span>Setup Token</span>
+            </button>
           </div>
 
           {error && (
@@ -213,7 +272,67 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
             </div>
           )}
 
-          {activeTab === 'password' ? (
+          {setupSuccess && (
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-start gap-2.5 text-emerald-300 text-xs">
+              <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <span>{setupSuccess}</span>
+            </div>
+          )}
+
+          {activeTab === 'setup' ? (
+            <form onSubmit={handleSetupSubmit} className="space-y-4">
+              <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30 text-xs text-purple-200">
+                Enter your startup auto-generated setup token to initialize permanent Super Admin credentials for <strong className="text-white">madhunand@gmail.com</strong>.
+              </div>
+              <div>
+                <label className="block text-[11px] font-mono text-slate-300 uppercase tracking-wider mb-1.5">
+                  Super Admin Email
+                </label>
+                <input
+                  type="email"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="w-full bg-slate-900/60 border border-slate-800 text-white px-3.5 py-2.5 rounded-xl text-sm focus:outline-none focus:border-purple-400"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-mono text-slate-300 uppercase tracking-wider mb-1.5">
+                  Setup Token
+                </label>
+                <input
+                  type="text"
+                  value={setupTokenInput}
+                  onChange={(e) => setSetupTokenInput(e.target.value)}
+                  placeholder="Paste 32-character crypto setup token"
+                  required
+                  className="w-full bg-slate-900/60 border border-slate-800 text-white px-3.5 py-2.5 rounded-xl text-sm font-mono focus:outline-none focus:border-purple-400 placeholder:text-slate-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-mono text-slate-300 uppercase tracking-wider mb-1.5">
+                  Choose Permanent Password
+                </label>
+                <input
+                  type="password"
+                  value={newAdminPassword}
+                  onChange={(e) => setNewAdminPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  required
+                  minLength={8}
+                  className="w-full bg-slate-900/60 border border-slate-800 text-white px-3.5 py-2.5 rounded-xl text-sm focus:outline-none focus:border-purple-400 placeholder:text-slate-500"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold font-mono flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-purple-950/30 disabled:opacity-50"
+              >
+                {loading ? 'Verifying Token...' : 'Initialize & Sign In as Super Admin'}
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          ) : activeTab === 'password' ? (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-[11px] font-mono text-slate-300 uppercase tracking-wider mb-1.5">
