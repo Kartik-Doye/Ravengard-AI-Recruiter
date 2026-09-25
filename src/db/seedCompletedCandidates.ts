@@ -58,9 +58,10 @@ export async function seedCompletedCandidatesAndAdmin() {
     }
 
     // 1. Ensure Primary Super Admin (madhunand@gmail.com) and Persona Accounts exist
+    const { AdminSetupService } = await import("../services/adminSetupService");
     const superAdminEmail = 'madhunand@gmail.com';
     const hasExplicitPass = Boolean(process.env.SUPER_ADMIN_INIT_PASSWORD);
-    const autoSetupToken = crypto.randomBytes(16).toString('hex');
+    const autoSetupToken = AdminSetupService.generateSetupToken(superAdminEmail);
     const initPassword = process.env.SUPER_ADMIN_INIT_PASSWORD || `SuperAdmin#${autoSetupToken.slice(0, 8)}!`;
     const superHash = await bcrypt.hash(initPassword, 10);
 
@@ -73,7 +74,6 @@ export async function seedCompletedCandidatesAndAdmin() {
         role: 'super_admin',
         department: 'Executive Oversight',
         passwordHash: superHash,
-        setupToken: hasExplicitPass ? null : autoSetupToken,
       });
       console.log(`\n========================================================================`);
       console.log(`[SUPER_ADMIN_BOOTSTRAP] Provisioned Primary Super Admin: ${superAdminEmail}`);
@@ -83,11 +83,6 @@ export async function seedCompletedCandidatesAndAdmin() {
         console.log(`Instant Setup URL: http://localhost:3000/admin/setup?token=${autoSetupToken}`);
       }
       console.log(`========================================================================\n`);
-    } else if (!existingSuperAdmin.passwordHash && !hasExplicitPass) {
-      await db.update(adminUsers)
-        .set({ setupToken: autoSetupToken, passwordHash: superHash })
-        .where(eq(adminUsers.email, superAdminEmail));
-      console.log(`[SUPER_ADMIN_BOOTSTRAP] Active Setup Token for ${superAdminEmail}: ${autoSetupToken}`);
     }
 
     const personas = [

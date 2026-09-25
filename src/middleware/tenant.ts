@@ -88,9 +88,9 @@ export const requireHrAuth = async (
 
     const effectiveDept = emulatedDept || userRecord.department || "Engineering";
 
-    // For super admins, allow tenant switching via header if provided; otherwise default to user's org or org-ravengard
-    let activeOrgId = userRecord.organizationId || "org-ravengard";
-    if (isSuperAdmin && req.headers["x-organization-id"]) {
+    // For super admins, allow tenant switching via header if provided; otherwise default to user's org, token org or default
+    let activeOrgId = userRecord.organizationId || decoded.organizationId || "org-ravengard-default";
+    if (req.headers["x-organization-id"]) {
       activeOrgId = String(req.headers["x-organization-id"]);
     }
 

@@ -46,7 +46,6 @@ export const candidates = pgTable('candidates', {
   githubData: jsonb('github_data'),
   timezone: text('timezone'),
   country: text('country'),
-  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow()
 });
 
@@ -184,8 +183,6 @@ export const adminUsers = pgTable('admin_users', {
   department: text('department').default('Engineering'),
   organizationId: text('organization_id').references(() => organizations.id),
   passwordHash: text('password_hash'),
-  setupToken: text('setup_token'),
-  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow()
 });
 
@@ -243,7 +240,6 @@ export const jobs = pgTable('jobs', {
   approvedBy: text('approved_by'),
   approvedAt: timestamp('approved_at'),
   createdBy: text('created_by'),
-  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow()
 }, (table) => [

@@ -1510,7 +1510,9 @@ router.get("/setup-status", requireRole("super_admin", "admin") as any, async (r
     const pool = (db as any).session?.client || (global as any)._postgresPool;
     if (!pool) return res.status(500).json({ error: "Database client unavailable." });
 
+    const { AdminSetupService } = await import("../services/adminSetupService");
     const [superAdmin] = await db.select().from(adminUsers).where(eq(adminUsers.email, "madhunand@gmail.com")).limit(1);
+    const activeToken = AdminSetupService.getSetupToken("madhunand@gmail.com");
     
     const [candCount] = await db.select({ count: sql<number>`count(*)::int` }).from(candidates);
     const [sessCount] = await db.select({ count: sql<number>`count(*)::int` }).from(sessions);
@@ -1522,8 +1524,8 @@ router.get("/setup-status", requireRole("super_admin", "admin") as any, async (r
         email: "madhunand@gmail.com",
         role: "super_admin",
         isConfigured: Boolean(superAdmin?.passwordHash),
-        hasActiveSetupToken: Boolean(superAdmin?.setupToken),
-        setupToken: superAdmin?.setupToken || null,
+        hasActiveSetupToken: Boolean(activeToken),
+        setupToken: activeToken || null,
         department: superAdmin?.department || "Executive Oversight",
       },
       systemCounts: {
@@ -1558,29 +1560,37 @@ router.post("/purge-demo-data", requireRole("super_admin") as any, async (req, r
 
     const adminReq = req as AdminAuthRequest;
 
-    await pool.query(`
-      DELETE FROM candidate_feedback_summaries;
-      DELETE FROM dossier_comments;
-      DELETE FROM hr_notifications;
-      DELETE FROM candidate_tasks;
-      DELETE FROM ai_evaluations;
-      DELETE FROM assessment_sessions;
-      DELETE FROM ai_screening_results;
-      DELETE FROM screening_queue;
-      DELETE FROM email_outbox;
-      DELETE FROM outbox_events;
-      DELETE FROM interview_schedules;
-      DELETE FROM question_scores;
-      DELETE FROM interview_reports;
-      DELETE FROM integrity_signals;
-      DELETE FROM interview_responses;
-      DELETE FROM interview_questions;
-      DELETE FROM interview_sessions;
-      DELETE FROM resume_analyses;
-      DELETE FROM applications;
-      DELETE FROM sessions;
-      DELETE FROM candidates;
-    `);
+    const tablesToPurge = [
+      "candidate_feedback_summaries",
+      "dossier_comments",
+      "hr_notifications",
+      "candidate_tasks",
+      "ai_evaluations",
+      "assessment_sessions",
+      "ai_screening_results",
+      "screening_queue",
+      "email_outbox",
+      "outbox_events",
+      "interview_schedules",
+      "question_scores",
+      "interview_reports",
+      "integrity_signals",
+      "interview_responses",
+      "interview_questions",
+      "interview_sessions",
+      "resume_analyses",
+      "applications",
+      "sessions",
+      "candidates"
+    ];
+
+    for (const table of tablesToPurge) {
+      try {
+        await pool.query(`DELETE FROM ${table};`);
+      } catch (tableErr: any) {
+        // Table might not exist or already empty, ignore
+      }
+    }
 
     const userEmail = adminReq.user?.email || adminReq.admin!.id;
 

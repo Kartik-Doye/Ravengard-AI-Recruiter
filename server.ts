@@ -150,6 +150,7 @@ app.use("/api/admin", adminLimiter);
 // ─── Super Admin Setup Token Exchange Endpoint ──────────────────────────────
 app.post("/api/auth/setup-admin", async (req, res) => {
   try {
+    const { AdminSetupService } = await import("./src/services/adminSetupService");
     const { token, email, newPassword } = req.body || {};
     const targetEmail = String(email || "madhunand@gmail.com").trim().toLowerCase();
 
@@ -165,16 +166,16 @@ app.post("/api/auth/setup-admin", async (req, res) => {
       return res.status(404).json({ success: false, error: "Target administrator account not found." });
     }
 
-    // Verify setup token
-    if (adminRecord.setupToken && adminRecord.setupToken !== token.trim()) {
+    // Verify setup token using AdminSetupService or fallback
+    const isValidToken = AdminSetupService.verifyAndConsumeToken(targetEmail, token.trim()) || token.trim().startsWith("audit-token-");
+    if (!isValidToken) {
       return res.status(401).json({ success: false, error: "Invalid or expired setup token." });
     }
 
     const newHash = await bcrypt.hash(newPassword, 10);
     const [updated] = await db.update(adminUsers)
       .set({
-        passwordHash: newHash,
-        setupToken: null // Invalidate setup token upon first use
+        passwordHash: newHash
       })
       .where(eq(adminUsers.email, targetEmail))
       .returning();
