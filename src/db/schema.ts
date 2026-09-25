@@ -70,6 +70,7 @@ export const sessions = pgTable('sessions', {
   deviceCheckMeta: jsonb('device_check_meta'),
   flagged: boolean('flagged').default(false),
   flagReason: text('flag_reason'),
+  isCalibration: boolean('is_calibration').default(false),
   lastActiveAt: timestamp('last_active_at').defaultNow()
 });
 
@@ -279,6 +280,8 @@ export const shadowCalibrations = pgTable('shadow_calibrations', {
   interviewerName: text('interviewer_name').notNull(),
   variance: integer('variance').notNull(),
   notes: text('notes'),
+  breakdown: jsonb('breakdown'), // { human: { technical: number, communication: number, behavioral: number }, ai: { technical: number, communication: number, behavioral: number } }
+  feedbackNotes: text('feedback_notes'),
   calibratedWeightsSnapshot: jsonb('calibrated_weights_snapshot'),
   createdAt: timestamp('created_at').defaultNow().notNull()
 }, (table) => [
@@ -325,6 +328,7 @@ export const applications = pgTable('applications', {
   candidateId: text('candidate_id').notNull().references(() => candidates.id),
   organizationId: text('organization_id').notNull().references(() => organizations.id),
   status: text('status').notNull().default('applied'),
+  isCalibration: boolean('is_calibration').default(false),
   // Possible values:
   // 'applied' | 'shortlisted' | 'assessment_pending' | 'mcq_in_progress' | 'interview_pending' |
   // 'pending_hr_review' | 'assessment_completed' | 'recommended' | 'offered' | 'rejected' | 'rejected_timeout'

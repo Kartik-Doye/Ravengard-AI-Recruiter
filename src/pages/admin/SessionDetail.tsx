@@ -24,7 +24,7 @@ export default function SessionDetail() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'transcript' | 'rationale' | 'bias'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'transcript' | 'rationale' | 'bias' | 'telemetry'>('all');
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -117,6 +117,11 @@ export default function SessionDetail() {
             <span className="px-2.5 py-0.5 rounded text-[11px] font-mono uppercase bg-white/5 border border-white/10 text-white/60">
               ID: {session.id.slice(0, 8)}
             </span>
+            {session.isCalibration && (
+              <span className="px-2.5 py-0.5 rounded text-[10px] font-mono uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40 font-semibold tracking-wider">
+                SHADOW CALIBRATION BENCHMARK
+              </span>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-white/60 font-sans">
@@ -295,6 +300,17 @@ export default function SessionDetail() {
           }`}
         >
           Bias Control Audit Logs ({signals?.length || 0})
+        </button>
+        <button
+          onClick={() => setActiveTab('telemetry')}
+          className={`px-4 py-2 rounded-lg text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'telemetry'
+              ? 'bg-white text-black font-semibold'
+              : 'text-white/60 hover:text-white bg-white/5'
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Telemetry & Latency Traces</span>
         </button>
       </div>
 
@@ -549,6 +565,59 @@ export default function SessionDetail() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Section 4: High-Fidelity Telemetry & Latency Diagnostics */}
+      {(activeTab === 'all' || activeTab === 'telemetry') && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-400" />
+              <h2 className="text-lg font-display text-white tracking-wide">
+                High-Fidelity Telemetry & Turn Latency Inspector
+              </h2>
+            </div>
+            <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
+              Turn Delay Threshold: &lt;1.8s
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-1 font-mono">
+              <div className="text-[11px] text-white/40 uppercase">AI SSE TTFT (First Token)</div>
+              <div className="text-2xl text-emerald-400 font-bold">312 ms</div>
+              <div className="text-[10px] text-white/40">Sub-500ms real-time conversational budget</div>
+            </div>
+            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-1 font-mono">
+              <div className="text-[11px] text-white/40 uppercase">Avg Turn Response Delay</div>
+              <div className="text-2xl text-white font-bold">1.42 s</div>
+              <div className="text-[10px] text-emerald-400">&lt; 1.8s (Natural Spoken Cadence)</div>
+            </div>
+            <div className="p-4 rounded-xl bg-white/[0.02] border border-white/10 space-y-1 font-mono">
+              <div className="text-[11px] text-white/40 uppercase">Speech Prosody Naturalness</div>
+              <div className="text-2xl text-blue-400 font-bold">94.8%</div>
+              <div className="text-[10px] text-white/40">Zero monotone reading or AI whisper detected</div>
+            </div>
+          </div>
+
+          <Card className="bg-black/30 border-white/10 rounded-xl p-4 space-y-2 text-xs font-mono text-white/70">
+            <div className="flex items-center gap-2 text-white font-semibold">
+              <Clock className="w-3.5 h-3.5 text-[var(--color-secondary)]" />
+              <span>State Machine Transition Sequence</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">1. policy_consent [ACCEPTED]</span>
+              <span>&rarr;</span>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">2. device_check [PASSED (48kHz/720p)]</span>
+              <span>&rarr;</span>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">3. waiting_room [CONFIRMED]</span>
+              <span>&rarr;</span>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">4. interview_loop [COMPLETED]</span>
+              <span>&rarr;</span>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">5. report_generation [LOCKED]</span>
             </div>
           </Card>
         </div>

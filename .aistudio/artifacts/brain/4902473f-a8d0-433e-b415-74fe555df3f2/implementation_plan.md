@@ -1,40 +1,51 @@
-# Automated End-to-End Enterprise Audit & Verification Plan
+# Implementation Plan: Internal Shadow-Calibration Run & High-Fidelity Telemetry
 
-This plan executes a rigorous, automated end-to-end test suite against all 5 pillars of the Ravengard Enterprise Governance & Security Architecture.
-
----
-
-### Key Verification Milestones
-
-1. **Test Suite 1: Super-Admin Provisioning & Setup Token Lifecycle**
-   - Verify `madhunand@gmail.com` exists with `super_admin` role.
-   - Verify `POST /api/auth/setup-admin` successfully validates token, updates password hash, invalidates the setup token, and returns an authenticated JWT.
-
-2. **Test Suite 2: LLM Zero-Delete Database Safety Guardrail**
-   - Send simulated destructive SQL payloads (`DELETE FROM candidates`, `DROP TABLE sessions`, `TRUNCATE jobs`) to API endpoints.
-   - Verify middleware immediately intercepts queries with `403 Forbidden` (`LLM_ZERO_DELETE_GUARD_TRIGGERED`).
-   - Confirm event is recorded in `audit_logs` with action `LLM_DELETE_BLOCKED`.
-
-3. **Test Suite 3: Multi-Stage Requisition Approval Governance**
-   - Create a requisition in `draft`.
-   - Transition: `draft` $\rightarrow$ `pending_finance` $\rightarrow$ `pending_tech_lead` $\rightarrow$ `published`.
-   - Test Rejection Gate: Verify rejection requires critique notes and returns status to `draft`.
-   - Test RBAC Department Sandboxing & Blind Review field redaction for `technical_interviewer`.
-
-4. **Test Suite 4: Secondary-Device Anti-Cheat Engine Telemetry**
-   - Submit synthetic telemetry turns with $\Delta\text{TTFT} > 1.8\text{s}$.
-   - Verify 3 consecutive turns trigger `HIGH_RISK_PROXY_LATENCY` flag and adaptive rapid-probing follow-up.
-   - Verify prosody reading invariance and cross-modal code-speech divergence signal evaluation.
-
-5. **Test Suite 5: Production Data Purge Execution**
-   - Seed sample mock candidates, test sessions, and transcripts.
-   - Execute `POST /api/admin/purge-demo-data` with payload `{ confirmation: "PURGE-DEMO-DATA" }`.
-   - Verify test candidates/transcripts are wiped while jobs, admin accounts, and immutable audit logs remain intact.
+Configure Ravengard for an internal engineering team shadow-calibration trial with high-fidelity telemetry, real-time signal diagnostics, and audit logging to establish baseline scoring accuracy and anti-cheat fidelity before the public domain cutover.
 
 ---
 
-### Execution Strategy
+## User Review Required
 
-- Construct a standalone Node/TypeScript runner `test_enterprise_suite.ts`.
-- Execute all 5 suites sequentially with clear assertions and error reporting.
-- Present a formatted verification scorecard summarizing pass/fail metrics across all security boundaries.
+> [!IMPORTANT]
+> **Calibration Scope & Data Isolation**: All internal calibration interview runs will be tagged with a distinct `is_calibration: true` metadata flag. This ensures calibration sessions are analyzed separately from live candidates and can be reviewed side-by-side with human interviewer scorecards without corrupting production baseline metrics.
+
+- **Internal Reviewer Cohort**: Verify that engineering tech leads and hiring managers have reviewer permissions in the admin console.
+- **Scoring Rubric Alignment**: Calibrate AI rubric weights (Technical 50%, Communication 30%, Behavioral 20%) against human scorecard ratings.
+- **Telemetry Retention**: Confirm high-fidelity audit trail retention parameters for calibration sessions.
+
+---
+
+## Proposed Changes
+
+### 1. Calibration Session Tagging & Cohort Management
+- Add support for a `calibration` run mode when generating candidate assessment invites from the Admin Requisitions panel.
+- Ensure calibration sessions track full dual-plane evaluations:
+  - Automated AI scoring breakdown.
+  - Human panel shadow scoring form for side-by-side variance analysis.
+  - Inter-rater reliability (IRR) / delta scoring calculator.
+
+### 2. High-Fidelity Telemetry & Diagnostic Inspector
+- Enhance Admin / Reviewer session detail views with a real-time Telemetry Trace stream:
+  - **Latency Traces**: Measure AI SSE response time, voice stream latency, and candidate turn-taking pauses (>1.8s flag).
+  - **Anti-Cheat Signal Feed**: Visualize tab blurs, window switches, prosody consistency, and cross-modal discrepancies with millisecond timestamps.
+  - **State Machine Event Log**: Detailed records of stage gate transitions (Device Check -> Waiting Room -> Interview Rounds -> Final Report).
+
+### 3. Comprehensive Audit Trail & Calibration Export Package
+- Build an exportable **Calibration & Audit Summary Package** (JSON / CSV / Structured Report) containing:
+  - AI score breakdown vs human interviewer ground truth.
+  - Anti-cheat signal breakdown with false-positive / true-positive analysis.
+  - Complete immutable audit logs for compliance review.
+
+---
+
+## Verification Plan
+
+### Automated & Integration Tests
+- Run backend and schema checks (`compile_applet` & `lint_applet`).
+- Verify calibration session isolation: ensure calibration data does not pollute production requisition candidate pipelines.
+- Verify audit log event emission across all session stages.
+
+### Manual Walkthrough & UI Verification
+- Generate an internal calibration invite from the Admin Dashboard.
+- Complete a simulated interview session with triggered telemetry signals.
+- Inspect the Admin Telemetry & Calibration view to verify side-by-side scorecard comparison and high-fidelity event timeline.

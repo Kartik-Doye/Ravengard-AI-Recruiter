@@ -25,7 +25,7 @@ export function AdminLayout({
     { label: 'Job Openings', path: '/admin/jobs' },
     { label: 'Candidate Ledger', path: '/admin' },
     { label: 'ATS & HR Funnel', path: '/admin/ats' },
-    { label: 'Telemetry & Governance', path: '/admin/telemetry' },
+    { label: 'Telemetry & Calibration', path: '/admin/telemetry' },
     { label: 'All Candidates', path: '/admin/candidates' },
     { label: 'Scorecards & Reports', path: '/admin/reports' },
     { label: 'Flagged Review Queue', path: '/admin/flags' },
