@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Validate recall memory structure without imposing arbitrary size or age caps."""
+
+import json
+import re
+import sys
+from pathlib import Path
+
+FILES = ("PROJECT_CONTEXT.md", "DECISIONS.md", "STATUS.md", "LEARNINGS.md")
+
+
+def findings_for(root: Path):
+    findings = []
+    for name in FILES:
+        path = root / name
+        if not path.is_file():
+            findings.append({
+                "file": name,
+                "check": "exists",
+                "status": "missing",
+                "detail": "created only when durable memory is needed",
+            })
+            continue
+
+        lines = path.read_text().splitlines()
+        if name in ("DECISIONS.md", "LEARNINGS.md"):
+            headings = [line for line in lines if line.startswith("## ")]
+            normalized = set()
+            for heading in headings:
+                if not re.search(r"\d{4}-\d{2}-\d{2}", heading):
+                    findings.append({
+                        "file": name,
+                        "check": "dated-entry",
+                        "status": "missing",
+                        "detail": f"undated entry: {heading[:80]}",
+                    })
+                key = re.sub(
+                    r"^##\s+(?:\[[^]]+\]\s+)?\d{4}-\d{2}-\d{2}\s*[:,-]?\s*",
+                    "",
+                    heading,
+                ).strip().lower()
+                if key in normalized:
+                    findings.append({
+                        "file": name,
+                        "check": "dedupe",
+                        "status": "duplicate",
+                        "detail": f"duplicate entry: {key[:80]}",
+                    })
+                normalized.add(key)
+
+        if name == "STATUS.md" and not re.search(
+            r"updated\s+\d{4}-\d{2}-\d{2}", "\n".join(lines), re.I
+        ):
+            findings.append({
+                "file": name,
+                "check": "updated-marker",
+                "status": "missing",
+                "detail": "add 'updated YYYY-MM-DD'",
+            })
+    return findings
+
+
+def main():
+    args = [arg for arg in sys.argv[1:] if arg != "--json"]
+    root = Path(args[0]) if args else Path.cwd()
+    if not root.is_dir():
+        print(f"check-memory: not a directory: {root}", file=sys.stderr)
+        return 2
+
+    findings = findings_for(root)
+    if "--json" in sys.argv:
+        print(json.dumps({"root": str(root), "findings": findings}, indent=2))
+    elif findings:
+        for item in findings:
+            print(
+                f"{item['status'].upper():<9} {item['file']:<20} "
+                f"{item['check']:<15} {item['detail']}"
+            )
+    else:
+        print("check-memory: memory structure is consistent")
+
+    blocking = {"duplicate"}
+    return 1 if any(item["status"] in blocking for item in findings) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

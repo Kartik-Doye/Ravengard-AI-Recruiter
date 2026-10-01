@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "skills": {
+    "backend": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/backend/SKILL.md",
+      "computedHash": "b17c1165a2a6f0bc5a5c9d26bf018da529a1f5e29302ba7217236f3ded71f129"
+    },
+    "blueprint": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/blueprint/SKILL.md",
+      "computedHash": "f8677e30a348834297236734f8aa5e7f8912c257f67bdf3e43726ee2f1894309"
+    },
+    "cleared": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/cleared/SKILL.md",
+      "computedHash": "c7398742b903fb24511e7f5b9a5b2d0c13a805a184c9e6cc23b90d319bb9efee"
+    },
+    "concierge": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/concierge/SKILL.md",
+      "computedHash": "4c7360a3280ccecb8ee55c2a68abbc591724e8324a3772ebbca78d7f8ae80f1a"
+    },
+    "distill": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/distill/SKILL.md",
+      "computedHash": "7e48a9d096047ed039f9ff5c7b1f64b055c5acf8d6bab38e8d7c1a64adebd79e"
+    },
+    "ditto": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/ditto/SKILL.md",
+      "computedHash": "d55a6b0bbf4f8d6f587f515276e9b442538c65753d5457dee602f3df31503d9c"
+    },
+    "findable": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/findable/SKILL.md",
+      "computedHash": "45652a2b385c184fba715d8cdb71dab1578f0957a96207acce0e1f1e2d35a942"
+    },
+    "friction": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/friction/SKILL.md",
+      "computedHash": "e24c5144af38e83e9449c89eb79e25ee4ad9519642e31a626314bdff0358490e"
+    },
+    "frontpage": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontpage/SKILL.md",
+      "computedHash": "32a8e4e11063981b7c117ae5ab319ee05d0098c01b589e347b4d8ce72250e86f"
+    },
+    "frugal": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/frugal/SKILL.md",
+      "computedHash": "fbbf6367fb36f2f0f236c7ab335ac86313c89118ba5ca9c0ccd25fc8373a6ec7"
+    },
+    "handsfree": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/handsfree/SKILL.md",
+      "computedHash": "57b09174bb3bea8722121410dcbe21845d850c43d9cfcb7cefdcd6d159161fbe"
+    },
+    "harden": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/harden/SKILL.md",
+      "computedHash": "bd34b0746d9c8979307ae46ea9c37175e1232f1bbc617d3dcddd975188d28a3f"
+    },
+    "headroom": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/headroom/SKILL.md",
+      "computedHash": "6e566f8e649c8c56be752b9294b5293357cf678ab42bc4903da9a899a22cf275"
+    },
+    "hotpath": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/hotpath/SKILL.md",
+      "computedHash": "52e397cb43a9bc36dceef7bd923f6b70f180a5cddcfca8c90dcd1a07fed71f0a"
+    },
+    "hotseat": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/hotseat/SKILL.md",
+      "computedHash": "d4a9f4dc41c1b98c4110c15cd61fcc04d544e1936ec320ed2b964ec4da728485"
+    },
+    "janitor": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/janitor/SKILL.md",
+      "computedHash": "003cfc14d5bc975efb8c98fdada8e8f58c4d6fc96fd914097f41a01d730ab00b"
+    },
+    "masterplan": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/masterplan/SKILL.md",
+      "computedHash": "f84db9f1d021b68522a1fe4159fc804878591c72b7df45bc2b9c689ac5618c78"
+    },
+    "pilot": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/pilot/SKILL.md",
+      "computedHash": "b312348016423efbe61d466d211288b11b7772bb8ca9d3467a58eed3467e1a4a"
+    },
+    "polish": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/polish/SKILL.md",
+      "computedHash": "58a23e23a51bac8de3070670fa7782ad4069800e889a21544d61c1c75b4997d5"
+    },
+    "proof": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/proof/SKILL.md",
+      "computedHash": "7721e5139cbeacc8d9802f190b46c6f5c190e0dcd0ac3a6771d96bebfcda8ca3"
+    },
+    "recall": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/recall/SKILL.md",
+      "computedHash": "faae1d5c359b58907c618a9ad67a78b2baea3926078a3c1466fc7cd2de0a450e"
+    },
+    "referee": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/referee/SKILL.md",
+      "computedHash": "2d0bb2b5d6b98246007679c2256ef237c1ea37ea7a167b9b81e60a7d5a392ec6"
+    },
+    "roadtest": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/roadtest/SKILL.md",
+      "computedHash": "a2e9355ff5c05378f48103190e8a632402ff549c2d3f40e7999e1bc3c24702c0"
+    },
+    "runway": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/runway/SKILL.md",
+      "computedHash": "ae711750acfa94bafa347c5aac434b5f33566629a674a3270fdd3f4e777ebbfa"
+    },
+    "scout": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/scout/SKILL.md",
+      "computedHash": "8f3c008b5de1c2c2448f99fd4b7679e232feecae8cbf9daaa480f7b62b93ab85"
+    },
+    "sleuth": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/sleuth/SKILL.md",
+      "computedHash": "2827bfc28c48c6df8dd1d397cf1bde9346192e8bf1f08d792ca70612484fb1a4"
+    },
+    "spelunk": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/spelunk/SKILL.md",
+      "computedHash": "955ed166966ef0898bba640a08c6de6352764beb67bf6ceb5ea106901ea3f576"
+    },
+    "unslop": {
+      "source": "udaysharmadev/Skills",
+      "sourceType": "github",
+      "skillPath": "skills/unslop/SKILL.md",
+      "computedHash": "d4ef498d457e22c25cb94804a7f3232bb583577dce8f71ae7e7a4e6f84d404ee"
+    }
+  }
+}
