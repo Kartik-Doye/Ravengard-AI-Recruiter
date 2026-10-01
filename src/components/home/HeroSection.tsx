@@ -38,17 +38,18 @@ export function HeroSection() {
           {/* Action Buttons */}
           <div className="mt-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
             <Link
-              to="/gateway"
+              to="/jobs"
               className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-4 text-base font-semibold text-[#060814] hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl"
             >
-              Run Candidate Demo
+              Explore Open Roles
               <ArrowRight className="w-4 h-4 text-[#060814]" />
             </Link>
-            <DemoLink
+            <Link
+              to="/admin/login"
               className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/5 px-8 py-4 text-base font-medium text-white hover:bg-white/10 hover:border-white/30 transition-all backdrop-blur-sm"
             >
-              Book a Demo
-            </DemoLink>
+              Enterprise Portal
+            </Link>
           </div>
           
           {/* Trust Badges - Spaced with generous vertical padding and clean visual separators */}

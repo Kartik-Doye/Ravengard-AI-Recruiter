@@ -1760,6 +1760,31 @@ router.post("/purge-demo-data", requireRole("super_admin") as any, async (req, r
   }
 });
 
+// ─── POST /api/admin/hard-reset ───────────────────────────────────────────────
+// Absolute Day-One Hard Reset: Wipes all jobs, rubrics, candidates, transcripts, telemetry, and seeds only madhunand@gmail.com
+router.post("/hard-reset", requireRole("super_admin") as any, async (req, res) => {
+  try {
+    const { confirmation } = req.body || {};
+    if (confirmation !== "HARD-RESET-PRODUCTION" && confirmation !== "PURGE-ALL" && confirmation !== "PURGE-DEMO-DATA") {
+      return res.status(400).json({
+        error: 'Confirmation mismatch. You must provide confirmation: "HARD-RESET-PRODUCTION" to execute an absolute database reset.'
+      });
+    }
+
+    const { executeHardReset } = await import("../../scripts/hard_reset_db");
+    const result = await executeHardReset();
+
+    res.json({
+      ...result,
+      message: "Database hard reset completed. Absolute clean slate established. Only root super_admin (madhunand@gmail.com) is provisioned.",
+      timestamp: new Date().toISOString()
+    });
+  } catch (e: any) {
+    console.error("admin/hard-reset error:", e);
+    res.status(500).json({ error: "Failed to execute database hard reset: " + e.message });
+  }
+});
+
 // ─── SHADOW-CALIBRATION & TELEMETRY OBSERVABILITY ENDPOINTS ──────────────────
 
 // GET /api/admin/calibrations

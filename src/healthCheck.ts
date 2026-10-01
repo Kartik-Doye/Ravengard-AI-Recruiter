@@ -4,7 +4,7 @@ import express from 'express';
 
 export const healthCheckRouter = express.Router();
 
-healthCheckRouter.get('/health', async (req, res) => {
+healthCheckRouter.get(['/', '/health'], async (req, res) => {
   try {
     const start = Date.now();
     await db.execute(sql`SELECT 1`);

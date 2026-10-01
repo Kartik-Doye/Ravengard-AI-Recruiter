@@ -5,6 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "dev:all": "tsx server.ts",
+    "dev:candidate": "tsx src/servers/candidateServer.ts",
+    "dev:hr": "tsx src/servers/hrServer.ts",
+    "dev:admin": "tsx src/servers/adminServer.ts",
+    "db:hard-reset": "tsx scripts/hard_reset_db.ts",
+    "db:purge": "tsx scripts/hard_reset_db.ts",
     "sitemap": "node scripts/generate-sitemap.cjs",
     "validate-build": "tsx scripts/validate-build.ts",
     "build": "npm run clean && npm run sitemap && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=build/server.cjs && npm run validate-build",

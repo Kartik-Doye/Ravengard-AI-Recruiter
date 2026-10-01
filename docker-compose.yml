@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  ravengard-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ravengard-enterprise-gateway
+    restart: always
+    ports:
+      # Port 3000: Candidate Portal (Public / External)
+      - "3000:3000"
+      # Port 3001: HR & Hiring Manager Workspace (Internal / VPN)
+      - "3001:3001"
+      # Port 3002: Enterprise Admin Console (Highly Restricted)
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - PORT_HR=3001
+      - PORT_ADMIN=3002
+      - MULTI_PORT=true
+      - APP_URL=http://localhost:3000
+      - HR_URL=http://localhost:3001
+      - ADMIN_URL=http://localhost:3002
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3

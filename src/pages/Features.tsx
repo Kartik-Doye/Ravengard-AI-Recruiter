@@ -159,17 +159,18 @@ export default function Features() {
         className="text-center mt-24 flex flex-col sm:flex-row items-center justify-center gap-4"
       >
         <Link 
-          to="/gateway" 
+          to="/jobs" 
           className="rounded-full bg-white px-8 py-4 text-sm font-semibold text-slate-950 hover:bg-slate-100 hover:scale-[1.01] active:scale-[0.98] transition-all shadow-sm flex items-center gap-2"
         >
-          <span>Run Candidate Demo</span>
+          <span>Explore Open Roles</span>
           <ArrowRight className="w-4 h-4 text-slate-950" />
         </Link>
-        <DemoLink 
+        <Link 
+          to="/admin/login"
           className="rounded-full border border-white/20 bg-white/5 px-8 py-4 text-sm font-medium text-white hover:bg-white/10 hover:border-white/30 transition-all backdrop-blur-sm"
         >
-          Book a Demo
-        </DemoLink>
+          Enterprise Portal
+        </Link>
       </motion.div>
     </div>
   );

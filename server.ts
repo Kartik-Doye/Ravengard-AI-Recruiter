@@ -476,8 +476,8 @@ app.use("/api/candidate/scheduling", schedulingRouter);
 app.use("/api/scheduling", schedulingRouter);
 app.use("/api/hr", enterpriseAuditInterceptor, hrRouter);
 app.use("/api/v1/integrations", integrationsRouter);
-app.use("/api/candidate/portal", candidatePortalRouter);
 app.use("/api/jobs", publicJobsRouter);
+app.use("/api/public/jobs", publicJobsRouter);
 
   // Lead capture endpoint for enterprise consultations & demo requests
   app.post("/api/leads", async (req, res) => {
@@ -1708,9 +1708,56 @@ ${allRoutes.map(r => `  <url>
     process.exit(1);
   }
 
+  const PORT_HR = parseInt(process.env.PORT_HR || "3001", 10);
+  const PORT_ADMIN = parseInt(process.env.PORT_ADMIN || "3002", 10);
+
   const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`\n========================================================================`);
+    console.log(`  RAVENGARD AI: MULTI-PORT ENTERPRISE TOPOLOGY ACTIVE`);
+    console.log(`========================================================================`);
+    console.log(`  [1] Candidate Portal (Public / External)     : http://0.0.0.0:${PORT} (Host: careers.domain.com)`);
+    console.log(`  [2] HR Workspace (Internal / Corporate VPN)  : http://0.0.0.0:${PORT_HR} (Host: hr.domain.com)`);
+    console.log(`  [3] Admin Console (Highly Restricted / CISO) : http://0.0.0.0:${PORT_ADMIN} (Host: admin.domain.com)`);
+    console.log(`========================================================================\n`);
   });
+
+  // Start dedicated HR workspace listener on Port 3001
+  try {
+    const { createHrApp } = await import("./src/servers/hrServer");
+    const hrApp = await createHrApp();
+    if (process.env.NODE_ENV === "production") {
+      const distPath = path.join(process.cwd(), "dist");
+      hrApp.use(express.static(distPath));
+      hrApp.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
+    }
+    const hrServer = hrApp.listen(PORT_HR, "0.0.0.0", () => {
+      console.log(`[HR Workspace Listener] Started on Port ${PORT_HR}`);
+    });
+    hrServer.on("error", (err: any) => {
+      console.warn(`[HR Workspace Listener Notice] Port ${PORT_HR} listener notice:`, err.message);
+    });
+  } catch (hrErr: any) {
+    console.warn("HR Listener init notice:", hrErr.message);
+  }
+
+  // Start dedicated Admin console listener on Port 3002
+  try {
+    const { createAdminApp } = await import("./src/servers/adminServer");
+    const adminApp = await createAdminApp();
+    if (process.env.NODE_ENV === "production") {
+      const distPath = path.join(process.cwd(), "dist");
+      adminApp.use(express.static(distPath));
+      adminApp.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
+    }
+    const adminServer = adminApp.listen(PORT_ADMIN, "0.0.0.0", () => {
+      console.log(`[Admin Console Listener] Started on Port ${PORT_ADMIN}`);
+    });
+    adminServer.on("error", (err: any) => {
+      console.warn(`[Admin Console Listener Notice] Port ${PORT_ADMIN} listener notice:`, err.message);
+    });
+  } catch (adminErr: any) {
+    console.warn("Admin Listener init notice:", adminErr.message);
+  }
 
   // Attach silent WebSocket server to gracefully complete Vite HMR handshakes without connection errors
   try {

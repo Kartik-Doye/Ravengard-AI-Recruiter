@@ -23,14 +23,14 @@ export function FinalCtaSection() {
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3">
           <div className="flex flex-wrap justify-center gap-3">
-            <Link to="/gateway" className="rounded-full bg-white px-6 py-3.5 text-sm font-medium text-[#060814] hover:bg-white/90 transition-colors">
-              Run candidate test drive
+            <Link to="/jobs" className="rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-[#060814] hover:bg-white/90 transition-colors shadow-sm">
+              Explore Open Requisitions
             </Link>
-            <DemoLink className="rounded-full border border-white/15 bg-white/5 px-6 py-3.5 text-sm font-medium text-white hover:bg-white/10 transition-colors">
-              Book a Demo
-            </DemoLink>
+            <Link to="/admin/login" className="rounded-full border border-white/15 bg-white/5 px-6 py-3.5 text-sm font-medium text-white hover:bg-white/10 transition-colors">
+              Enterprise Access
+            </Link>
           </div>
-          <p className="text-xs text-white/40 mt-2">Personalized walkthrough • Custom ATS pipeline demo</p>
+          <p className="text-xs text-white/40 mt-2">SOC 2 Type II • GDPR & EEOC Compliant</p>
         </div>
       </motion.div>
     </section>

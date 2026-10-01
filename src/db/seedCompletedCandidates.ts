@@ -165,29 +165,6 @@ export async function seedCompletedCandidatesAndAdmin() {
       console.log(`========================================================================\n`);
     }
 
-    const personas = [
-      { id: 'admin-root', email: 'admin@ravengard.com', name: 'Ravengard Lead Auditor', role: 'admin', dept: 'Compliance & Audit' },
-      { id: 'admin-recruiter', email: 'recruiter@ravengard.com', name: 'Sarah Jenkins (Recruiter)', role: 'recruiter', dept: 'Talent Acquisition' },
-      { id: 'admin-hm-eng', email: 'hiringmanager@ravengard.com', name: 'Alex Rivera (Engineering HM)', role: 'hiring_manager', dept: 'Engineering' },
-      { id: 'admin-tech-int', email: 'interviewer@ravengard.com', name: 'Devon Vance (Tech Interviewer)', role: 'technical_interviewer', dept: 'Engineering' },
-      { id: 'admin-finance', email: 'finance@ravengard.com', name: 'Morgan Taylor (Finance Approver)', role: 'finance_approver', dept: 'Finance' },
-    ];
-
-    for (const p of personas) {
-      const [existing] = await db.select().from(adminUsers).where(eq(adminUsers.email, p.email)).limit(1);
-      if (!existing) {
-        const hashed = await bcrypt.hash('admin123', 10);
-        await db.insert(adminUsers).values({
-          id: p.id,
-          email: p.email,
-          name: p.name,
-          role: p.role as any,
-          department: p.dept,
-          passwordHash: hashed
-        });
-      }
-    }
-
     // 2. Ensure Default Organization exists
     const [existingOrg] = await db.select().from(organizations).where(eq(organizations.id, 'org-ravengard-default')).limit(1);
     if (!existingOrg) {
@@ -197,7 +174,6 @@ export async function seedCompletedCandidatesAndAdmin() {
       });
     }
 
-    // 3. Ensure Default Jobs exist
     const defaultJobsList = [
       {
         id: 'job-dist-sys-01',
@@ -231,10 +207,36 @@ export async function seedCompletedCandidatesAndAdmin() {
       }
     ];
 
-    for (const j of defaultJobsList) {
-      const [existingJob] = await db.select().from(jobs).where(eq(jobs.id, j.id)).limit(1);
-      if (!existingJob) {
-        await db.insert(jobs).values(j);
+    // 3. Seed Demo Personas & Default Jobs only if explicitly requested
+    if (process.env.SEED_DEMO_DATA === "true") {
+      const personas = [
+        { id: 'admin-root', email: 'admin@ravengard.com', name: 'Ravengard Lead Auditor', role: 'admin', dept: 'Compliance & Audit' },
+        { id: 'admin-recruiter', email: 'recruiter@ravengard.com', name: 'Sarah Jenkins (Recruiter)', role: 'recruiter', dept: 'Talent Acquisition' },
+        { id: 'admin-hm-eng', email: 'hiringmanager@ravengard.com', name: 'Alex Rivera (Engineering HM)', role: 'hiring_manager', dept: 'Engineering' },
+        { id: 'admin-tech-int', email: 'interviewer@ravengard.com', name: 'Devon Vance (Tech Interviewer)', role: 'technical_interviewer', dept: 'Engineering' },
+        { id: 'admin-finance', email: 'finance@ravengard.com', name: 'Morgan Taylor (Finance Approver)', role: 'finance_approver', dept: 'Finance' },
+      ];
+
+      for (const p of personas) {
+        const [existing] = await db.select().from(adminUsers).where(eq(adminUsers.email, p.email)).limit(1);
+        if (!existing) {
+          const hashed = await bcrypt.hash('admin123', 10);
+          await db.insert(adminUsers).values({
+            id: p.id,
+            email: p.email,
+            name: p.name,
+            role: p.role as any,
+            department: p.dept,
+            passwordHash: hashed
+          });
+        }
+      }
+
+      for (const j of defaultJobsList) {
+        const [existingJob] = await db.select().from(jobs).where(eq(jobs.id, j.id)).limit(1);
+        if (!existingJob) {
+          await db.insert(jobs).values(j);
+        }
       }
     }
 
