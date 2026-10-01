@@ -43,7 +43,7 @@ export async function seedCompletedCandidatesAndAdmin() {
     await ensureDefaultRubric("v1.0");
     await ensureDefaultRubric("v2.4-enterprise-strict");
 
-    // Ensure schema columns exist for adminUsers and jobs
+    // Ensure schema columns exist for adminUsers and jobs, plus enterprise tables
     if (pool) {
       try {
         await pool.query(`
@@ -51,6 +51,86 @@ export async function seedCompletedCandidatesAndAdmin() {
           ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
           ALTER TABLE jobs ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
           ALTER TABLE candidates ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+
+          CREATE TABLE IF NOT EXISTS sso_configurations (
+            id TEXT PRIMARY KEY,
+            provider_type TEXT NOT NULL DEFAULT 'SAML_2_0',
+            entity_id TEXT NOT NULL DEFAULT 'https://ravengard.ai/saml/metadata',
+            sign_on_url TEXT NOT NULL DEFAULT 'https://login.microsoftonline.com/common/saml2',
+            x509_certificate TEXT,
+            issuer_url TEXT,
+            client_id TEXT,
+            client_secret TEXT,
+            enabled BOOLEAN NOT NULL DEFAULT true,
+            mfa_policy TEXT NOT NULL DEFAULT 'TOTP',
+            allowed_domains JSONB NOT NULL DEFAULT '["ravengard.com", "enterprise.corp"]'::jsonb,
+            attribute_mapping JSONB NOT NULL DEFAULT '{"email": "email", "name": "displayName", "role": "groups"}'::jsonb,
+            updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS scim_tokens (
+            id TEXT PRIMARY KEY,
+            token_hash TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT 'Okta SCIM 2.0 Connector',
+            permissions JSONB NOT NULL DEFAULT '["users:read", "users:write", "groups:read"]'::jsonb,
+            last_used_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT NOW() NOT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS directory_sync_logs (
+            id TEXT PRIMARY KEY,
+            provider TEXT NOT NULL DEFAULT 'Okta SCIM',
+            action TEXT NOT NULL DEFAULT 'SYNC_BATCH',
+            email TEXT,
+            status TEXT NOT NULL DEFAULT 'SUCCESS',
+            details TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW() NOT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS security_threat_logs (
+            id TEXT PRIMARY KEY,
+            timestamp TIMESTAMP DEFAULT NOW() NOT NULL,
+            threat_type TEXT NOT NULL,
+            severity TEXT NOT NULL DEFAULT 'MEDIUM',
+            ip_address TEXT NOT NULL,
+            country_code TEXT NOT NULL DEFAULT 'US',
+            city TEXT NOT NULL DEFAULT 'Unknown',
+            latitude NUMERIC(9, 6) NOT NULL DEFAULT 37.7749,
+            longitude NUMERIC(9, 6) NOT NULL DEFAULT -122.4194,
+            raw_payload_snippet TEXT NOT NULL,
+            action_taken TEXT NOT NULL DEFAULT 'BLOCKED',
+            metadata JSONB
+          );
+
+          CREATE TABLE IF NOT EXISTS tenant_branding (
+            id TEXT PRIMARY KEY DEFAULT 'default_tenant',
+            custom_domain TEXT DEFAULT 'careers.ravengard.ai',
+            domain_verified BOOLEAN NOT NULL DEFAULT false,
+            dns_status TEXT NOT NULL DEFAULT 'PENDING',
+            dns_records JSONB NOT NULL DEFAULT '{"cname": {"host": "careers", "value": "cname.ravengard.ai", "status": "verified"}, "txt": {"host": "_ravengard-verify", "value": "rvg_verify_8f7b2c9a1d", "status": "pending"}}'::jsonb,
+            brand_name TEXT NOT NULL DEFAULT 'Ravengard Talent',
+            logo_url TEXT DEFAULT '',
+            favicon_url TEXT DEFAULT '',
+            primary_color_hex TEXT NOT NULL DEFAULT '#4F46E5',
+            accent_color_hex TEXT NOT NULL DEFAULT '#06B6D4',
+            candidate_agreement_html TEXT DEFAULT 'I hereby consent to participate in this AI-assisted structured interview evaluation. All answers are recorded, evaluated against standardized role competencies, and maintained securely under enterprise data privacy regulations.',
+            smtp_host TEXT DEFAULT 'smtp.sendgrid.net',
+            smtp_port INTEGER NOT NULL DEFAULT 587,
+            smtp_user TEXT DEFAULT 'apikey',
+            smtp_sender_email TEXT DEFAULT 'recruiting@ravengard.ai',
+            smtp_sender_name TEXT DEFAULT 'Ravengard Talent Acquisition',
+            smtp_secure BOOLEAN NOT NULL DEFAULT true,
+            smtp_verified BOOLEAN NOT NULL DEFAULT true,
+            updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+          );
+
+          INSERT INTO tenant_branding (id, custom_domain, brand_name, primary_color_hex, accent_color_hex, domain_verified, dns_status)
+          VALUES ('default_tenant', 'careers.ravengard.ai', 'Ravengard Talent', '#4F46E5', '#06B6D4', false, 'PENDING')
+          ON CONFLICT (id) DO NOTHING;
+
+          INSERT INTO sso_configurations (id, provider_type, entity_id, sign_on_url, mfa_policy, enabled)
+          VALUES ('default_sso', 'SAML_2_0', 'https://ravengard.ai/saml/metadata', 'https://login.microsoftonline.com/common/saml2', 'TOTP', true)
+          ON CONFLICT (id) DO NOTHING;
         `);
       } catch (colErr) {
         console.warn("Schema extension notice:", colErr);
@@ -158,7 +238,19 @@ export async function seedCompletedCandidatesAndAdmin() {
       }
     }
 
-    // 4. Check if completed candidates exist
+    // 4. Production Clean-Slate Guard: Strictly disable demo candidates/transcripts unless explicitly enabled
+    const disableDemoSeeds = 
+      process.env.DISABLE_DEMO_SEEDS === 'true' || 
+      process.env.SEED_DEMO_DATA === 'false' || 
+      process.env.NODE_ENV === 'production' ||
+      process.env.ENABLE_DEMO_SEEDS !== 'true';
+
+    if (disableDemoSeeds) {
+      console.log('[PROD_CLEAN_SLATE] Startup seed script: Demo candidates, test transcripts, and mock notifications are strictly DISABLED.');
+      return;
+    }
+
+    // Check if completed candidates exist
     const existingCandidates = await db.select().from(candidates).limit(3);
     if (existingCandidates.length >= 3) {
       // Ensure application links exist for existing candidates

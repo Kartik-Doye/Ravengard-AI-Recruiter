@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for Ravengard Admin V2 incorporating FinOps & Token Budget Controller and AI Persona & Rubric Studio, featuring departmental hard/soft token caps, adaptive model degradation, automated rubric generation from job descriptions, and prompt versioning with diff inspection.",
-  "updatedAt":  "2026-09-25T16:24:38.722929363Z",
+  "summary":  "Architectural plan for total database hard reset to clean Day-One state (root super_admin madhunand@gmail.com only) and isolation of Candidate Portal (Port 3000), HR Workspace (Port 3001), and Enterprise Admin Console (Port 3002) with dual-mode port & Host header routing.",
+  "updatedAt":  "2026-10-01T03:54:36.966045648Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

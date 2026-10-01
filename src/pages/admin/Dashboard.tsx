@@ -11,11 +11,18 @@ import {
   RefreshCw,
   Scale,
   Calendar,
-  UserCheck
+  UserCheck,
+  Coins,
+  Key,
+  Radio,
+  Globe,
+  Sliders
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { CandidatePerformanceCharts } from '../../components/admin/CandidatePerformanceCharts';
 import { DownloadSummaryButton } from '../../components/admin/DownloadSummaryButton';
+import { D3WorldThreatMap } from '../../components/admin/D3WorldThreatMap';
+import { useSecurityStream } from '../../contexts/SecurityStreamContext';
 
 interface CompletedSession {
   id: string;
@@ -38,6 +45,8 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [recommendationFilter, setRecommendationFilter] = useState<'ALL' | 'Proceed' | 'Review' | 'Reject'>('ALL');
   const [showCharts, setShowCharts] = useState(true);
+  const [showThreatMap, setShowThreatMap] = useState(true);
+  const { allEvents, simulateThreat, simulateLogin } = useSecurityStream();
   const navigate = useNavigate();
 
   const fetchCompletedSessions = async () => {
@@ -152,6 +161,19 @@ export default function Dashboard() {
           </button>
 
           <button
+            onClick={() => setShowThreatMap(!showThreatMap)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-mono border transition-colors cursor-pointer ${
+              showThreatMap
+                ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300'
+                : 'bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border-white/10'
+            }`}
+            title="Toggle interactive D3.js Global Threat & Telemetry Map"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>{showThreatMap ? 'Hide Threat Map' : 'D3 Threat Map'}</span>
+          </button>
+
+          <button
             onClick={fetchCompletedSessions}
             disabled={loading}
             className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-xs border border-white/10 transition-colors cursor-pointer"
@@ -166,6 +188,78 @@ export default function Dashboard() {
       {/* Candidate Performance Metrics Visualizations (Recharts) */}
       {showCharts && (
         <CandidatePerformanceCharts sessions={sessions} />
+      )}
+
+      {/* Enterprise Administration Pillars V2 */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 font-mono text-xs">
+        <Link
+          to="/admin/finops"
+          className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900 transition-all group"
+        >
+          <div className="flex items-center justify-between text-slate-400 group-hover:text-indigo-400 mb-1.5">
+            <span className="text-[10px] uppercase tracking-wider">Module 1</span>
+            <Coins className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-slate-200 font-semibold block text-[13px]">FinOps Budgets</span>
+          <span className="text-slate-500 text-[11px] block mt-0.5">Token hard-caps & routing</span>
+        </Link>
+
+        <Link
+          to="/admin/studio"
+          className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-cyan-500/50 hover:bg-slate-900 transition-all group"
+        >
+          <div className="flex items-center justify-between text-slate-400 group-hover:text-cyan-400 mb-1.5">
+            <span className="text-[10px] uppercase tracking-wider">Module 2</span>
+            <Sliders className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-slate-200 font-semibold block text-[13px]">Persona Studio</span>
+          <span className="text-slate-500 text-[11px] block mt-0.5">Rubrics & prompt versions</span>
+        </Link>
+
+        <Link
+          to="/admin/identity"
+          className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-900 transition-all group"
+        >
+          <div className="flex items-center justify-between text-slate-400 group-hover:text-emerald-400 mb-1.5">
+            <span className="text-[10px] uppercase tracking-wider">Module 3</span>
+            <Key className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-slate-200 font-semibold block text-[13px]">Enterprise SSO</span>
+          <span className="text-slate-500 text-[11px] block mt-0.5">SAML/SCIM & IdP sandbox</span>
+        </Link>
+
+        <Link
+          to="/admin/security-stream"
+          className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-rose-500/50 hover:bg-slate-900 transition-all group"
+        >
+          <div className="flex items-center justify-between text-slate-400 group-hover:text-rose-400 mb-1.5">
+            <span className="text-[10px] uppercase tracking-wider">Module 4</span>
+            <Radio className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
+          </div>
+          <span className="text-slate-200 font-semibold block text-[13px]">Security Visualizer</span>
+          <span className="text-slate-500 text-[11px] block mt-0.5">Live SSE threat stream</span>
+        </Link>
+
+        <Link
+          to="/admin/branding"
+          className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-900 transition-all group"
+        >
+          <div className="flex items-center justify-between text-slate-400 group-hover:text-amber-400 mb-1.5">
+            <span className="text-[10px] uppercase tracking-wider">Module 5</span>
+            <Globe className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-slate-200 font-semibold block text-[13px]">Whitelabeling</span>
+          <span className="text-slate-500 text-[11px] block mt-0.5">Custom domains & CSS injection</span>
+        </Link>
+      </div>
+
+      {/* D3.js Interactive Threat & Login Vectors World Map */}
+      {showThreatMap && (
+        <D3WorldThreatMap
+          events={allEvents}
+          onSimulateThreat={simulateThreat}
+          onSimulateLogin={simulateLogin}
+        />
       )}
 
       {/* Metric Tiles */}

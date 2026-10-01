@@ -637,5 +637,96 @@ export const promptVersions = pgTable('prompt_versions', {
   index('idx_prompt_versions_rubric').on(table.rubricTemplateId, table.version)
 ]);
 
+// --- Enterprise Identity & SSO Schema ---
+
+export const ssoConfigurations = pgTable('sso_configurations', {
+  id: text('id').primaryKey(),
+  providerType: text('provider_type').notNull().default('SAML_2_0'), // 'SAML_2_0' | 'OIDC' | 'OKTA' | 'ENTRA_ID' | 'GOOGLE_WORKSPACE' | 'PING_IDENTITY'
+  entityId: text('entity_id').notNull().default('https://ravengard.ai/saml/metadata'),
+  signOnUrl: text('sign_on_url').notNull().default('https://login.microsoftonline.com/common/saml2'),
+  x509Certificate: text('x509_certificate'),
+  issuerUrl: text('issuer_url'),
+  clientId: text('client_id'),
+  clientSecret: text('client_secret'),
+  enabled: boolean('enabled').notNull().default(true),
+  mfaPolicy: text('mfa_policy').notNull().default('TOTP'), // 'DISABLED' | 'TOTP' | 'WEBAUTHN' | 'STRICT_ENFORCEMENT'
+  allowedDomains: jsonb('allowed_domains').notNull().default(['ravengard.com', 'enterprise.corp']),
+  attributeMapping: jsonb('attribute_mapping').notNull().default({
+    email: 'email',
+    name: 'displayName',
+    role: 'groups'
+  }),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const scimTokens = pgTable('scim_tokens', {
+  id: text('id').primaryKey(),
+  tokenHash: text('token_hash').notNull(),
+  name: text('name').notNull().default('Okta SCIM 2.0 Connector'),
+  permissions: jsonb('permissions').notNull().default(['users:read', 'users:write', 'groups:read']),
+  lastUsedAt: timestamp('last_used_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const directorySyncLogs = pgTable('directory_sync_logs', {
+  id: text('id').primaryKey(),
+  provider: text('provider').notNull().default('Okta SCIM'),
+  action: text('action').notNull().default('SYNC_BATCH'), // 'CREATE_USER' | 'UPDATE_USER' | 'DEPROVISION_USER' | 'SYNC_BATCH'
+  email: text('email'),
+  status: text('status').notNull().default('SUCCESS'), // 'SUCCESS' | 'FAILURE' | 'SKIPPED'
+  details: text('details').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('idx_sync_logs_provider').on(table.provider, table.createdAt)
+]);
+
+// --- Real-Time Security & Compliance Visualizer Schema ---
+
+export const securityThreatLogs = pgTable('security_threat_logs', {
+  id: text('id').primaryKey(),
+  timestamp: timestamp('timestamp').defaultNow().notNull(),
+  threatType: text('threat_type').notNull(), // 'PROMPT_INJECTION' | 'SQL_INJECTION' | 'ZERO_DELETE_VIOLATION' | 'GEO_ANOMALY' | 'RATE_LIMIT_SPIKE' | 'UNAUTHORIZED_ACCESS'
+  severity: text('severity').notNull().default('MEDIUM'), // 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  ipAddress: text('ip_address').notNull(),
+  countryCode: text('country_code').notNull().default('US'),
+  city: text('city').notNull().default('Unknown'),
+  latitude: decimal('latitude', { precision: 9, scale: 6 }).notNull().default('37.7749'),
+  longitude: decimal('longitude', { precision: 9, scale: 6 }).notNull().default('-122.4194'),
+  rawPayloadSnippet: text('raw_payload_snippet').notNull(),
+  actionTaken: text('action_taken').notNull().default('BLOCKED'), // 'BLOCKED' | 'FLAGGED' | 'DEGRADED'
+  metadata: jsonb('metadata'),
+}, (table) => [
+  index('idx_threat_logs_time').on(table.timestamp),
+  index('idx_threat_logs_type').on(table.threatType, table.severity)
+]);
+
+// --- Tenant Whitelabeling & Branding Schema ---
+
+export const tenantBranding = pgTable('tenant_branding', {
+  id: text('id').primaryKey().default('default_tenant'),
+  customDomain: text('custom_domain').default('careers.ravengard.ai'),
+  domainVerified: boolean('domain_verified').notNull().default(false),
+  dnsStatus: text('dns_status').notNull().default('PENDING'), // 'PENDING' | 'VERIFIED' | 'FAILED'
+  dnsRecords: jsonb('dns_records').notNull().default({
+    cname: { host: 'careers', value: 'cname.ravengard.ai', status: 'verified' },
+    txt: { host: '_ravengard-verify', value: 'rvg_verify_8f7b2c9a1d', status: 'pending' }
+  }),
+  brandName: text('brand_name').notNull().default('Ravengard Talent'),
+  logoUrl: text('logo_url').default(''),
+  faviconUrl: text('favicon_url').default(''),
+  primaryColorHex: text('primary_color_hex').notNull().default('#4F46E5'),
+  accentColorHex: text('accent_color_hex').notNull().default('#06B6D4'),
+  candidateAgreementHtml: text('candidate_agreement_html').default('I hereby consent to participate in this AI-assisted structured interview evaluation. All answers are recorded, evaluated against standardized role competencies, and maintained securely under enterprise data privacy regulations.'),
+  smtpHost: text('smtp_host').default('smtp.sendgrid.net'),
+  smtpPort: integer('smtp_port').notNull().default(587),
+  smtpUser: text('smtp_user').default('apikey'),
+  smtpSenderEmail: text('smtp_sender_email').default('recruiting@ravengard.ai'),
+  smtpSenderName: text('smtp_sender_name').default('Ravengard Talent Acquisition'),
+  smtpSecure: boolean('smtp_secure').notNull().default(true),
+  smtpVerified: boolean('smtp_verified').notNull().default(true),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+
 
 

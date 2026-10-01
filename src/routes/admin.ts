@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db } from "../db/index";
+import { db, createPool } from "../db/index";
 import {
   candidates,
   sessions,
@@ -18,6 +18,7 @@ import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { authAdmin, requireRole, AdminAuthRequest } from "../middleware/admin";
 import { logAdminAction } from "../lib/auditLogger";
+import { recordAuditEvent } from "../services/enterpriseAuditService";
 import crypto from "crypto";
 
 const router = Router();
@@ -86,41 +87,63 @@ router.get("/jobs/pending", async (req, res) => {
   }
 });
 
-// ─── PATCH /api/admin/jobs/:id/approve ────────────────────────────────────────
-// Super Admin review and 1-click publishing
-router.patch("/jobs/:id/approve", requireRole("admin", "super_admin") as any, async (req, res) => {
+// ─── POST & PATCH /api/admin/jobs/:id/approve ─────────────────────────────────
+// Multi-Stage Requisition Approval Pipeline (Finance -> Tech Lead -> Published)
+const handleJobApprove = async (req: any, res: any) => {
   try {
     const jobId = req.params.id;
     const adminReq = req as AdminAuthRequest;
+    const role = (req.body?.role || adminReq.admin?.role || "").toLowerCase();
+    const notes = req.body?.notes || "";
+
+    const [existingJob] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    if (!existingJob) {
+      return res.status(404).json({ error: "Job requisition not found." });
+    }
+
+    let nextStatus = "published";
+    if (role === "finance_approver" || existingJob.status === "pending_finance" || (existingJob.status === "draft" && role.includes("finance"))) {
+      nextStatus = "pending_tech_lead";
+    } else {
+      nextStatus = "published";
+    }
+
+    const history = Array.isArray(existingJob.approvalHistory) ? [...existingJob.approvalHistory] : [];
+    history.push({
+      stage: existingJob.status,
+      action: nextStatus === "published" ? "TECH_LEAD_RUBRIC_APPROVED" : "FINANCE_BUDGET_APPROVED",
+      user: adminReq.user?.email || "admin@ravengard.com",
+      role: adminReq.admin?.role || role,
+      timestamp: new Date().toISOString(),
+      notes: notes || (nextStatus === "published" ? "Job approved and published." : "Finance envelope verified.")
+    });
 
     const [updatedJob] = await db
       .update(jobs)
       .set({
-        status: "published",
+        status: nextStatus,
         approvedBy: adminReq.admin?.id || "super_admin",
         approvedAt: new Date(),
+        approvalHistory: history,
         updatedAt: new Date(),
       })
       .where(eq(jobs.id, jobId))
       .returning();
 
-    if (!updatedJob) {
-      return res.status(404).json({ error: "Job requisition not found or already published." });
-    }
-
     await logAdminAction({
-      adminId: adminReq.admin!.id,
-      role: adminReq.admin!.role,
+      adminId: adminReq.admin?.id || "admin-root",
+      role: adminReq.admin?.role || "super_admin",
       action: "approve_job",
       target: `job:${jobId}`,
-      metadata: { status: "published" },
+      metadata: { status: nextStatus, role, notes },
       requestId: (req as any).requestId,
       ip: req.ip,
     });
 
     res.status(200).json({
       success: true,
-      message: "Job approved. It is now live on the Candidate Portal.",
+      message: nextStatus === "published" ? "Job approved. It is now live on the Candidate Portal." : "Finance approved. Stage advanced to pending_tech_lead.",
+      status: nextStatus,
       data: {
         jobId: updatedJob.id,
         status: updatedJob.status,
@@ -130,36 +153,52 @@ router.patch("/jobs/:id/approve", requireRole("admin", "super_admin") as any, as
     console.error("Admin approval error:", error);
     res.status(500).json({ error: "Failed to approve job requisition." });
   }
-});
+};
 
-// ─── PATCH /api/admin/jobs/:id/reject ─────────────────────────────────────────
-// Super Admin rejection with feedback note
-router.patch("/jobs/:id/reject", requireRole("admin", "super_admin") as any, async (req, res) => {
+router.post("/jobs/:id/approve", requireRole("admin", "super_admin", "finance_approver", "technical_interviewer", "hiring_manager") as any, handleJobApprove);
+router.patch("/jobs/:id/approve", requireRole("admin", "super_admin", "finance_approver", "technical_interviewer", "hiring_manager") as any, handleJobApprove);
+
+// ─── POST & PATCH /api/admin/jobs/:id/reject ──────────────────────────────────
+// Rejection with mandatory feedback returning state to 'draft'
+const handleJobReject = async (req: any, res: any) => {
   try {
     const jobId = req.params.id;
-    const { feedback } = req.body || {};
+    const { feedback, notes } = req.body || {};
     const adminReq = req as AdminAuthRequest;
+    const rejectionReason = feedback || notes || "Requisition requires revisions before publishing.";
+
+    const [existingJob] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    if (!existingJob) {
+      return res.status(404).json({ error: "Job requisition not found." });
+    }
+
+    const history = Array.isArray(existingJob.approvalHistory) ? [...existingJob.approvalHistory] : [];
+    history.push({
+      stage: existingJob.status,
+      action: "REQUISITION_REJECTED",
+      user: adminReq.user?.email || "admin@ravengard.com",
+      role: adminReq.admin?.role || "super_admin",
+      timestamp: new Date().toISOString(),
+      notes: rejectionReason
+    });
 
     const [updatedJob] = await db
       .update(jobs)
       .set({
         status: "draft",
-        approvalFeedback: feedback || "Requisition requires revisions before publishing.",
+        approvalFeedback: rejectionReason,
+        approvalHistory: history,
         updatedAt: new Date(),
       })
       .where(eq(jobs.id, jobId))
       .returning();
 
-    if (!updatedJob) {
-      return res.status(404).json({ error: "Job requisition not found." });
-    }
-
     await logAdminAction({
-      adminId: adminReq.admin!.id,
-      role: adminReq.admin!.role,
+      adminId: adminReq.admin?.id || "admin-root",
+      role: adminReq.admin?.role || "super_admin",
       action: "reject_job",
       target: `job:${jobId}`,
-      metadata: { feedback },
+      metadata: { feedback: rejectionReason },
       requestId: (req as any).requestId,
       ip: req.ip,
     });
@@ -167,6 +206,7 @@ router.patch("/jobs/:id/reject", requireRole("admin", "super_admin") as any, asy
     res.status(200).json({
       success: true,
       message: "Job sent back to HR drafts for revision.",
+      status: "draft",
       data: {
         jobId: updatedJob.id,
         status: updatedJob.status,
@@ -176,7 +216,10 @@ router.patch("/jobs/:id/reject", requireRole("admin", "super_admin") as any, asy
     console.error("Admin job rejection error:", error);
     res.status(500).json({ error: "Failed to reject job requisition." });
   }
-});
+};
+
+router.post("/jobs/:id/reject", requireRole("admin", "super_admin") as any, handleJobReject);
+router.patch("/jobs/:id/reject", requireRole("admin", "super_admin") as any, handleJobReject);
 
 // ─── POST /api/admin/jobs ─────────────────────────────────────────────────────
 // Create new Job Opening (e.g., Senior Distributed Systems Engineer)
@@ -286,6 +329,82 @@ router.post("/jobs/:id/magic-link", async (req, res) => {
   } catch (e) {
     console.error("admin/jobs/magic-link error:", e);
     res.status(500).json({ error: "Failed to generate magic candidate link." });
+  }
+});
+
+// ─── POST /api/admin/candidates/:id/generate-offer ───────────────────────────
+// Phase 4 Offer Generation: Outputs branded compensation & legal offer package
+router.post("/candidates/:id/generate-offer", requireRole("admin", "super_admin", "hr_admin", "recruiter", "hiring_manager") as any, async (req, res) => {
+  try {
+    const candidateId = req.params.id;
+    const adminReq = req as AdminAuthRequest;
+    const {
+      baseSalary = 185000,
+      bonusPercentage = 15,
+      stockGrantShares = 10000,
+      vestingYears = 4,
+      startDate = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      benefitsTier = "Enterprise Platinum",
+      notes = "Approved by hiring committee and executive leadership."
+    } = req.body || {};
+
+    const [candidate] = await db.select().from(candidates).where(eq(candidates.id, candidateId)).limit(1);
+    if (!candidate) {
+      return res.status(404).json({ error: "Candidate not found." });
+    }
+
+    const offerId = `OFR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const offerPackage = {
+      offerId,
+      candidateId: candidate.id,
+      candidateName: candidate.name,
+      candidateEmail: candidate.email,
+      compensation: {
+        baseSalary: typeof baseSalary === 'number' ? `$${baseSalary.toLocaleString()}` : baseSalary,
+        annualBonus: `${bonusPercentage}% Target Annual Performance Bonus`,
+        equityGrant: `${typeof stockGrantShares === 'number' ? stockGrantShares.toLocaleString() : stockGrantShares} Shares (${vestingYears}-year standard vesting)`,
+        benefitsTier
+      },
+      startDate,
+      status: "generated",
+      generatedBy: adminReq.user?.email || "admin@ravengard.com",
+      generatedAt: new Date().toISOString(),
+      notes
+    };
+
+    // Update application or candidate status if linked
+    const pool = createPool() || (db as any).session?.client || (global as any)._postgresPool;
+    if (pool) {
+      try {
+        await pool.query(
+          `UPDATE applications SET status = 'offered', offer_details_json = $1, updated_at = NOW() WHERE candidate_id = $2`,
+          [JSON.stringify(offerPackage), candidateId]
+        );
+      } catch (appUpdateErr) {
+        console.warn("Application status offer update notice:", appUpdateErr);
+      }
+    }
+
+    await logAdminAction({
+      adminId: adminReq.admin!.id,
+      role: adminReq.admin!.role,
+      action: "generate_offer",
+      target: `candidate:${candidateId}`,
+      metadata: { offerId, baseSalary, startDate },
+      requestId: (req as any).requestId,
+      ip: req.ip,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Branded offer package ${offerId} generated successfully.`,
+      offerId,
+      documentId: offerId,
+      offer: offerPackage
+    });
+  } catch (error: any) {
+    console.error("Admin generate-offer error:", error);
+    res.status(500).json({ error: "Failed to generate offer package." });
   }
 });
 
@@ -1546,7 +1665,7 @@ router.get("/setup-status", requireRole("super_admin", "admin") as any, async (r
 // Alias endpoint matching implementation plan
 router.post("/purge-demo-data", requireRole("super_admin") as any, async (req, res) => {
   try {
-    const pool = (db as any).session?.client || (global as any)._postgresPool;
+    const pool = createPool() || (db as any).session?.client || (global as any)._postgresPool;
     if (!pool) {
       return res.status(500).json({ error: "Database client unavailable." });
     }
@@ -1594,6 +1713,7 @@ router.post("/purge-demo-data", requireRole("super_admin") as any, async (req, r
 
     const userEmail = adminReq.user?.email || adminReq.admin!.id;
 
+    // 1. Immutable Admin Log
     await logAdminAction({
       adminId: adminReq.admin!.id,
       role: adminReq.admin!.role,
@@ -1602,24 +1722,35 @@ router.post("/purge-demo-data", requireRole("super_admin") as any, async (req, r
       metadata: {
         purgedBy: userEmail,
         timestamp: new Date().toISOString(),
-        tablesPurged: [
-          "candidates",
-          "sessions",
-          "applications",
-          "interview_reports",
-          "interview_questions",
-          "interview_responses",
-          "integrity_signals",
-          "hr_notifications"
-        ]
+        tablesPurged: tablesToPurge
       },
       requestId: (req as any).requestId,
       ip: req.ip,
     });
 
+    // 2. Immutable Enterprise Compliance Audit Log
+    await recordAuditEvent({
+      organizationId: "org-ravengard",
+      userId: adminReq.admin!.id,
+      userEmail,
+      userName: (adminReq.user as any)?.name || "Super Admin",
+      userRole: adminReq.admin!.role,
+      userDepartment: "Executive Oversight",
+      action: "ENTERPRISE_DEMO_DATA_PURGE",
+      resourceType: "database_clean_slate",
+      resourceId: "production_cutover",
+      details: {
+        confirmation: "PURGE-DEMO-DATA",
+        tablesPurged: tablesToPurge,
+        auditLogsRetained: true,
+        timestamp: new Date().toISOString(),
+      },
+      ipAddress: req.ip
+    });
+
     res.json({
       success: true,
-      message: "Enterprise demo data purge completed successfully. All candidate records, test transcripts, and notifications have been wiped.",
+      message: "Enterprise demo data purge completed successfully. All candidate records, test transcripts, and notifications have been wiped. Immutable audit logs remain intact.",
       timestamp: new Date().toISOString(),
       purgedBy: userEmail
     });

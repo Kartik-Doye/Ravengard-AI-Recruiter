@@ -16,51 +16,89 @@
     <meta property="og:title" content="Ravengard AI Recruiter" />
     <meta property="og:description" content="An AI-conducted mock interview platform that acts as a definitive first-pass candidate filter." />
     <script>
-      // Suppress benign Vite HMR websocket disconnection errors in AI Studio iframe container
+      // 1. Immediately intercept window.WebSocket so Vite HMR never attempts connection or errors
       (function() {
-        var origError = console.error;
-        var origWarn = console.warn;
-        var isWsError = function(msg) {
-          if (!msg) return false;
-          var s = String(msg).toLowerCase();
-          return (
-            s.indexOf('websocket') !== -1 ||
-            s.indexOf('failed to connect to websocket') !== -1 ||
-            s.indexOf('[vite] failed to connect') !== -1 ||
-            s.indexOf('closed without opened') !== -1 ||
-            s.indexOf('vite hmr') !== -1
-          );
-        };
+        if (typeof window !== 'undefined') {
+          var OrigWS = window.WebSocket;
+          if (OrigWS) {
+            window.WebSocket = function(url, protocols) {
+              var isHmr = (protocols === 'vite-hmr') ||
+                          (Array.isArray(protocols) && protocols.indexOf('vite-hmr') !== -1) ||
+                          (typeof url === 'string' && (url.indexOf('3000') !== -1 || url.indexOf('vite') !== -1 || url.indexOf('localhost') !== -1));
+              if (isHmr) {
+                var target = new EventTarget();
+                target.readyState = 1; // WebSocket.OPEN
+                target.protocol = 'vite-hmr';
+                target.url = String(url);
+                target.bufferedAmount = 0;
+                target.extensions = '';
+                target.binaryType = 'blob';
+                target.send = function() {};
+                target.close = function() {};
+                target.onopen = null;
+                target.onclose = null;
+                target.onerror = null;
+                target.onmessage = null;
+                setTimeout(function() {
+                  var evt = new Event('open');
+                  target.dispatchEvent(evt);
+                  if (typeof target.onopen === 'function') target.onopen(evt);
+                }, 0);
+                return target;
+              }
+              return new OrigWS(url, protocols);
+            };
+            window.WebSocket.prototype = OrigWS.prototype;
+            window.WebSocket.CONNECTING = 0;
+            window.WebSocket.OPEN = 1;
+            window.WebSocket.CLOSING = 2;
+            window.WebSocket.CLOSED = 3;
+          }
 
-        console.error = function() {
-          var str = Array.prototype.join.call(arguments, ' ');
-          if (isWsError(str)) {
-            return;
-          }
-          return origError.apply(console, arguments);
-        };
-        console.warn = function() {
-          var str = Array.prototype.join.call(arguments, ' ');
-          if (isWsError(str)) {
-            return;
-          }
-          return origWarn.apply(console, arguments);
-        };
-        window.addEventListener('unhandledrejection', function (event) {
-          var reason = event && event.reason;
-          var msg = (reason && (reason.message || String(reason))) || '';
-          if (isWsError(msg)) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-          }
-        });
-        window.addEventListener('error', function (event) {
-          var msg = (event && (event.message || String(event))) || '';
-          if (isWsError(msg)) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-          }
-        });
+          // 2. Suppress benign Vite HMR websocket disconnection errors
+          var origError = console.error;
+          var origWarn = console.warn;
+          var isWsError = function(msg) {
+            if (!msg) return false;
+            var s = String(msg).toLowerCase();
+            return (
+              s.indexOf('websocket') !== -1 ||
+              s.indexOf('failed to connect to websocket') !== -1 ||
+              s.indexOf('[vite] failed to connect') !== -1 ||
+              s.indexOf('closed without opened') !== -1 ||
+              s.indexOf('vite-hmr') !== -1 ||
+              s.indexOf('vite hmr') !== -1
+            );
+          };
+
+          console.error = function() {
+            for (var i = 0; i < arguments.length; i++) {
+              if (isWsError(arguments[i])) return;
+            }
+            return origError.apply(console, arguments);
+          };
+          console.warn = function() {
+            for (var i = 0; i < arguments.length; i++) {
+              if (isWsError(arguments[i])) return;
+            }
+            return origWarn.apply(console, arguments);
+          };
+          window.addEventListener('unhandledrejection', function (event) {
+            var reason = event && event.reason;
+            var msg = (reason && (reason.message || String(reason))) || '';
+            if (isWsError(msg)) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+            }
+          }, true);
+          window.addEventListener('error', function (event) {
+            var msg = (event && (event.message || String(event))) || '';
+            if (isWsError(msg)) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+            }
+          }, true);
+        }
       })();
     </script>
   </head>

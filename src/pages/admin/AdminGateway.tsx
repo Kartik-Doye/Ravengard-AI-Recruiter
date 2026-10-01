@@ -11,10 +11,17 @@ import { AtsPipeline } from './AtsPipeline';
 import { JobsPage } from './JobsPage';
 import { JobApprovalGate } from './JobApprovalGate';
 import { AdminTelemetryDashboard } from './AdminTelemetryDashboard';
+import { FinOpsControllerView } from '../../components/admin/FinOpsControllerView';
+import { PersonaStudioView } from '../../components/admin/PersonaStudioView';
+import { SsoDirectoryView } from '../../components/admin/SsoDirectoryView';
+import { SecurityVisualizerView } from '../../components/admin/SecurityVisualizerView';
+import { TenantBrandingView } from '../../components/admin/TenantBrandingView';
 import { ApiSettings } from '../../components/admin/ApiSettings';
 import { AdminSettings } from './AdminSettings';
 import { ShieldCheck, LogOut, ArrowLeft } from 'lucide-react';
 import { AdminLayout } from '../../components/layout/AdminLayout';
+import { SecurityStreamProvider } from '../../contexts/SecurityStreamContext';
+import { LiveSecurityDrawer } from '../../components/admin/LiveSecurityDrawer';
 
 export default function AdminGateway() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -80,28 +87,36 @@ export default function AdminGateway() {
   }
 
   return (
-    <AdminLayout
-      title="Ravengard"
-      badge="ADMIN AUDIT"
-      onLogout={handleLogout}
-    >
-      <div className="p-6 max-w-7xl mx-auto">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/jobs" element={<JobApprovalGate />} />
-          <Route path="/ats" element={<AtsPipeline />} />
-          <Route path="/telemetry" element={<AdminTelemetryDashboard />} />
-          <Route path="/candidates" element={<CandidatesPage />} />
-          <Route path="/candidates/:id" element={<CandidateDetail />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/flags" element={<FlagQueue />} />
-          <Route path="/api-settings" element={<ApiSettings />} />
-          <Route path="/settings" element={<AdminSettings />} />
-          <Route path="/sessions/:id" element={<SessionDetail />} />
-          <Route path="/session/:id" element={<SessionDetail />} />
-          <Route path="*" element={<Navigate to="/admin" replace />} />
-        </Routes>
-      </div>
-    </AdminLayout>
+    <SecurityStreamProvider>
+      <AdminLayout
+        title="Ravengard"
+        badge="ADMIN AUDIT"
+        onLogout={handleLogout}
+      >
+        <div className="p-6 max-w-7xl mx-auto">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/jobs" element={<JobApprovalGate />} />
+            <Route path="/ats" element={<AtsPipeline />} />
+            <Route path="/finops" element={<FinOpsControllerView />} />
+            <Route path="/studio" element={<PersonaStudioView />} />
+            <Route path="/identity" element={<SsoDirectoryView />} />
+            <Route path="/security-stream" element={<SecurityVisualizerView />} />
+            <Route path="/branding" element={<TenantBrandingView />} />
+            <Route path="/telemetry" element={<AdminTelemetryDashboard />} />
+            <Route path="/candidates" element={<CandidatesPage />} />
+            <Route path="/candidates/:id" element={<CandidateDetail />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/flags" element={<FlagQueue />} />
+            <Route path="/api-settings" element={<ApiSettings />} />
+            <Route path="/settings" element={<AdminSettings />} />
+            <Route path="/sessions/:id" element={<SessionDetail />} />
+            <Route path="/session/:id" element={<SessionDetail />} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Routes>
+        </div>
+      </AdminLayout>
+      <LiveSecurityDrawer />
+    </SecurityStreamProvider>
   );
 }

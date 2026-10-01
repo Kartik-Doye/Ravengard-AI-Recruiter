@@ -5,12 +5,13 @@ import { adminUsers } from "../db/schema";
 import { eq } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 
-export type AdminRole = "admin" | "reviewer" | "viewer" | "super_admin" | "hr_admin" | "hr_user" | "recruiter" | "hiring_manager" | "HR" | "ADMIN";
+export type AdminRole = "admin" | "reviewer" | "viewer" | "super_admin" | "hr_admin" | "hr_user" | "recruiter" | "hiring_manager" | "finance_approver" | "technical_interviewer" | "tech_lead" | "HR" | "ADMIN";
 
 export interface AdminAuthRequest extends AuthRequest {
   admin?: {
     id: string;
     role: AdminRole;
+    email?: string;
   };
 }
 
