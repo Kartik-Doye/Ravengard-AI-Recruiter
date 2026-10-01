@@ -16,11 +16,13 @@ import { adminWhitelabelRouter } from "../routes/adminWhitelabel";
 import { scimRouter } from "../routes/scimRouter";
 import telemetryRouter from "../routes/telemetry";
 import { healthCheckRouter } from "../healthCheck";
+import { adminTopologyGuard } from "../middleware/topologyGuard";
 
 export async function createAdminApp() {
   const app = express();
   app.set("trust proxy", true);
 
+  app.use(adminTopologyGuard);
   app.use(express.json({ limit: "15mb" }));
   app.use(express.urlencoded({ extended: true, limit: "15mb" }));
   app.use(cookieParser());

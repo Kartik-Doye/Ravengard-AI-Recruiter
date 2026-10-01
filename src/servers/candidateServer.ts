@@ -11,11 +11,13 @@ import { candidatePortalRouter } from "../routes/candidatePortal";
 import { publicJobsRouter } from "../routes/publicJobs";
 import candidateRoutes from "../routes/candidate";
 import { healthCheckRouter } from "../healthCheck";
+import { candidateTopologyGuard } from "../middleware/topologyGuard";
 
 export async function createCandidateApp() {
   const app = express();
   app.set("trust proxy", true);
 
+  app.use(candidateTopologyGuard);
   app.use(express.json({ limit: "15mb" }));
   app.use(express.urlencoded({ extended: true, limit: "15mb" }));
   app.use(cookieParser());

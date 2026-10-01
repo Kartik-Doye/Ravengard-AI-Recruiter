@@ -51,6 +51,8 @@ import cookieParser from "cookie-parser";
 import { enterpriseAuditInterceptor } from "./src/services/enterpriseAuditService";
 import { llmDatabaseSafetyGuard } from "./src/middleware/llmDatabaseSafetyGuard";
 
+import { candidateTopologyGuard } from "./src/middleware/topologyGuard";
+
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // --- Shared Helpers ---
@@ -139,6 +141,7 @@ async function startServer() {
   const PORT = parseInt(process.env.PORT || "3000", 10);
   const app = express();
   app.set("trust proxy", 1);
+  app.use(candidateTopologyGuard);
   app.use(correlationIdMiddleware);
   app.use(requestLogger);
   app.use(cookieParser());

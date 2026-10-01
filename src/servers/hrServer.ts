@@ -12,11 +12,13 @@ import { authRouter } from "../routes/auth";
 import { schedulingRouter } from "../routes/scheduling";
 import { integrationsRouter } from "../routes/integrationsRouter";
 import { healthCheckRouter } from "../healthCheck";
+import { hrTopologyGuard } from "../middleware/topologyGuard";
 
 export async function createHrApp() {
   const app = express();
   app.set("trust proxy", true);
 
+  app.use(hrTopologyGuard);
   app.use(express.json({ limit: "15mb" }));
   app.use(express.urlencoded({ extended: true, limit: "15mb" }));
   app.use(cookieParser());
