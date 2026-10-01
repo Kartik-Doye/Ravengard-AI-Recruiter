@@ -18,6 +18,7 @@ import { generateWelcomeChecklist, generateInstructionsResponse, validateDeviceC
 import { sendWelcomeEmail } from "./src/lib/email";
 import crypto from "crypto";
 import fs from "fs/promises";
+import fsSync from "fs";
 import { registrationSchema, reportSchema } from "./src/lib/validation";
 import adminRoutes from "./src/routes/admin";
 import adminFinOpsRouter from "./src/routes/adminFinOps";
@@ -148,7 +149,7 @@ async function startServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use("/api", healthCheckRouter);
-  app.use(healthCheckRouter);
+  app.use("/health", healthCheckRouter);
 
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -1593,10 +1594,12 @@ ${allRoutes.map(r => `  <url>
     });
     app.use(vite.middlewares);
   } else {
-    const buildPath = path.join(process.cwd(), 'build');
-    app.use(express.static(buildPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(buildPath, 'index.html'));
+    const distPath = fsSync.existsSync(path.join(process.cwd(), "dist"))
+      ? path.join(process.cwd(), "dist")
+      : path.join(process.cwd(), "build");
+    app.use(express.static(distPath));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
