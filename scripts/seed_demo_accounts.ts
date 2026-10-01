@@ -21,7 +21,9 @@ async function seedDemoAccounts() {
       console.error("ERROR: ADMIN_PASSWORD_HASH env var is required for seeding. Set it to a secure password.");
       process.exit(1);
     }
-    const passwordHash = await bcrypt.hash(defaultPassword, 10);
+    const passwordHash = defaultPassword.startsWith("$2b$")
+      ? defaultPassword
+      : await bcrypt.hash(defaultPassword, 10);
 
     await pool.query(`
       INSERT INTO admin_users (id, email, name, role, organization_id, password_hash)
@@ -36,7 +38,7 @@ async function seedDemoAccounts() {
         password_hash = EXCLUDED.password_hash;
     `, [passwordHash]);
 
-    console.log("✅ Seeded Admin & HR users with password:", defaultPassword);
+    console.log("✅ Seeded Admin & HR users with configured ADMIN_PASSWORD_HASH.");
     console.log("   - superadmin@ravengard.com (super_admin)");
     console.log("   - admin@ravengard.com (super_admin)");
     console.log("   - hr@ravengard.com (hr_admin)");

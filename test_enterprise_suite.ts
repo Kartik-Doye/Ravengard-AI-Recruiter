@@ -53,7 +53,7 @@ async function startTestServer(): Promise<any> {
         return res.status(400).json({ success: false, error: "Setup token and password are required." });
       }
 
-      const isValid = AdminSetupService.verifyAndConsumeToken(targetEmail, token.trim()) || token.trim().startsWith("audit-token-");
+      const isValid = AdminSetupService.verifyAndConsumeToken(targetEmail, token.trim());
       if (!isValid) {
         return res.status(401).json({ success: false, error: "Invalid setup token." });
       }
@@ -129,7 +129,7 @@ async function runAllTests() {
       { id: "admin-finance", email: "finance@ravengard.com", name: "Morgan Taylor (Finance Approver)", role: "finance_approver", dept: "Finance" },
     ];
 
-    const defaultHashed = await bcrypt.hash("admin123", 10);
+    const defaultHashed = await bcrypt.hash(process.env.ADMIN_PASSWORD_HASH || "EnterpriseAuditedPassword#2026", 10);
     for (const p of personas) {
       const [existing] = await db.select().from(adminUsers).where(eq(adminUsers.email, p.email)).limit(1);
       if (!existing) {
@@ -152,7 +152,7 @@ async function runAllTests() {
     // ============================================================================
     console.log("\n--- Suite 1: Super Admin Provisioning & Setup Token Lifecycle ---");
     const superAdminEmail = "madhunand@gmail.com";
-    const testSetupToken = "audit-token-" + crypto.randomBytes(8).toString("hex");
+    const testSetupToken = "setup-token-" + crypto.randomBytes(8).toString("hex");
 
     AdminSetupService.setSetupToken(superAdminEmail, testSetupToken);
     assert(true, "Suite 1", "Super Admin Provisioning", `Verified ${superAdminEmail} registered as super_admin`);

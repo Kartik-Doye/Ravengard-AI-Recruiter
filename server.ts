@@ -1571,12 +1571,10 @@ ${allRoutes.map(r => `  <url>
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = fsSync.existsSync(path.join(process.cwd(), "dist"))
-      ? path.join(process.cwd(), "dist")
-      : path.join(process.cwd(), "build");
-    app.use(express.static(distPath));
+    const buildPath = path.join(process.cwd(), "build");
+    app.use(express.static(buildPath));
     app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      res.sendFile(path.join(buildPath, "index.html"));
     });
   }
 
@@ -1709,9 +1707,9 @@ ${allRoutes.map(r => `  <url>
     const { createHrApp } = await import("./src/servers/hrServer");
     const hrApp = await createHrApp();
     if (process.env.NODE_ENV === "production") {
-      const distPath = path.join(process.cwd(), "dist");
-      hrApp.use(express.static(distPath));
-      hrApp.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
+      const buildPath = path.join(process.cwd(), "build");
+      hrApp.use(express.static(buildPath));
+      hrApp.get("*", (_req, res) => res.sendFile(path.join(buildPath, "index.html")));
     }
     const hrServer = hrApp.listen(PORT_HR, "0.0.0.0", () => {
       console.log(`[HR Workspace Listener] Started on Port ${PORT_HR}`);
@@ -1728,9 +1726,9 @@ ${allRoutes.map(r => `  <url>
     const { createAdminApp } = await import("./src/servers/adminServer");
     const adminApp = await createAdminApp();
     if (process.env.NODE_ENV === "production") {
-      const distPath = path.join(process.cwd(), "dist");
-      adminApp.use(express.static(distPath));
-      adminApp.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")));
+      const buildPath = path.join(process.cwd(), "build");
+      adminApp.use(express.static(buildPath));
+      adminApp.get("*", (_req, res) => res.sendFile(path.join(buildPath, "index.html")));
     }
     const adminServer = adminApp.listen(PORT_ADMIN, "0.0.0.0", () => {
       console.log(`[Admin Console Listener] Started on Port ${PORT_ADMIN}`);

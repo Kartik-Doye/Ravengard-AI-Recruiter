@@ -13,6 +13,8 @@ import candidateRoutes from "../routes/candidate";
 import { healthCheckRouter } from "../healthCheck";
 import { candidateTopologyGuard } from "../middleware/topologyGuard";
 
+import candidateInterviewRoutes from "../routes/candidateInterviewRoutes";
+
 export async function createCandidateApp() {
   const app = express();
   app.set("trust proxy", true);
@@ -39,6 +41,7 @@ export async function createCandidateApp() {
   app.use("/api/public/jobs", publicJobsRouter);
   app.use("/api/candidate", candidatePortalRouter);
   app.use("/api/candidate", candidateRoutes);
+  app.use("/api", candidateInterviewRoutes);
 
   return app;
 }
@@ -53,10 +56,10 @@ export async function startCandidateServer(port = Number(process.env.PORT_CANDID
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "build");
-    app.use(express.static(distPath));
+    const buildPath = path.join(process.cwd(), "build");
+    app.use(express.static(buildPath));
     app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      res.sendFile(path.join(buildPath, "index.html"));
     });
   }
 

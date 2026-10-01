@@ -18,6 +18,8 @@ import telemetryRouter from "../routes/telemetry";
 import { healthCheckRouter } from "../healthCheck";
 import { adminTopologyGuard } from "../middleware/topologyGuard";
 
+import { handleAdminLogin } from "../controllers/adminAuthController";
+
 export async function createAdminApp() {
   const app = express();
   app.set("trust proxy", true);
@@ -38,6 +40,9 @@ export async function createAdminApp() {
     message: { error: "Too many requests to Enterprise Admin Console, please slow down." }
   });
   app.use("/api/admin", adminLimiter);
+
+  // Public Admin Auth Endpoint (prior to authenticated routes)
+  app.post("/api/admin/login", handleAdminLogin);
 
   // Mount Admin Console Endpoints
   app.use("/api/health", healthCheckRouter);
@@ -63,10 +68,10 @@ export async function startAdminServer(port = Number(process.env.PORT_ADMIN || 3
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "build");
-    app.use(express.static(distPath));
+    const buildPath = path.join(process.cwd(), "build");
+    app.use(express.static(buildPath));
     app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      res.sendFile(path.join(buildPath, "index.html"));
     });
   }
 

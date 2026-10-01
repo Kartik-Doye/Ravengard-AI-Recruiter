@@ -16,7 +16,7 @@
     "build": "npm run clean && npm run sitemap && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=build/server.cjs && npm run validate-build",
     "start": "node build/server.cjs",
     "preview": "vite preview",
-    "clean": "rm -rf dist build server.js",
+    "clean": "node -e \"const fs=require('fs');['dist','build','server.js'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true})}catch{}})\"",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
@@ -26,7 +26,7 @@
     "qa": "node scripts/qa-check-routes.js",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:migrate": "tsx scripts/migrate_assessment_expires_at.ts"
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

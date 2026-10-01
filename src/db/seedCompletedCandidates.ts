@@ -220,7 +220,11 @@ export async function seedCompletedCandidatesAndAdmin() {
       for (const p of personas) {
         const [existing] = await db.select().from(adminUsers).where(eq(adminUsers.email, p.email)).limit(1);
         if (!existing) {
-          const hashed = await bcrypt.hash('admin123', 10);
+          const adminPassword = process.env.ADMIN_PASSWORD_HASH;
+          const hashed = adminPassword 
+            ? (adminPassword.startsWith("$2b$") ? adminPassword : await bcrypt.hash(adminPassword, 10))
+            : await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 10);
+
           await db.insert(adminUsers).values({
             id: p.id,
             email: p.email,

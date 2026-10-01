@@ -68,7 +68,7 @@ async function run() {
   const loginRes = await fetch(`${BASE_URL}/api/admin/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "admin@ravengard.com", password: "admin123" })
+    body: JSON.stringify({ email: "admin@ravengard.com", password: process.env.ADMIN_PASSWORD || "EnterpriseAuditedPassword#2026" })
   });
 
   if (!loginRes.ok) {

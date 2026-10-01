@@ -1,35 +1,19 @@
-const routes = [
-  "/",
-  "/about",
-  "/projects",
-  "/contact",
-  "/gateway",
-];
+#!/usr/bin/env node
+import { spawn } from "child_process";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const requiredStates = [
-  "header",
-  "footer",
-  "loader",
-  "pageTransition",
-  "responsiveLayout",
-  "noConsoleErrors",
-];
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const tsScript = path.join(__dirname, "qa-check-routes.ts");
 
-function checkRoute(route) {
-  return {
-    route,
-    status: "pass",
-    checks: {
-      header: true,
-      footer: true,
-      loader: true,
-      pageTransition: true,
-      responsiveLayout: true,
-      noConsoleErrors: true,
-    },
-  };
-}
+const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+const child = spawn(npx, ["tsx", tsScript], {
+  stdio: "inherit",
+  shell: true,
+  env: process.env,
+});
 
-const report = routes.map(checkRoute);
-
-console.log(JSON.stringify({ requiredStates, report }, null, 2));
+child.on("exit", (code) => {
+  process.exit(code || 0);
+});

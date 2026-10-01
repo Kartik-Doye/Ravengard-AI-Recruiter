@@ -491,7 +491,10 @@ export async function syncFunnelTablesAndSeed() {
 
     console.log("[DB Sync] Funnel tables, question banks, rubrics, and schemas synchronized successfully.");
   } catch (err: any) {
-    console.error("[DB Sync] Warning during syncFunnelTablesAndSeed:", err.message);
+    console.error("[DB Sync] Error during syncFunnelTablesAndSeed:", err.message);
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(`[DB Sync Fatal] Database synchronization failed in production: ${err.message}`);
+    }
   } finally {
     if (client) client.release();
     try {

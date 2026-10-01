@@ -12,6 +12,7 @@ export default {
   schema: "./src/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
+  schemaFilter: ["public", "ravengard"],
   dbCredentials: {
     url: dbUrl!,
   },
