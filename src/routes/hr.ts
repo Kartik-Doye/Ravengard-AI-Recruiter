@@ -64,7 +64,7 @@ hrRouter.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials." });
     }
 
-    const isValid = (await bcrypt.compare(password, user.passwordHash)) || password === "admin123" || password === "kartik@doye#26";
+    const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
       return res.status(401).json({ error: "Invalid credentials." });
     }

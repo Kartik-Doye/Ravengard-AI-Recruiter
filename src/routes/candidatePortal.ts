@@ -131,26 +131,16 @@ candidatePortalRouter.post("/auth/login", async (req: Request, res: Response) =>
     const normalizedEmail = email.trim().toLowerCase();
     let [candidate] = await db.select().from(candidates).where(eq(candidates.email, normalizedEmail)).limit(1);
 
-    if (!candidate && normalizedEmail === "candidate@ravengard.com") {
-      const demoCandidateId = `cand-demo-active`;
-      const demoHash = await bcrypt.hash("demo123", 10);
-      const [created] = await db.insert(candidates).values({
-        id: demoCandidateId,
-        email: "candidate@ravengard.com",
-        name: "Alex Chen (Demo Candidate)",
-        passwordHash: demoHash,
-        organizationId: "org-ravengard-default",
-        emailVerified: true,
-      }).returning();
-      candidate = created;
-    }
-
     if (!candidate) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
-    if (candidate.passwordHash) {
-      const isValid = (await bcrypt.compare(password, candidate.passwordHash)) || password === "demo123" || password === "password123" || password === "candidate123";
+    if (!candidate.passwordHash) {
+      return res.status(401).json({ error: "Account requires token-based authentication. Please use the magic link sent to your email." });
+    }
+
+    {
+      const isValid = await bcrypt.compare(password, candidate.passwordHash);
       if (!isValid) {
         return res.status(401).json({ error: "Invalid email or password." });
       }

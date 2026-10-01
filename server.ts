@@ -189,8 +189,8 @@ app.post("/api/auth/setup-admin", async (req, res) => {
       return res.status(404).json({ success: false, error: "Target administrator account not found." });
     }
 
-    // Verify setup token using AdminSetupService or fallback
-    const isValidToken = AdminSetupService.verifyAndConsumeToken(targetEmail, token.trim()) || token.trim().startsWith("audit-token-");
+    // Verify setup token using AdminSetupService (strict verification only)
+    const isValidToken = AdminSetupService.verifyAndConsumeToken(targetEmail, token.trim());
     if (!isValidToken) {
       return res.status(401).json({ success: false, error: "Invalid or expired setup token." });
     }
@@ -245,35 +245,12 @@ app.post("/api/admin/login", async (req, res) => {
   const lookupEmail = identifier === "admin" ? "admin@ravengard.com" : (identifier === "hr" ? "hr@ravengard.com" : identifier);
   let [adminRecord] = await db.select().from(adminUsers).where(eq(adminUsers.email, lookupEmail)).limit(1);
 
-  // Auto-seed default HR or Admin accounts if not yet in database
-  if (!adminRecord && (lookupEmail === "hr@ravengard.com" || lookupEmail === "admin@ravengard.com")) {
-    const isHr = lookupEmail === "hr@ravengard.com";
-    const newId = isHr ? "hr-root" : "admin-root";
-    const role = isHr ? "hr_admin" : "admin";
-    const name = isHr ? "Ravengard HR Director" : "Ravengard Lead Auditor";
-    const hashed = await bcrypt.hash("admin123", 10);
-    try {
-      const [inserted] = await db.insert(adminUsers).values({
-        id: newId,
-        email: lookupEmail,
-        name,
-        role,
-        passwordHash: hashed,
-        organizationId: "org-ravengard"
-      }).returning();
-      adminRecord = inserted;
-    } catch {
-      // If conflict, re-fetch
-      const [reFetched] = await db.select().from(adminUsers).where(eq(adminUsers.email, lookupEmail)).limit(1);
-      adminRecord = reFetched;
-    }
-  }
 
   if (!adminRecord || !adminRecord.passwordHash) {
     return res.status(401).json({ success: false, error: "Invalid credentials." });
   }
 
-  const passwordValid = (await bcrypt.compare(password, adminRecord.passwordHash)) || password === "admin123" || password === "kartik@doye#26";
+  const passwordValid = await bcrypt.compare(password, adminRecord.passwordHash);
   if (!passwordValid) {
     return res.status(401).json({ success: false, error: "Invalid credentials." });
   }

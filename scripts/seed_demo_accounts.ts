@@ -16,7 +16,11 @@ async function seedDemoAccounts() {
     `);
 
     // 2. Ensure Super Admin user
-    const defaultPassword = process.env.ADMIN_PASSWORD_HASH || "kartik@doye#26";
+    const defaultPassword = process.env.ADMIN_PASSWORD_HASH;
+    if (!defaultPassword) {
+      console.error("ERROR: ADMIN_PASSWORD_HASH env var is required for seeding. Set it to a secure password.");
+      process.exit(1);
+    }
     const passwordHash = await bcrypt.hash(defaultPassword, 10);
 
     await pool.query(`
