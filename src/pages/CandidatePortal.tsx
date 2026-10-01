@@ -35,6 +35,7 @@ import {
   PenTool,
 } from 'lucide-react';
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal';
+import { CandidateAuth } from '../components/auth/CandidateAuth';
 
 interface ApplicationItem {
   application_id: string;
@@ -93,10 +94,10 @@ export default function CandidatePortal() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Auth Form State (Login / Register)
+  // Auth Form State (Login / Register) - Pre-populated with demo credentials for seamless testing
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
+  const [authEmail, setAuthEmail] = useState('candidate@ravengard.com');
+  const [authPassword, setAuthPassword] = useState('demo123');
   const [authName, setAuthName] = useState('');
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
@@ -580,147 +581,18 @@ export default function CandidatePortal() {
   };
 
   // ==========================================================================
-  // RENDER: NOT AUTHENTICATED (Login / Register Screen)
+  // RENDER: NOT AUTHENTICATED (Candidate Auth Screen)
   // ==========================================================================
   if (!token) {
     return (
-      <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden">
-        {/* Background glow ambient */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-cyan-600/10 rounded-full blur-[140px] pointer-events-none" />
-        <div className="absolute -bottom-20 right-10 w-[400px] h-[400px] bg-violet-600/10 rounded-full blur-[120px] pointer-events-none" />
-
-        <div className="w-full max-w-md bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl relative z-10">
-          <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300 shadow-lg shadow-cyan-500/20">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="font-bold text-lg tracking-tight text-white">Candidate Portal</h1>
-                <p className="text-xs text-slate-400">Ravengard Assessment Hub</p>
-              </div>
-            </div>
-            <div className="flex bg-slate-800/80 rounded-xl p-1 border border-white/5 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setAuthMode('login')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${authMode === 'login' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'text-slate-400 hover:text-white'}`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuthMode('register')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${authMode === 'register' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'text-slate-400 hover:text-white'}`}
-              >
-                Register
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-start gap-3 animate-shake">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleAuthSubmit} className="space-y-4">
-            {authMode === 'register' && (
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">Full Name</label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    required
-                    value={authName}
-                    onChange={(e) => setAuthName(e.target.value)}
-                    placeholder="e.g. Alex Chen"
-                    className="w-full bg-slate-950/60 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-500/20"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                <input
-                  type="email"
-                  required
-                  value={authEmail}
-                  onChange={(e) => setAuthEmail(e.target.value)}
-                  placeholder="candidate@example.com"
-                  className="w-full bg-slate-950/60 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-500/20"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-medium text-slate-300">Password</label>
-                {authMode === 'login' && (
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotModal(true)}
-                    className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
-                  >
-                    Forgot?
-                  </button>
-                )}
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                <input
-                  type="password"
-                  required
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-950/60 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-500/20"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={authSubmitting}
-              className="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-500/20 transition-all transform active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {authSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-              <span>{authMode === 'register' ? 'Create Candidate Account' : 'Sign In to Portal'}</span>
-            </button>
-          </form>
-
-          <div className="relative my-6 text-center">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
-            <span className="relative bg-slate-900 px-3 text-[11px] font-semibold tracking-wider uppercase text-slate-500">or fast track</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleFastTrackDemo}
-            disabled={authSubmitting}
-            className="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-white/10 hover:border-cyan-500/30 text-xs font-semibold text-cyan-300 transition-all flex items-center justify-center gap-2"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Launch Interactive Candidate Demo</span>
-          </button>
-
-          <div className="mt-6 text-center">
-            <Link to="/careers" className="text-xs text-slate-400 hover:text-white transition-colors inline-flex items-center gap-1.5">
-              <span>Looking for open roles?</span>
-              <span className="text-cyan-400 underline underline-offset-4">Explore Careers</span>
-            </Link>
-          </div>
-        </div>
-
-        {showForgotModal && (
-          <ForgotPasswordModal isOpen={showForgotModal} onClose={() => setShowForgotModal(false)} />
-        )}
-      </div>
+      <CandidateAuth
+        onSuccess={(newToken, cand) => {
+          setToken(newToken);
+          if (cand?.name) setCandidateName(cand.name);
+          if (cand?.email) setCandidateEmail(cand.email);
+          loadInbox();
+        }}
+      />
     );
   }
 

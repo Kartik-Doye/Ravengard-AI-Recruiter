@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft } from "lucide-react";
 import { RavengardSymbol } from "../ui/RavengardSymbol";
 import { DemoLink } from "../ui/DemoLink";
+import { CandidateAuth } from "../auth/CandidateAuth";
 
 type NavLink = {
   label: string;
@@ -22,6 +23,7 @@ export function SiteHeader() {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showCandidateAuthModal, setShowCandidateAuthModal] = useState(false);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -109,12 +111,21 @@ export function SiteHeader() {
             })}
           </nav>
 
-          <Link
-            to="/admin/login"
-            className="hidden md:inline-flex items-center justify-center rounded-full bg-white px-5 py-2 text-sm font-semibold text-zinc-950 hover:bg-zinc-100 transition-colors ml-2 shadow-sm"
-          >
-            Admin Portal
-          </Link>
+          <div className="hidden md:flex items-center gap-2.5 ml-2">
+            <button
+              type="button"
+              onClick={() => setShowCandidateAuthModal(true)}
+              className="inline-flex items-center justify-center rounded-full border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-xs font-semibold text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400 transition-all shadow-sm shadow-cyan-500/10 cursor-pointer"
+            >
+              Candidate Login
+            </button>
+            <Link
+              to="/admin/login"
+              className="inline-flex items-center justify-center rounded-full bg-white px-5 py-2 text-sm font-semibold text-zinc-950 hover:bg-zinc-100 transition-colors shadow-sm"
+            >
+              Admin Portal
+            </Link>
+          </div>
           
           <button
             type="button"
@@ -182,10 +193,20 @@ export function SiteHeader() {
               })}
               
               <div className="pt-2 border-t border-white/10 flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    setShowCandidateAuthModal(true);
+                  }}
+                  className="block w-full rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-5 py-3.5 text-base font-semibold text-center text-cyan-300 hover:bg-cyan-500/20 transition-all cursor-pointer"
+                >
+                  Candidate Login
+                </button>
                 <Link
                   to="/admin/login"
                   onClick={() => setMobileOpen(false)}
-                  className="block rounded-2xl bg-white px-5 py-4 text-base font-semibold text-center text-zinc-950 hover:bg-zinc-100 transition-colors"
+                  className="block rounded-2xl bg-white px-5 py-3.5 text-base font-semibold text-center text-zinc-950 hover:bg-zinc-100 transition-colors"
                 >
                   Admin Portal
                 </Link>
@@ -194,6 +215,15 @@ export function SiteHeader() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Candidate Auth Modal */}
+      {showCandidateAuthModal && (
+        <CandidateAuth
+          isModal={true}
+          isOpen={showCandidateAuthModal}
+          onClose={() => setShowCandidateAuthModal(false)}
+        />
+      )}
     </header>
   );
 }

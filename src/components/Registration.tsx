@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { registrationSchema } from '../lib/validation';
 import { useToast } from '../contexts/ToastContext';
 import { 
@@ -1198,11 +1199,21 @@ export default function Registration({ user, onComplete }: { user: string, onCom
           </div>
 
           {/* Form Actions */}
-          <div className="pt-2 flex items-center justify-end gap-3 border-t border-white/10">
+          <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/10">
+            <div className="text-xs text-slate-400 text-center sm:text-left">
+              <span>Already registered? </span>
+              <Link 
+                to="/portal" 
+                className="text-cyan-400 hover:text-cyan-300 font-semibold underline underline-offset-4 transition-colors"
+              >
+                Returning Candidate? Sign In
+              </Link>
+            </div>
+
             <button
               type="submit"
               disabled={loading || !isFormValid}
-              className="px-6 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-sm rounded-lg transition-all shadow-lg shadow-violet-600/20 flex items-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-sm rounded-lg transition-all shadow-lg shadow-violet-600/20 flex items-center justify-center gap-2 cursor-pointer"
             >
               {loading ? (
                 <>

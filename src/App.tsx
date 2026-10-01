@@ -60,6 +60,8 @@ export default function App() {
                       <Route path="/portal" element={<CandidatePortal />} />
                       <Route path="/candidate" element={<CandidatePortal />} />
                       <Route path="/candidate/portal" element={<CandidatePortal />} />
+                      <Route path="/candidate/login" element={<CandidatePortal />} />
+                      <Route path="/candidate-login" element={<CandidatePortal />} />
                       <Route path="/assessment-guide" element={<AssessmentGuide />} />
                       {/* Interview Gateway renders without standard layout wrappers based on location in RootLayout */}
                       
