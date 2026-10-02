@@ -280,16 +280,31 @@ export default function HrAtsPipeline() {
         })}
       </div>
 
-      {/* Search */}
-      <div className="relative mb-4">
-        <Search className="w-4 h-4 text-white/25 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Search by candidate name, email, or job title..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-white/[0.03] border border-white/8 rounded-xl text-sm text-white placeholder-white/25 focus:outline-none focus:border-blue-500/40 transition-colors font-sans"
-        />
+      {/* Search & Blind Mode Toolbar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-white/25 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search by candidate name, email, or job title..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white/[0.03] border border-white/8 rounded-xl text-sm text-white placeholder-white/25 focus:outline-none focus:border-blue-500/40 transition-colors font-sans"
+          />
+        </div>
+
+        <button
+          onClick={() => setBlindMode(!blindMode)}
+          className={`inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-mono font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+            blindMode
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+              : 'bg-white/[0.03] text-white/60 border-white/8 hover:text-white hover:bg-white/5'
+          }`}
+          title="Toggle Blind Evaluation Mode (EEOC Anti-Bias Compliance)"
+        >
+          <EyeOff className="w-3.5 h-3.5" />
+          Blind Review: {blindMode ? 'ON' : 'OFF'}
+        </button>
       </div>
 
       {/* Batch Rejection Approval (only on pending_rejection_review tab) */}

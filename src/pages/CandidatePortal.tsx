@@ -91,7 +91,7 @@ export default function CandidatePortal() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('ravengard_candidate_token'));
   const [candidateEmail, setCandidateEmail] = useState<string>('');
   const [candidateName, setCandidateName] = useState<string>('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(searchParams.get('token')));
   const [error, setError] = useState<string | null>(null);
 
   // Auth Form State (Login / Register) - Pre-populated with demo credentials for seamless testing

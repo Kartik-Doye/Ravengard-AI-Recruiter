@@ -67,6 +67,7 @@ export default function HrCandidateDossier() {
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [resetLinkLoading, setResetLinkLoading] = useState(false);
   const [clearTelemetryLoading, setClearTelemetryLoading] = useState(false);
+  const [isBlindMode, setIsBlindMode] = useState(false);
   const [expandedTranscript, setExpandedTranscript] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -319,19 +320,25 @@ export default function HrCandidateDossier() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-lg font-display font-bold text-white">
-                    {app.candidate_name || 'Unknown Candidate'}
+                    {isBlindMode
+                      ? `Candidate #BLIND-${(app.candidate_id || app.id || "8421").slice(0, 6).toUpperCase()}`
+                      : (app.candidate_name || 'Unknown Candidate')}
                   </h1>
-                  {dossier.roleAccess?.role === 'technical_interviewer' && (
+                  {isBlindMode ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      <EyeOff className="w-3 h-3" /> Blind Review Active (EEOC Safe)
+                    </span>
+                  ) : dossier.roleAccess?.role === 'technical_interviewer' ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-purple-500/15 text-purple-300 border border-purple-500/30">
                       <EyeOff className="w-3 h-3" /> Technical Reviewer Redacted
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-white/40 font-mono mt-0.5">
                   <span className="inline-flex items-center gap-1">
-                    <Mail className="w-3 h-3" /> {app.candidate_email}
+                    <Mail className="w-3 h-3" /> {isBlindMode ? "[PII Redacted - Blind Mode]" : app.candidate_email}
                   </span>
-                  {app.mobile && (
+                  {app.mobile && !isBlindMode && (
                     <span className="inline-flex items-center gap-1">
                       <Phone className="w-3 h-3" /> {app.mobile}
                     </span>
@@ -340,26 +347,47 @@ export default function HrCandidateDossier() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2 mt-3 text-[10px] font-mono text-white/30">
-              {app.college && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/5 rounded border border-white/8">
-                  <GraduationCap className="w-3 h-3" /> {app.college}
+              {isBlindMode ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-400/80 rounded border border-amber-500/20">
+                  <EyeOff className="w-3 h-3" /> Education & Demographics Redacted for Anti-Bias
                 </span>
-              )}
-              {app.degree && (
-                <span className="px-2 py-0.5 bg-white/5 rounded border border-white/8">
-                  {app.degree}
-                </span>
-              )}
-              {app.grad_year && (
-                <span className="px-2 py-0.5 bg-white/5 rounded border border-white/8">
-                  Class of {app.grad_year}
-                </span>
+              ) : (
+                <>
+                  {app.college && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/5 rounded border border-white/8">
+                      <GraduationCap className="w-3 h-3" /> {app.college}
+                    </span>
+                  )}
+                  {app.degree && (
+                    <span className="px-2 py-0.5 bg-white/5 rounded border border-white/8">
+                      {app.degree}
+                    </span>
+                  )}
+                  {app.grad_year && (
+                    <span className="px-2 py-0.5 bg-white/5 rounded border border-white/8">
+                      Class of {app.grad_year}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </div>
 
           {/* Actions */}
           <div className="flex flex-wrap gap-2">
+            {/* Blind Mode Toggle Button */}
+            <button
+              onClick={() => setIsBlindMode(!isBlindMode)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium border transition-all cursor-pointer ${
+                isBlindMode
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+                  : 'bg-white/5 text-white/60 border-white/10 hover:text-white hover:bg-white/10'
+              }`}
+              title="Toggle Blind Evaluation Mode (EEOC Anti-Bias Compliance)"
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+              Blind Review: {isBlindMode ? 'ON' : 'OFF'}
+            </button>
             {/* Offer Generation Action */}
             {dossier.roleAccess?.canGenerateOffer !== false && dossier.roleAccess?.role !== 'technical_interviewer' && (
               <button

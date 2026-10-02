@@ -45,11 +45,11 @@ export default function RootLayout() {
             {currentOutlet && (
               <motion.div
                 key={location.pathname}
-                initial={{ opacity: 0, y: 14, filter: "blur(4px)" }}
-                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, y: -10, filter: "blur(3px)" }}
-                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                className="flex-1 flex flex-col w-full text-slate-50"
+                initial={{ opacity: 1, y: 0 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                className="flex-1 flex flex-col w-full text-slate-50 relative z-10"
               >
                 {currentOutlet}
               </motion.div>

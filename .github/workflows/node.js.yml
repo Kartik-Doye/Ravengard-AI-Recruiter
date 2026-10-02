@@ -23,9 +23,7 @@ jobs:
 
     strategy:
       matrix:
-        # Node 20 LTS is the production target.
-        # 18.x is EOL (dropped); 22.x has native-binding issues with some pkgs.
-        node-version: [20.x]
+        node-version: [22.x]
 
     steps:
       - name: Checkout repository

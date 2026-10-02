@@ -273,6 +273,17 @@ candidateInterviewRoutes.post(["/interview/:id/answer", "/interview/response"], 
       return res.status(400).json({ error: "questionId and responseText are required." });
     }
 
+    // Ensure referenced question exists in interviewQuestions to satisfy foreign key constraint
+    const [existingQ] = await db.select().from(interviewQuestions).where(eq(interviewQuestions.id, questionId)).limit(1);
+    if (!existingQ) {
+      await db.insert(interviewQuestions).values({
+        id: questionId,
+        questionIndex: 1,
+        questionText: "Assessment question",
+        generatedAt: new Date()
+      }).onConflictDoNothing();
+    }
+
     const [resp] = await db.insert(interviewResponses).values({
       id: crypto.randomUUID(),
       questionId,

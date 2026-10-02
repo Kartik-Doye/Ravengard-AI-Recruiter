@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Play, RotateCcw, Copy, Check, Code2, Terminal, CheckCircle2, XCircle, Clock, ListFilter } from "lucide-react";
+import { Play, RotateCcw, Copy, Check, Code2, Terminal, CheckCircle2, XCircle, Clock, ListFilter, Sparkles } from "lucide-react";
 import { Button } from "../ui/Button";
 import { executeCodeInBrowser, ExecutionReport, DEFAULT_TEST_SUITES } from "../../utils/codeRunner";
 
@@ -116,6 +116,7 @@ export const CodeSandbox: React.FC<CodeSandboxProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [formattedToast, setFormattedToast] = useState(false);
   const [executionReport, setExecutionReport] = useState<ExecutionReport | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<"tests" | "console">("tests");
 
@@ -130,6 +131,57 @@ export const CodeSandbox: React.FC<CodeSandboxProps> = ({
     navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleFormatCode = () => {
+    if (!code || !code.trim() || readOnly || isRunning) return;
+    try {
+      const lines = code.split("\n");
+      const isPython = language.toLowerCase() === "python";
+      let indentLevel = 0;
+      const indentSize = isPython ? 4 : 2;
+      const formattedLines: string[] = [];
+
+      for (const rawLine of lines) {
+        const trimmed = rawLine.trim();
+        if (!trimmed) {
+          formattedLines.push("");
+          continue;
+        }
+
+        if (isPython) {
+          const leadingSpaces = (rawLine.match(/^(\s*)/)?.[1] || "").length;
+          const normalized = Math.round(leadingSpaces / 4) * 4;
+          formattedLines.push(" ".repeat(normalized) + trimmed);
+        } else {
+          if (trimmed.startsWith("}") || trimmed.startsWith("]") || trimmed.startsWith(")")) {
+            indentLevel = Math.max(0, indentLevel - 1);
+          }
+          formattedLines.push(" ".repeat(indentLevel * indentSize) + trimmed);
+          const opens = (trimmed.match(/[{\[(]/g) || []).length;
+          const closes = (trimmed.match(/[}\])]/g) || []).length;
+          indentLevel = Math.max(0, indentLevel + (opens - closes));
+        }
+      }
+
+      const result = formattedLines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+      setCode(result);
+      setFormattedToast(true);
+      setTimeout(() => setFormattedToast(false), 1500);
+    } catch (err) {
+      console.warn("Formatting notice:", err);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Format shortcut: Shift + Alt + F or Cmd/Ctrl + Shift + I
+    if (
+      (e.shiftKey && e.altKey && (e.key === "f" || e.key === "F")) ||
+      ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "i" || e.key === "I"))
+    ) {
+      e.preventDefault();
+      handleFormatCode();
+    }
   };
 
   const handleReset = () => {
@@ -188,6 +240,21 @@ export const CodeSandbox: React.FC<CodeSandboxProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Format Code Button */}
+          <button
+            onClick={handleFormatCode}
+            title="Format Code (Shift + Alt + F / Cmd + Shift + I)"
+            disabled={readOnly || isRunning}
+            className="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded transition-colors disabled:opacity-40 relative group"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            {formattedToast && (
+              <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shadow">
+                Formatted!
+              </span>
+            )}
+          </button>
+
           <button
             onClick={handleCopy}
             title="Copy Code"
@@ -232,10 +299,11 @@ export const CodeSandbox: React.FC<CodeSandboxProps> = ({
         <textarea
           value={code}
           onChange={(e) => setCode(e.target.value)}
+          onKeyDown={handleKeyDown}
           readOnly={readOnly || isRunning}
           spellCheck={false}
           className="flex-1 bg-transparent text-slate-100 font-mono text-xs p-3 leading-6 resize-none focus:outline-none selection:bg-amber-500/20"
-          placeholder="// Type or paste your code solution here..."
+          placeholder="// Type or paste your code solution here (Shift+Alt+F to format)..."
         />
       </div>
 

@@ -24,14 +24,30 @@ import NotFound from './pages/NotFound';
 
 
 export default function App() {
-  const [initialLoad, setInitialLoad] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname.toLowerCase();
+      // Bypass full-screen intro blocker on direct portal, candidate, and internal console routes
+      if (
+        p.startsWith('/portal') ||
+        p.startsWith('/candidate') ||
+        p.startsWith('/interview') ||
+        p.startsWith('/admin') ||
+        p.startsWith('/hr')
+      ) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   useEffect(() => {
+    if (!initialLoad) return;
     const timer = setTimeout(() => {
       setInitialLoad(false);
     }, 1500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [initialLoad]);
 
   if (initialLoad) {
     return <SmoothLoader duration={1500} />;
@@ -45,7 +61,12 @@ export default function App() {
             <LenisProvider>
               <BrowserRouter>
                 <AppMeta />
-                <Suspense fallback={<SmoothLoader />}>
+                <Suspense fallback={
+                  <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-3">
+                    <div className="w-8 h-8 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin" />
+                    <span className="text-xs font-mono uppercase tracking-widest text-slate-500">Initializing...</span>
+                  </div>
+                }>
                   <Routes>
                     <Route element={<RootLayout />}>
                       <Route path="/" element={<Home />} />
