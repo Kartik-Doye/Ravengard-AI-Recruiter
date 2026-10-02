@@ -17,6 +17,7 @@ import {
   Briefcase
 } from 'lucide-react';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
+import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 
 export interface CandidateAuthProps {
   isOpen?: boolean;
@@ -47,6 +48,10 @@ export const CandidateAuth: React.FC<CandidateAuthProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showForgotModal, setShowForgotModal] = useState<boolean>(false);
+
+  // Real-time email validation
+  const isEmailEntered = email.trim().length > 0;
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   // Auto-populate with demo credentials upon component mount
   useEffect(() => {
@@ -203,7 +208,15 @@ export const CandidateAuth: React.FC<CandidateAuthProps> = ({
         )}
 
         <div>
-          <label className="block text-xs font-medium text-slate-200 mb-1.5">Email Address</label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-medium text-slate-200">Email Address</label>
+            {isEmailEntered && (
+              <span className={`text-[11px] font-medium flex items-center gap-1 ${isValidEmail ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {isValidEmail ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                {isValidEmail ? 'Valid format' : 'Invalid email format'}
+              </span>
+            )}
+          </div>
           <div className="relative">
             <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
             <input
@@ -212,8 +225,23 @@ export const CandidateAuth: React.FC<CandidateAuthProps> = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="candidate@ravengard.com"
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30 transition-all font-medium"
+              className={`w-full bg-slate-950 border rounded-xl py-2.5 pl-10 pr-9 text-sm text-white placeholder:text-slate-500 focus:outline-none transition-all font-medium ${
+                isEmailEntered
+                  ? isValidEmail
+                    ? 'border-emerald-500/50 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/20'
+                    : 'border-amber-500/50 focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20'
+                  : 'border-slate-700 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30'
+              }`}
             />
+            {isEmailEntered && (
+              <div className="absolute right-3 top-3 pointer-events-none">
+                {isValidEmail ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-amber-400" />
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -224,9 +252,9 @@ export const CandidateAuth: React.FC<CandidateAuthProps> = ({
               <button
                 type="button"
                 onClick={() => setShowForgotModal(true)}
-                className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors font-medium cursor-pointer"
               >
-                Forgot?
+                Forgot Password?
               </button>
             )}
           </div>
@@ -249,6 +277,13 @@ export const CandidateAuth: React.FC<CandidateAuthProps> = ({
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+
+          {/* Real-time Password Strength Meter */}
+          {password.length > 0 && (
+            <div className="mt-2.5">
+              <PasswordStrengthIndicator password={password} userInputs={[email, name]} />
+            </div>
+          )}
         </div>
 
         <button
@@ -317,8 +352,15 @@ export const CandidateAuth: React.FC<CandidateAuthProps> = ({
 
   if (isModal) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-        <div className="relative z-10 w-full max-w-md flex justify-center">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && onClose) {
+            onClose();
+          }
+        }}
+      >
+        <div className="relative z-10 w-full max-w-md flex justify-center animate-in zoom-in-95 duration-200">
           {content}
         </div>
       </div>

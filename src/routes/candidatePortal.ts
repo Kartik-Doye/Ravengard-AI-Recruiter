@@ -131,6 +131,26 @@ candidatePortalRouter.post("/auth/login", async (req: Request, res: Response) =>
     const normalizedEmail = email.trim().toLowerCase();
     let [candidate] = await db.select().from(candidates).where(eq(candidates.email, normalizedEmail)).limit(1);
 
+    // Auto-provision demo candidate if credentials match the designated demo account
+    if (normalizedEmail === 'candidate@ravengard.com' && password === 'demo123') {
+      if (!candidate) {
+        const passwordHash = await bcrypt.hash('demo123', 10);
+        await db.insert(candidates).values({
+          id: 'cand-demo-alex-chen',
+          email: 'candidate@ravengard.com',
+          name: 'Alex Chen',
+          passwordHash,
+          phone: '+1 (555) 234-5678',
+          createdAt: new Date().toISOString(),
+        } as any).onConflictDoNothing();
+        [candidate] = await db.select().from(candidates).where(eq(candidates.email, normalizedEmail)).limit(1);
+      } else if (!candidate.passwordHash) {
+        const passwordHash = await bcrypt.hash('demo123', 10);
+        await db.update(candidates).set({ passwordHash }).where(eq(candidates.id, candidate.id));
+        candidate.passwordHash = passwordHash;
+      }
+    }
+
     if (!candidate) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
