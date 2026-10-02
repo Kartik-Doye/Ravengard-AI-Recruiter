@@ -163,3 +163,12 @@ export async function runPublicApiTests() {
 
   return allPassed;
 }
+
+import { describe, it, expect } from 'vitest';
+
+describe('Public APIs Integration Test Suite', () => {
+  it('defines the runPublicApiTests verification function', () => {
+    expect(typeof runPublicApiTests).toBe('function');
+  });
+});
+

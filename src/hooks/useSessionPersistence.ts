@@ -100,6 +100,7 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions = {}
   }, [onRecover]);
 
   const hasNotifiedRef = useRef(false);
+  const isClearingRef = useRef(false);
 
   // 1. Recovery on initial mount
   useEffect(() => {
@@ -149,6 +150,11 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions = {}
   // 2. Automatic synchronization to localStorage on state changes
   useEffect(() => {
     if (!isInitialized || !autoSync || typeof window === 'undefined') return;
+
+    if (isClearingRef.current) {
+      isClearingRef.current = false;
+      return;
+    }
 
     try {
       const payload: CandidateSessionState = {
@@ -203,6 +209,7 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions = {}
   }, []);
 
   const clearSessionState = useCallback(() => {
+    isClearingRef.current = true;
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem(storageKey);
