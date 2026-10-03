@@ -52,7 +52,7 @@ interface Application {
 
 type TabKey = 'all' | 'pre_screened' | 'pending_rejection_review' | 'post_assessment';
 
-const TAB_CONFIG: { key: TabKey; label: string; icon: React.ElementType }[] = [
+const TAB_CONFIG: { key: TabKey; label: string; icon: any }[] = [
   { key: 'all', label: 'All Applicants', icon: Users },
   { key: 'pre_screened', label: 'Pre-Screened by AI', icon: Sparkles },
   { key: 'pending_rejection_review', label: 'Pending Rejection Review', icon: AlertTriangle },

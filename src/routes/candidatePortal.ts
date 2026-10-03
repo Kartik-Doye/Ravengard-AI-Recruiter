@@ -19,6 +19,7 @@ import {
   redeemMagicToken,
   signCandidateMagicJwt,
   signCandidateProfileJwt,
+  generateMagicToken,
 } from "../services/magicTokenService";
 import {
   requireCandidateAuth,
@@ -184,6 +185,98 @@ candidatePortalRouter.post("/auth/login", async (req: Request, res: Response) =>
   } catch (err: any) {
     console.error("Candidate login error:", err);
     return res.status(500).json({ error: "Failed to authenticate." });
+  }
+});
+
+/**
+ * POST /api/candidate/recover-link
+ * Dispatches password reset link or temporary candidate access token via Resend/SMTP email service.
+ */
+candidatePortalRouter.post("/recover-link", async (req: Request, res: Response) => {
+  try {
+    const { email, newPassword } = req.body || {};
+
+    if (!email || !email.includes("@")) {
+      return res.status(400).json({ error: "A valid email address is required." });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    let [candidate] = await db.select().from(candidates).where(eq(candidates.email, normalizedEmail)).limit(1);
+
+    // If newPassword was provided, update candidate password hash
+    if (newPassword && newPassword.length >= 6) {
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      if (candidate) {
+        await db.update(candidates).set({ passwordHash }).where(eq(candidates.id, candidate.id));
+      } else {
+        const candidateId = `cand-${crypto.createHash("md5").update(normalizedEmail).digest("hex").slice(0, 16)}`;
+        const [created] = await db.insert(candidates).values({
+          id: candidateId,
+          email: normalizedEmail,
+          name: "Candidate",
+          passwordHash,
+          organizationId: "org-ravengard",
+          emailVerified: true,
+        }).returning();
+        candidate = created;
+      }
+    }
+
+    // Generate temporary magic reset token
+    const magicResult = generateMagicToken(process.env.APP_URL || "https://ravengard.ai");
+
+    // Construct professional HTML email for candidate password reset
+    const emailSubject = "Ravengard Candidate Portal: Password Reset & Temporary Access Link";
+    const emailBodyText = `Hello ${candidate?.name || "Candidate"},\n\nWe received a password reset / access recovery request for your Ravengard Candidate Portal account (${normalizedEmail}).\n\nClick the link below to access your candidate assessment portal and complete your password reset:\n${magicResult.magicLinkUrl}\n\nThis temporary link is valid for 48 hours.\n\nBest regards,\nRavengard AI Talent Acquisition Team`;
+
+    const emailBodyHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background-color: #0b0f19; color: #f8fafc; border-radius: 16px; border: 1px solid #1e293b;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="color: #38bdf8; font-size: 22px; font-weight: 700; margin: 0;">Ravengard Assessment Portal</h2>
+          <p style="color: #94a3b8; font-size: 13px; margin-top: 4px;">Account Security & Recovery Service</p>
+        </div>
+        <div style="background-color: #020617; padding: 24px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 24px;">
+          <p style="font-size: 14px; color: #e2e8f0; margin-top: 0;">Hello <strong>${candidate?.name || "Candidate"}</strong>,</p>
+          <p style="font-size: 14px; color: #cbd5e1; line-height: 1.6;">
+            We received a request to recover access or reset the password for candidate account <strong>${normalizedEmail}</strong>.
+          </p>
+          <div style="text-align: center; margin: 28px 0;">
+            <a href="${magicResult.magicLinkUrl}" style="background: linear-gradient(135deg, #06b6d4, #2563eb); color: #020617; font-weight: 700; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);">
+              Reset Password & Launch Portal &rarr;
+            </a>
+          </div>
+          <p style="font-size: 12px; color: #64748b; margin-bottom: 0;">
+            This temporary reset link is valid for 48 hours. If you did not request this, you can safely ignore this message.
+          </p>
+        </div>
+        <p style="font-size: 11px; color: #475569; text-align: center; margin: 0;">
+          Ravengard AI Systems &bull; Enterprise Candidate Authentication Gateway
+        </p>
+      </div>
+    `;
+
+    // Queue email into PostgreSQL outbox and process immediately via Resend/SMTP transporter
+    await emailService.queueEmail({
+      recipientEmail: normalizedEmail,
+      recipientName: candidate?.name || "Candidate",
+      templateType: "shortlist_invitation",
+      subject: emailSubject,
+      bodyText: emailBodyText,
+      bodyHtml: emailBodyHtml,
+    });
+
+    // Trigger immediate outbox processor batch
+    emailService.processOutboxBatch(5).catch((err) => {
+      console.warn("Outbox dispatch trigger:", err);
+    });
+
+    return res.json({
+      success: true,
+      message: `Password reset link and temporary access credentials dispatched to ${normalizedEmail}.`,
+    });
+  } catch (err: any) {
+    console.error("Recover link error:", err);
+    return res.status(500).json({ error: "Failed to dispatch password recovery email." });
   }
 });
 
