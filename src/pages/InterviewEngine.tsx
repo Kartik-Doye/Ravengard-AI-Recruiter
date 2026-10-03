@@ -3,6 +3,8 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { InterviewProgressStepper, InterviewStageKey } from '../components/interview/InterviewProgressStepper';
 import { AudioWaveformVisualizer } from '../components/interview/AudioWaveformVisualizer';
+import { Avatar3D } from '../components/interview/Avatar3D';
+import { useViseme } from '../hooks/useViseme';
 import { VoiceInputToggle } from '../components/interview/VoiceInputToggle';
 import { CodeSandbox } from '../components/interview/CodeSandbox';
 import { WhiteboardCanvas } from '../components/interview/WhiteboardCanvas';
@@ -24,7 +26,13 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [enableVoiceNarration, setEnableVoiceNarration] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
-  
+
+  // 3D Avatar lip-sync: estimates visemes from speech text in real-time
+  const { viseme, volume } = useViseme({
+    isSpeaking: isStreaming || isAiSpeaking,
+    speakingText: questionText,
+  });
+
   const token = localStorage.getItem('ravengard_uid');
   const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const heartbeatTimerRef = useRef<any>(null);
@@ -336,12 +344,14 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
         </div>
       </div>
 
-      {/* 2. Real-Time Audio Frequency Waveform Visualizer */}
-      <AudioWaveformVisualizer
+      {/* 2. 3D Face-to-Face AI Interviewer Avatar with Lip-Sync */}
+      <Avatar3D
+        viseme={viseme}
         isSpeaking={isStreaming || isAiSpeaking}
+        volume={volume}
         speakingText={questionText}
         enableVoiceSynthesis={enableVoiceNarration}
-        onToggleVoice={(enabled) => {
+        onToggleVoice={(enabled: boolean) => {
           setEnableVoiceNarration(enabled);
           if (enabled && questionText && !isStreaming) {
             speakQuestion(questionText);
@@ -487,4 +497,3 @@ export default function InterviewEngine({ session, onNext }: { session: any, onN
     </div>
   );
 }
-

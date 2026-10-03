@@ -37,6 +37,17 @@ export interface ChatCompletionResponse {
   }[];
 }
 
+/**
+ * ponytail: Groq deprecated llama-3.3-70b-versatile on 2026-08-16 (shutdown date).
+ * Using openai/gpt-oss-20b (20B params, free tier, lightweight) as primary.
+ * Gemini gemini-2.5-flash also deprecated — updated to gemini-3.8-flash.
+ * OpenRouter secondary uses qwen/qwen3.8-27b:free (free tier).
+ * If any model is deprecated in the future, update the constants here only.
+ */
+const GROQ_DEFAULT_MODEL = "openai/gpt-oss-20b";
+const OPENROUTER_DEFAULT_MODEL = "qwen/qwen3.8-27b:free";
+const GEMINI_MODEL = "gemini-3.8-flash";
+
 export class LLMRouter {
   private static geminiClient: GoogleGenAI | null = null;
   private static groqClient: OpenAI | null = null;
@@ -91,8 +102,7 @@ export class LLMRouter {
          VALUES ($1, $2, $3, $4, $5, NOW())`,
         [`tel-${crypto.randomUUID()}`, orgId, context.module, Math.max(tokensUsed, 1), Math.max(latencyMs, 10)]
       );
-      
-      // Optionally log provider in metadata if the table supports it, or just console log for now
+
       console.log(`[LLM TELEMETRY] Provider: ${provider}, Module: ${context.module}, Latency: ${latencyMs}ms, Tokens: ${tokensUsed}`);
     } catch {
       // Non-blocking telemetry
@@ -118,7 +128,7 @@ export class LLMRouter {
     if (groq) {
       try {
         const stream = await groq.chat.completions.create({
-          model: request.model || "llama-3.3-70b-versatile",
+          model: request.model || GROQ_DEFAULT_MODEL,
           messages: [{ role: "system", content: systemPrompt }, ...userMessages],
           temperature: request.temperature ?? 0.7,
           max_tokens: request.max_tokens ?? 300,
@@ -141,7 +151,7 @@ export class LLMRouter {
     if (openRouter) {
       try {
         const stream = await openRouter.chat.completions.create({
-          model: "meta-llama/llama-3.3-70b-instruct",
+          model: OPENROUTER_DEFAULT_MODEL,
           messages: [{ role: "system", content: systemPrompt }, ...userMessages],
           temperature: request.temperature ?? 0.7,
           max_tokens: request.max_tokens ?? 300,
@@ -164,7 +174,7 @@ export class LLMRouter {
       const gemini = this.getGeminiClient();
       const userPrompt = userMessages.map(m => m.content).join("\n\n");
       const responseStream = await gemini.models.generateContentStream({
-        model: "gemini-2.5-flash",
+        model: GEMINI_MODEL,
         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
         config: {
           systemInstruction: systemPrompt,
@@ -206,7 +216,7 @@ export class LLMRouter {
     if (groq) {
       try {
         const completion = await groq.chat.completions.create({
-          model: request.model || "llama-3.3-70b-versatile",
+          model: request.model || GROQ_DEFAULT_MODEL,
           messages: [{ role: "system", content: systemPrompt }, ...userMessages],
           temperature: request.temperature ?? 0.7,
           max_tokens: request.max_tokens ?? 300,
@@ -223,7 +233,7 @@ export class LLMRouter {
       const gemini = this.getGeminiClient();
       const userPrompt = userMessages.map(m => m.content).join("\n\n");
       const response = await gemini.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: GEMINI_MODEL,
         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
         config: {
           systemInstruction: systemPrompt,
@@ -256,7 +266,7 @@ export class LLMRouter {
     try {
       const gemini = this.getGeminiClient();
       const response = await gemini.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: GEMINI_MODEL,
         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
         config: {
           systemInstruction: systemPrompt,
@@ -271,19 +281,13 @@ export class LLMRouter {
       const validated = schema ? schema.parse(parsed) : parsed;
       await this.recordTelemetry({ module: "resume_screening" }, 150, Date.now() - startTime, "gemini");
       return validated as T;
-    } catch (err) {
-      await this.recordTelemetry({ module: "resume_screening" }, 50, Date.now() - startTime, "fallback");
-      return {
-        name: "Candidate",
-        email: "candidate@example.com",
-        skills: ["TypeScript", "Distributed Systems", "Cloud Architecture"],
-        yearsOfExperience: 5,
-        matchScore: 88,
-        matchExplanation: "Demonstrated strong foundational engineering and system decomposition.",
-        recommendation: "shortlist",
-        strengths: ["Clean architectural thinking", "Distributed system principles"],
-        weaknesses: ["Deep-dive observability nuances"],
-      } as unknown as T;
+    } catch (err: any) {
+      await this.recordTelemetry({ module: "resume_screening" }, 0, Date.now() - startTime, "failed");
+      // ponytail: Do NOT return a hardcoded mock — callers expect schema-shaped data.
+      // Re-throw so callers (scoringService, preScreeningService) can apply their own
+      // fallback/retry logic. Returning a wrong-shaped object causes silent downstream
+      // crashes (e.g. "result.scores is not iterable") and violates the no-silent-failure rule.
+      throw new Error(`LLM structuredOutput failed: ${err?.message || err}`);
     }
   }
 }

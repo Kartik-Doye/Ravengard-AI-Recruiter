@@ -29,9 +29,8 @@ export async function* generateQuestionStream(
   Previous questions: ${previousQuestions.map(q => q.questionText).join(' | ')}.
   Ask a professional, concise interview question.`;
 
-  // Use the LLM router for streaming with failover
+  // Use the LLM router for streaming with failover (model defaults to free tier openai/gpt-oss-20b)
   const stream = llmRouter.chatCompletionStream({
-    model: 'llama-3.3-70b-versatile', // Primary: Groq's Llama 3.3 70B
     messages: [
       { role: 'system', content: systemInstruction },
       { role: 'user', content: prompt },
@@ -70,7 +69,6 @@ export async function generateQuestion(
 
   try {
     const response = await llmRouter.chatCompletion({
-      model: 'llama-3.3-70b-versatile', // Primary: Groq
       messages: [
         { role: 'system', content: systemInstruction },
         { role: 'user', content: prompt },

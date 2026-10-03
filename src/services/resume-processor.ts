@@ -64,7 +64,7 @@ export async function analyzeResume(rawResumeText: string): Promise<z.infer<type
   try {
     const result = await llmRouter.structuredOutput<ResumeAnalysisResult>(
       {
-        model: 'gemini-2.5-flash', // Primary model
+        model: 'gemini-3.8-flash', // Primary model
         messages: [
           { role: 'system', content: systemInstruction },
           { role: 'user', content: prompt },
@@ -276,7 +276,7 @@ ${rawResumeText.slice(0, 3000)}`;
     const llmResult = await Promise.race([
       llmRouter.structuredOutput<z.infer<typeof CandidateProfileSchema>>(
         {
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.8-flash',
           messages: [
             { role: 'system', content: 'You are an expert resume parsing engine. Extract contact and education fields accurately. Return JSON matching the schema.' },
             { role: 'user', content: prompt }

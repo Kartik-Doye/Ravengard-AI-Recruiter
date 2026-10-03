@@ -1388,7 +1388,7 @@ router.get("/logs", async (req, res) => {
 
 // ─── LLM WATERFALL STATE & MONITORING ──────────────────────────────────────────
 let activeLlmWaterfall = {
-  primary: "gemini-2.5-flash",
+  primary: "gemini-3.8-flash",
   secondary: "mistral-large-2407",
   tertiary: "groq-llama-3.3-70b",
   autoFailoverEnabled: true,
@@ -1494,7 +1494,7 @@ router.get("/prompt-versions", async (req, res) => {
         id: "prompt-pre-screening-v1",
         name: "Resume Pre-Screening Engine",
         version: "v1.0",
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash",
         status: "active",
         temperature: 0.1,
         systemInstruction: "You are Ravengard's Principal Technical Recruiter and Assessment Engine. Evaluate candidate resume strictly against JD...",
@@ -1505,7 +1505,7 @@ router.get("/prompt-versions", async (req, res) => {
         id: "prompt-interview-eval-v1",
         name: "Phase 4 Conversational Technical Interview Loop",
         version: "v1.2",
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash",
         status: "active",
         temperature: 0.2,
         systemInstruction: "You are conducting an interactive, locked technical competency interview. Ask targeted follow-up questions one by one...",
@@ -1516,7 +1516,7 @@ router.get("/prompt-versions", async (req, res) => {
         id: "prompt-scoring-rubric-v1",
         name: "Phase 6 Final Rubric & Evidence Synthesizer",
         version: "v1.0",
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash",
         status: "active",
         temperature: 0.1,
         systemInstruction: "Evaluate candidate responses against the defined competency rubric. Extract exact evidence citations and strengths/weaknesses...",

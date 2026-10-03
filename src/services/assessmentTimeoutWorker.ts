@@ -8,14 +8,14 @@ export async function processAssessmentTimeouts(): Promise<{ timedOutCount: numb
   try {
     client = await pool.connect();
   } catch (connErr: any) {
-    // Database connecting or not ready yet
+    console.error("[SLA Timeout Worker] pool.connect() failed:", connErr?.message || connErr);
     return { timedOutCount: 0 };
   }
 
   try {
-    // 1. Verify applications table exists first
+    // 1. Verify applications table exists (check search_path, not just public schema)
     const tableCheck = await client.query(`
-      SELECT to_regclass('public.applications') as tbl;
+      SELECT to_regclass('applications') as tbl;
     `);
     
     if (!tableCheck.rows[0]?.tbl) {
@@ -23,11 +23,11 @@ export async function processAssessmentTimeouts(): Promise<{ timedOutCount: numb
       return { timedOutCount: 0 };
     }
 
-    // 2. Fetch existing column names on public.applications
+    // 2. Fetch existing column names on applications (search_path-aware)
     const colsRes = await client.query(`
       SELECT column_name 
       FROM information_schema.columns 
-      WHERE table_schema = 'public' AND table_name = 'applications';
+      WHERE table_name = 'applications';
     `);
     const existingCols = new Set(colsRes.rows.map((r: any) => r.column_name.toLowerCase()));
 
@@ -82,7 +82,7 @@ export async function processAssessmentTimeouts(): Promise<{ timedOutCount: numb
 
     return { timedOutCount: result.rows.length };
   } catch (err: any) {
-    // Graceful error logging without spamming
+    console.error("[SLA Timeout Worker] Error processing assessment timeouts:", err?.message || err);
     return { timedOutCount: 0 };
   } finally {
     if (client) client.release();

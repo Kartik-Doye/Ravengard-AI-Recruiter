@@ -611,9 +611,9 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
         return res.json({ reply, model: selectedModel });
       } catch (geminiError: any) {
         console.warn(`Primary model ${selectedModel} call failed, trying fallback:`, geminiError.message);
-        // Fallback to gemini-2.5-flash or standard
+        // Fallback to gemini-3.8-flash or standard
         const fallbackResponse = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
+          model: "gemini-3.8-flash",
           contents: formattedContents,
           config: {
             systemInstruction,
@@ -621,7 +621,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
             maxOutputTokens: 800
           }
         });
-        return res.json({ reply: fallbackResponse.text || "How can I assist with your assessment?", model: "gemini-2.5-flash" });
+        return res.json({ reply: fallbackResponse.text || "How can I assist with your assessment?", model: "gemini-3.8-flash" });
       }
     } catch (err: any) {
       console.error("Chat route error:", err);
@@ -1308,7 +1308,7 @@ Help recruiters interpret technical rubric scores, evaluate work samples, config
         Ask a professional, concise interview question.`;
 
         const responseStream = await ai.models.generateContentStream({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.8-flash',
           contents: prompt,
           config: { systemInstruction }
         });

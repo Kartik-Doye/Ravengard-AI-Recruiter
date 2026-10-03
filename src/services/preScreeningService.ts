@@ -105,7 +105,7 @@ You MUST output ONLY a valid JSON object matching this schema:
 `;
 
       const response = await this.aiClient.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.8-flash",
         contents: prompt,
         config: {
           temperature: 0.1,

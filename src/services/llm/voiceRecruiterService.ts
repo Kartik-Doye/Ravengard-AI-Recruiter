@@ -216,7 +216,7 @@ DEEP PROBING: Follow up directly on the candidate's last answer. Dig into concre
     });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: formattedContents,
       config: {
         systemInstruction,
@@ -255,7 +255,7 @@ DEEP PROBING: Follow up directly on the candidate's last answer. Dig into concre
       updatedRubricState: updatedRubric,
       mode,
       isFinished,
-      modelUsed: "gemini-2.5-flash",
+      modelUsed: "gemini-3.8-flash",
       ttfbMs: Date.now() - startTime
     };
 
